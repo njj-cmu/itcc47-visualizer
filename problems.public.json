@@ -361,5 +361,323 @@
         ]
       }
     ]
+  },
+  {
+    "id": "array-total",
+    "title": "Total of a List",
+    "module": "Module 2",
+    "difficulty": "Warm-up",
+    "statement": "Read how many numbers there are, then read that many numbers, and display their total. This is the pattern every later list problem is built on: read a count, then loop exactly that many times.",
+    "rules": [
+      [
+        "Input",
+        "First the count, then that many numbers, one per READ."
+      ],
+      [
+        "Output",
+        "A single number: the total."
+      ],
+      [
+        "The count is 0",
+        "There are no numbers to read. The total is 0."
+      ]
+    ],
+    "ioNote": "Display only the total. No labels, no extra words.",
+    "starter": "READ n\ntotal <- 0\n",
+    "visibleTests": [
+      {
+        "inputs": [
+          3,
+          10,
+          20,
+          30
+        ],
+        "expected": [
+          60
+        ],
+        "note": "three numbers, added in order"
+      },
+      {
+        "inputs": [
+          0
+        ],
+        "expected": [
+          0
+        ],
+        "note": "no numbers at all — the loop must not run"
+      }
+    ]
+  },
+  {
+    "id": "largest-value",
+    "title": "Largest in a List",
+    "module": "Module 2",
+    "difficulty": "Core",
+    "statement": "Read how many numbers there are, then read that many numbers, and display the largest. Think carefully about what the largest value starts as — a wrong starting value passes the obvious tests and fails the interesting ones.",
+    "rules": [
+      [
+        "Input",
+        "First the count, then that many numbers."
+      ],
+      [
+        "The count is 0 or less",
+        "Display INVALID and do nothing else."
+      ],
+      [
+        "Otherwise",
+        "Display the largest of the numbers."
+      ],
+      [
+        "The largest value appears more than once",
+        "Display it once."
+      ]
+    ],
+    "ioNote": "Output: the largest value, or exactly INVALID.",
+    "starter": "READ n\n",
+    "visibleTests": [
+      {
+        "inputs": [
+          3,
+          4,
+          9,
+          2
+        ],
+        "expected": [
+          9
+        ]
+      },
+      {
+        "inputs": [
+          0
+        ],
+        "expected": [
+          "INVALID"
+        ],
+        "note": "nothing to compare"
+      }
+    ]
+  },
+  {
+    "id": "linear-position",
+    "title": "Position in a List",
+    "module": "Module 2",
+    "difficulty": "Core",
+    "statement": "Read how many numbers there are, then that many numbers, and finally the value to look for. Display the position of the first match, counting from 1. Because the value to look for arrives last, you have to keep the numbers somewhere before you can search them.",
+    "rules": [
+      [
+        "Input",
+        "The count, then that many numbers, then the value to look for."
+      ],
+      [
+        "Output",
+        "The position of the first matching value, counting the first number as position 1."
+      ],
+      [
+        "The value appears more than once",
+        "Report the first position only."
+      ],
+      [
+        "The value is not there",
+        "Display exactly NOT FOUND."
+      ]
+    ],
+    "ioNote": "Output: a position number, or exactly NOT FOUND.",
+    "starter": "READ n\nvalues <- []\n",
+    "visibleTests": [
+      {
+        "inputs": [
+          4,
+          10,
+          20,
+          30,
+          40,
+          30
+        ],
+        "expected": [
+          3
+        ],
+        "note": "30 is the third number"
+      },
+      {
+        "inputs": [
+          3,
+          1,
+          2,
+          3,
+          9
+        ],
+        "expected": [
+          "NOT FOUND"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "above-average",
+    "title": "Above the Average",
+    "module": "Module 2",
+    "difficulty": "Challenge",
+    "statement": "Read how many numbers there are, then that many numbers. Display the average, then how many of the numbers are above it. You cannot know the average until you have seen every number, so this one cannot be done in a single pass.",
+    "rules": [
+      [
+        "Input",
+        "The count, then that many numbers. Every number is 0 or more."
+      ],
+      [
+        "The count is 0 or less",
+        "Display INVALID and do nothing else."
+      ],
+      [
+        "Average",
+        "The total divided by the count, using whole-number division. Drop any remainder."
+      ],
+      [
+        "Output",
+        "Two values in this order: the average, then how many numbers are strictly greater than it."
+      ]
+    ],
+    "ioNote": "Output two values, the average then the count. Or exactly INVALID.",
+    "starter": "READ n\nvalues <- []\ntotal <- 0\n",
+    "visibleTests": [
+      {
+        "inputs": [
+          4,
+          10,
+          20,
+          30,
+          40
+        ],
+        "expected": [
+          25,
+          2
+        ],
+        "note": "average 25; 30 and 40 are above it"
+      },
+      {
+        "inputs": [
+          0
+        ],
+        "expected": [
+          "INVALID"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "has-duplicate",
+    "title": "Any Repeats?",
+    "module": "Module 2",
+    "difficulty": "Challenge",
+    "statement": "Read how many numbers there are, then that many numbers. Display YES if any number appears more than once, and NO if every number is different. Comparing every number against every other one is the straightforward approach — notice how much work that becomes as the list grows.",
+    "rules": [
+      [
+        "Input",
+        "The count, then that many numbers."
+      ],
+      [
+        "Any number appears more than once",
+        "Display exactly YES."
+      ],
+      [
+        "Every number is different",
+        "Display exactly NO."
+      ],
+      [
+        "Fewer than two numbers",
+        "Nothing can repeat, so display NO."
+      ]
+    ],
+    "ioNote": "Output exactly YES or exactly NO.",
+    "starter": "READ n\nvalues <- []\n",
+    "visibleTests": [
+      {
+        "inputs": [
+          4,
+          1,
+          2,
+          3,
+          2
+        ],
+        "expected": [
+          "YES"
+        ],
+        "note": "2 appears twice"
+      },
+      {
+        "inputs": [
+          3,
+          1,
+          2,
+          3
+        ],
+        "expected": [
+          "NO"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "binary-checks",
+    "title": "Binary Search, Counted",
+    "module": "Module 2",
+    "difficulty": "Challenge",
+    "statement": "Read how many numbers there are, then that many numbers already in ascending order, then the value to look for. Display whether it was found, and how many middle values you had to examine. Compare that count against the length of the list — that gap is the whole reason binary search matters.",
+    "rules": [
+      [
+        "Input",
+        "The count, then that many numbers in ascending order, then the value to look for."
+      ],
+      [
+        "Method",
+        "Look at the middle of the range that is left. If it matches, stop. Otherwise discard the half that cannot contain the value."
+      ],
+      [
+        "Counting",
+        "Add one every time you examine a middle value, including the one that matches."
+      ],
+      [
+        "Output",
+        "Two values in this order: exactly FOUND or exactly NOT FOUND, then how many middle values were examined."
+      ]
+    ],
+    "ioNote": "Output FOUND or NOT FOUND, then the number of middle values examined.",
+    "starter": "READ n\nvalues <- []\n",
+    "visibleTests": [
+      {
+        "inputs": [
+          7,
+          3,
+          8,
+          15,
+          22,
+          34,
+          41,
+          50,
+          41
+        ],
+        "expected": [
+          "FOUND",
+          2
+        ],
+        "note": "middle is 22, then 41"
+      },
+      {
+        "inputs": [
+          7,
+          3,
+          8,
+          15,
+          22,
+          34,
+          41,
+          50,
+          5
+        ],
+        "expected": [
+          "NOT FOUND",
+          3
+        ]
+      }
+    ]
   }
 ]

@@ -1565,3 +1565,31 @@ html, body {
 .problem-btn-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .problem-btn-title { font-size: 0.9rem; }
 .problem-btn-sub { font-size: 0.72rem; color: var(--muted); }
+
+/* ---------- offline indicator ---------- */
+/* Shown only when the browser reports no connection. The site keeps working
+   from the service worker's saved copy; this just explains why. */
+
+.offline-badge {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  transform: translate(-50%, 12px);
+  z-index: 60;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--swap);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.offline-badge.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}

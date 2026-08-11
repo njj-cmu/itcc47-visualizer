@@ -51,12 +51,26 @@ function obfuscate(salt, index, text) {
   return out.toString('base64');
 }
 
-/** How the checker normalizes a run's outputs before hashing. */
+/*
+ * How the checker normalizes a run's outputs before hashing.
+ *
+ * MUST stay byte-identical to canon() in problems-app.js — the page hashes what
+ * the student printed and compares it against what this produced, so any
+ * difference fails every multi-output problem while single-output ones keep
+ * passing, which is a maddening way to find out.
+ *
+ * The \u0001 (SOH) separator is load-bearing, not decoration: joining with nothing
+ * would make ['1','23'] and ['12','3'] hash identically, so a wrong answer
+ * could pass. It is written as an escape here because a raw control byte is
+ * invisible in an editor and reads exactly like an empty string.
+ */
+const CANON_SEPARATOR = '\u0001';
+
 function canon(values) {
   return values.map((v) => {
     if (typeof v === 'boolean') return v ? 'true' : 'false';
     return String(v);
-  }).join('');
+  }).join(CANON_SEPARATOR);
 }
 
 // ---------- reference verification ----------

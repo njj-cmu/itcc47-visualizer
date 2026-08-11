@@ -169,6 +169,82 @@ PROBLEMS.forEach((p) => {
   });
 });
 
+// ---------- the checker and the build must agree ----------
+// The page hashes what a student printed and compares it against a digest made
+// at build time. If the two canon() functions disagree by even one character,
+// single-output problems keep passing while every multi-output problem becomes
+// unsolvable — a failure that looks like a broken problem, not a broken tool.
+
+section('canon: build and checker agree');
+
+function extractCanon(file, pattern) {
+  const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+  const match = src.match(pattern);
+  if (!match) return null;
+  try { return vm.runInNewContext(match[0] + ';canon', {}); } catch (e) { return null; }
+}
+
+const appCanon = extractCanon('problems-app.js', /function canon\(values\)[\s\S]*?\n\}/);
+const buildCanon = extractCanon('tools/build-problems.js', /const CANON_SEPARATOR[\s\S]*?function canon\(values\)[\s\S]*?\n\}/);
+
+ok('checker defines canon()', typeof appCanon === 'function');
+ok('build defines canon()', typeof buildCanon === 'function');
+
+if (appCanon && buildCanon) {
+  [
+    [['FOUND', 1]], [[1, 23]], [[12, 3]], [[3000, 235, 1]],
+    [[true, false]], [['a']], [[]], [[0, 0, 0]], [['INVALID']],
+  ].forEach(([values]) => {
+    ok(`canon agrees on ${JSON.stringify(values)}`, appCanon(values) === buildCanon(values),
+      appCanon(values) === buildCanon(values) ? '' :
+        `checker ${JSON.stringify(appCanon(values))} vs build ${JSON.stringify(buildCanon(values))}`);
+  });
+
+  // Without a separator, these two different answers hash identically and a
+  // wrong solution passes.
+  ok('canon separates values so outputs cannot collide',
+    appCanon([1, 23]) !== appCanon([12, 3]));
+}
+
+// ---------- offline support ----------
+
+section('offline support');
+
+const swSource = fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
+const { expectedAssets, START, END } = require('./build-sw.js');
+
+// A page added later but missing from the precache list is invisible until a
+// student is offline, which is the worst possible time to find out.
+// Read only between the generated markers — ordinary string literals elsewhere
+// in the file look identical to a list entry.
+const blockStart = swSource.indexOf(START);
+const blockEnd = swSource.indexOf(END);
+ok('precache markers are intact', blockStart !== -1 && blockEnd > blockStart);
+const precacheBlock = blockStart === -1 ? '' : swSource.slice(blockStart, blockEnd);
+const listed = [...precacheBlock.matchAll(/^\s*'([^']+)',$/gm)].map((m) => m[1]);
+const wanted = expectedAssets();
+const missing = wanted.filter((a) => !listed.includes(a));
+const extra = listed.filter((a) => !wanted.includes(a));
+
+ok('precache list covers every shipped asset', missing.length === 0,
+  missing.length ? `missing: ${missing.join(', ')} — run: node tools/build-sw.js` : '');
+ok('precache list has no stale entries', extra.length === 0,
+  extra.length ? `no longer exist: ${extra.join(', ')} — run: node tools/build-sw.js` : '');
+ok('precache includes the site root', listed.includes('./'));
+ok('service worker names a cache', /const CACHE\s*=\s*'[^']+'/.test(swSource));
+ok('service worker cleans up old caches', swSource.includes('caches.delete'));
+ok('service worker ignores non-GET requests', /request\.method\s*!==\s*'GET'/.test(swSource));
+ok('service worker ignores cross-origin requests', swSource.includes('url.origin !== self.location.origin'));
+
+// Every page must register the worker, or that page is not available offline.
+['index.html', 'writer.html', 'tracer.html', 'problems.html'].forEach((page) => {
+  const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
+  ok(`${page} registers the offline worker`, html.includes('sw-register.js'));
+});
+
+const regSource = fs.readFileSync(path.join(ROOT, 'sw-register.js'), 'utf8');
+ok('registration is skipped on file:// URLs', regSource.includes("location.protocol.indexOf('http')"));
+
 const sourceLeak = ['problems.source.json', 'problems.hidden.json']
   .filter((f) => fs.existsSync(path.join(ROOT, f)) && !isIgnored(f));
 

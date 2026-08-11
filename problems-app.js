@@ -78,7 +78,7 @@ function canon(values) {
   return values.map((v) => {
     if (typeof v === 'boolean') return v ? 'true' : 'false';
     return String(v);
-  }).join('');
+  }).join('\u0001');
 }
 
 function outputsOf(steps) {

@@ -563,5 +563,526 @@ const PROBLEMS = [
         "h": "4619895db0a349a1a8707afa87dc086f64889f6ce0016f38ab42b2923e2a7653"
       }
     ]
+  },
+  {
+    "id": "array-total",
+    "title": "Total of a List",
+    "module": "Module 2",
+    "difficulty": "Warm-up",
+    "statement": "Read how many numbers there are, then read that many numbers, and display their total. This is the pattern every later list problem is built on: read a count, then loop exactly that many times.",
+    "rules": [
+      [
+        "Input",
+        "First the count, then that many numbers, one per READ."
+      ],
+      [
+        "Output",
+        "A single number: the total."
+      ],
+      [
+        "The count is 0",
+        "There are no numbers to read. The total is 0."
+      ]
+    ],
+    "ioNote": "Display only the total. No labels, no extra words.",
+    "starter": "READ n\ntotal <- 0\n",
+    "salt": "afddca481dd1406d3940b0c167eba726",
+    "visibleTests": [
+      {
+        "inputs": [
+          3,
+          10,
+          20,
+          30
+        ],
+        "expected": [
+          60
+        ],
+        "note": "three numbers, added in order"
+      },
+      {
+        "inputs": [
+          0
+        ],
+        "expected": [
+          0
+        ],
+        "note": "no numbers at all — the loop must not run"
+      }
+    ],
+    "hidden": [
+      {
+        "i": "rcvzUmk=",
+        "n": 1,
+        "h": "0f318ce251084f7e4653c2a5e0c1d92c1acdaf12a81a7499ddec4005760860be"
+      },
+      {
+        "i": "i9H0Yt0333lG5hE3WB5W",
+        "n": 1,
+        "h": "2f1e4d6b56a6c897fc3755cdcf62603f45d27a6beda24b0a9335341c2049f32f"
+      },
+      {
+        "i": "aHz2lMxLg+oTphrR",
+        "n": 1,
+        "h": "0369af46f3a797ab3ec6101735fe590ae11588443a7388db51a35787c20b79f6"
+      },
+      {
+        "i": "2bN5tijVs4DjeJnIfA==",
+        "n": 1,
+        "h": "0f318ce251084f7e4653c2a5e0c1d92c1acdaf12a81a7499ddec4005760860be"
+      },
+      {
+        "i": "Wdt067QhY8uq",
+        "n": 1,
+        "h": "0369af46f3a797ab3ec6101735fe590ae11588443a7388db51a35787c20b79f6"
+      }
+    ]
+  },
+  {
+    "id": "largest-value",
+    "title": "Largest in a List",
+    "module": "Module 2",
+    "difficulty": "Core",
+    "statement": "Read how many numbers there are, then read that many numbers, and display the largest. Think carefully about what the largest value starts as — a wrong starting value passes the obvious tests and fails the interesting ones.",
+    "rules": [
+      [
+        "Input",
+        "First the count, then that many numbers."
+      ],
+      [
+        "The count is 0 or less",
+        "Display INVALID and do nothing else."
+      ],
+      [
+        "Otherwise",
+        "Display the largest of the numbers."
+      ],
+      [
+        "The largest value appears more than once",
+        "Display it once."
+      ]
+    ],
+    "ioNote": "Output: the largest value, or exactly INVALID.",
+    "starter": "READ n\n",
+    "salt": "efd7f1e338a96629c3268af4096d5635",
+    "visibleTests": [
+      {
+        "inputs": [
+          3,
+          4,
+          9,
+          2
+        ],
+        "expected": [
+          9
+        ]
+      },
+      {
+        "inputs": [
+          0
+        ],
+        "expected": [
+          "INVALID"
+        ],
+        "note": "nothing to compare"
+      }
+    ],
+    "hidden": [
+      {
+        "i": "77zuTRq5",
+        "n": 1,
+        "h": "d955696e9d3c0aa1db46822e29d9fc00c60fa6cc16a4e57571a68e453a3b628f"
+      },
+      {
+        "i": "QSiiHE6OyoPGGGlUPCJE",
+        "n": 1,
+        "h": "b1145ceb7333a9a563141c721370ef2ab1982f03a2cc135aed6e87c35da48ceb"
+      },
+      {
+        "i": "DMcj8F9yMdiN",
+        "n": 1,
+        "h": "db9042aeb22e2301212399618d52076a0d74cd260bd963d87b628d1f6d0dadb9"
+      },
+      {
+        "i": "7I8FB8Pk1ZkjtKQqaQ==",
+        "n": 1,
+        "h": "9fb3434b38ed0660ada88c87ed7860e35d0897a5e57daee5e592db7f66744ca9"
+      },
+      {
+        "i": "SsS4NPEneP1xOt2Fwg==",
+        "n": 1,
+        "h": "9fb3434b38ed0660ada88c87ed7860e35d0897a5e57daee5e592db7f66744ca9"
+      },
+      {
+        "i": "tosCArEFSYvo",
+        "n": 1,
+        "h": "c39c867b56998cbdb372c024ebb40fed14d5a1974fe2faf591c0262c0251c084"
+      }
+    ]
+  },
+  {
+    "id": "linear-position",
+    "title": "Position in a List",
+    "module": "Module 2",
+    "difficulty": "Core",
+    "statement": "Read how many numbers there are, then that many numbers, and finally the value to look for. Display the position of the first match, counting from 1. Because the value to look for arrives last, you have to keep the numbers somewhere before you can search them.",
+    "rules": [
+      [
+        "Input",
+        "The count, then that many numbers, then the value to look for."
+      ],
+      [
+        "Output",
+        "The position of the first matching value, counting the first number as position 1."
+      ],
+      [
+        "The value appears more than once",
+        "Report the first position only."
+      ],
+      [
+        "The value is not there",
+        "Display exactly NOT FOUND."
+      ]
+    ],
+    "ioNote": "Output: a position number, or exactly NOT FOUND.",
+    "starter": "READ n\nvalues <- []\n",
+    "salt": "fee6236aa05fd8503b4a4df0413c2c9d",
+    "visibleTests": [
+      {
+        "inputs": [
+          4,
+          10,
+          20,
+          30,
+          40,
+          30
+        ],
+        "expected": [
+          3
+        ],
+        "note": "30 is the third number"
+      },
+      {
+        "inputs": [
+          3,
+          1,
+          2,
+          3,
+          9
+        ],
+        "expected": [
+          "NOT FOUND"
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "wdP06+MsFw==",
+        "n": 1,
+        "h": "fc965f466db1474c1c5f7c3053002a10f7a4a78dc9b99dc3140a8dd25e5d2e68"
+      },
+      {
+        "i": "g7AF9GI6q+E60hy553Q9",
+        "n": 1,
+        "h": "fc965f466db1474c1c5f7c3053002a10f7a4a78dc9b99dc3140a8dd25e5d2e68"
+      },
+      {
+        "i": "oXjyspd9pat6Cj//8A==",
+        "n": 1,
+        "h": "a3cdf79d7ea83c366e96839ae1301bedd85305487c912fd4e2c15d18551f605c"
+      },
+      {
+        "i": "1OZripn7mdmdkqIzVQZd",
+        "n": 1,
+        "h": "6aca4ee23a58317dca802561db1d55fe4d4eed52cbd5c983c5c965f4feb668d6"
+      },
+      {
+        "i": "DJDg1o0=",
+        "n": 1,
+        "h": "d10f82d759477f1838ae28bb1781d8d5b89093010e1355edf1eb6778ab1481de"
+      },
+      {
+        "i": "HwURahpwDvXO",
+        "n": 1,
+        "h": "fc965f466db1474c1c5f7c3053002a10f7a4a78dc9b99dc3140a8dd25e5d2e68"
+      },
+      {
+        "i": "gLf6Vo+HvwRNuYX1Cibi",
+        "n": 1,
+        "h": "8330bbd60ca9b7d0a6434805ab29981155d29eee67e3655c89e94f76b073bfff"
+      },
+      {
+        "i": "6zHGRMmjhfKcHizm1RIuHoE=",
+        "n": 1,
+        "h": "fc965f466db1474c1c5f7c3053002a10f7a4a78dc9b99dc3140a8dd25e5d2e68"
+      }
+    ]
+  },
+  {
+    "id": "above-average",
+    "title": "Above the Average",
+    "module": "Module 2",
+    "difficulty": "Challenge",
+    "statement": "Read how many numbers there are, then that many numbers. Display the average, then how many of the numbers are above it. You cannot know the average until you have seen every number, so this one cannot be done in a single pass.",
+    "rules": [
+      [
+        "Input",
+        "The count, then that many numbers. Every number is 0 or more."
+      ],
+      [
+        "The count is 0 or less",
+        "Display INVALID and do nothing else."
+      ],
+      [
+        "Average",
+        "The total divided by the count, using whole-number division. Drop any remainder."
+      ],
+      [
+        "Output",
+        "Two values in this order: the average, then how many numbers are strictly greater than it."
+      ]
+    ],
+    "ioNote": "Output two values, the average then the count. Or exactly INVALID.",
+    "starter": "READ n\nvalues <- []\ntotal <- 0\n",
+    "salt": "bc1b632db7796d56f6550d0fb8e48b8b",
+    "visibleTests": [
+      {
+        "inputs": [
+          4,
+          10,
+          20,
+          30,
+          40
+        ],
+        "expected": [
+          25,
+          2
+        ],
+        "note": "average 25; 30 and 40 are above it"
+      },
+      {
+        "inputs": [
+          0
+        ],
+        "expected": [
+          "INVALID"
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "zHU8OCY=",
+        "n": 2,
+        "h": "418ca269336da1854aae129fde54e3ec9a8211c66b087e8780a8ffb7496d54b3"
+      },
+      {
+        "i": "TxELaQSy9e7i",
+        "n": 2,
+        "h": "d448ca5dfa2fea3585f97f201f81a2d03b6e3a6de57e49ce71b65e1ce71c6c51"
+      },
+      {
+        "i": "3pUg14sUDGFcwczoO1Y=",
+        "n": 2,
+        "h": "20552fc378ed34abd6d49946871a7b72bd5e391617d6d3c2f77c267ed4198d8c"
+      },
+      {
+        "i": "kSUP9UV22w==",
+        "n": 2,
+        "h": "38a399e044a40b4d7491ba97a16509d4cbf91710b54ca9edc9ce96d336db3a77"
+      },
+      {
+        "i": "3O9HVclML2qPzuA=",
+        "n": 2,
+        "h": "a6ad1709b5709ea98ca3e9e4ddf62668fe624afed829f33e8060e8a460cc0424"
+      },
+      {
+        "i": "9H1rpqlYoWZCYg==",
+        "n": 2,
+        "h": "909bcf80104a5d169fbf8c164ea20f9ddd9c66acdd5c53c1b73191d0eb100f13"
+      }
+    ]
+  },
+  {
+    "id": "has-duplicate",
+    "title": "Any Repeats?",
+    "module": "Module 2",
+    "difficulty": "Challenge",
+    "statement": "Read how many numbers there are, then that many numbers. Display YES if any number appears more than once, and NO if every number is different. Comparing every number against every other one is the straightforward approach — notice how much work that becomes as the list grows.",
+    "rules": [
+      [
+        "Input",
+        "The count, then that many numbers."
+      ],
+      [
+        "Any number appears more than once",
+        "Display exactly YES."
+      ],
+      [
+        "Every number is different",
+        "Display exactly NO."
+      ],
+      [
+        "Fewer than two numbers",
+        "Nothing can repeat, so display NO."
+      ]
+    ],
+    "ioNote": "Output exactly YES or exactly NO.",
+    "starter": "READ n\nvalues <- []\n",
+    "salt": "2e30f7af7dce12448e730ec8d19d017b",
+    "visibleTests": [
+      {
+        "inputs": [
+          4,
+          1,
+          2,
+          3,
+          2
+        ],
+        "expected": [
+          "YES"
+        ],
+        "note": "2 appears twice"
+      },
+      {
+        "inputs": [
+          3,
+          1,
+          2,
+          3
+        ],
+        "expected": [
+          "NO"
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "Iqiz",
+        "n": 1,
+        "h": "8379346a6cd557775932a75042efe82149fd1f3dfb73711b06115e2b9b3feee4"
+      },
+      {
+        "i": "M5rfjys=",
+        "n": 1,
+        "h": "8379346a6cd557775932a75042efe82149fd1f3dfb73711b06115e2b9b3feee4"
+      },
+      {
+        "i": "Q3jYNFNlqg==",
+        "n": 1,
+        "h": "5deecc7051bf73d5a2fbe013266fef17fe6920069e23c5c7427345410be6a742"
+      },
+      {
+        "i": "9OTqkEXAWVserlrJ5w==",
+        "n": 1,
+        "h": "5deecc7051bf73d5a2fbe013266fef17fe6920069e23c5c7427345410be6a742"
+      },
+      {
+        "i": "rw442E3VM08fRcZsgKc=",
+        "n": 1,
+        "h": "5deecc7051bf73d5a2fbe013266fef17fe6920069e23c5c7427345410be6a742"
+      },
+      {
+        "i": "teBpK7BL64vWjbl8LKq5",
+        "n": 1,
+        "h": "8379346a6cd557775932a75042efe82149fd1f3dfb73711b06115e2b9b3feee4"
+      }
+    ]
+  },
+  {
+    "id": "binary-checks",
+    "title": "Binary Search, Counted",
+    "module": "Module 2",
+    "difficulty": "Challenge",
+    "statement": "Read how many numbers there are, then that many numbers already in ascending order, then the value to look for. Display whether it was found, and how many middle values you had to examine. Compare that count against the length of the list — that gap is the whole reason binary search matters.",
+    "rules": [
+      [
+        "Input",
+        "The count, then that many numbers in ascending order, then the value to look for."
+      ],
+      [
+        "Method",
+        "Look at the middle of the range that is left. If it matches, stop. Otherwise discard the half that cannot contain the value."
+      ],
+      [
+        "Counting",
+        "Add one every time you examine a middle value, including the one that matches."
+      ],
+      [
+        "Output",
+        "Two values in this order: exactly FOUND or exactly NOT FOUND, then how many middle values were examined."
+      ]
+    ],
+    "ioNote": "Output FOUND or NOT FOUND, then the number of middle values examined.",
+    "starter": "READ n\nvalues <- []\n",
+    "salt": "cf6867867673e1c20231300fea266ce3",
+    "visibleTests": [
+      {
+        "inputs": [
+          7,
+          3,
+          8,
+          15,
+          22,
+          34,
+          41,
+          50,
+          41
+        ],
+        "expected": [
+          "FOUND",
+          2
+        ],
+        "note": "middle is 22, then 41"
+      },
+      {
+        "inputs": [
+          7,
+          3,
+          8,
+          15,
+          22,
+          34,
+          41,
+          50,
+          5
+        ],
+        "expected": [
+          "NOT FOUND",
+          3
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "3JCLzr7qew==",
+        "n": 2,
+        "h": "269792ecdbbf1e7a9540d8b01e7fdfec069a2f10f3a69c69eab7c0a90ad1c665"
+      },
+      {
+        "i": "wtmC/1A=",
+        "n": 2,
+        "h": "a75d863f7f7337b989a1c70ee8bdc7dc1f3cce505ae9307a4d5a0543f682230a"
+      },
+      {
+        "i": "qRm9TxW3d001EUhl/Jqf7frqO2r2",
+        "n": 2,
+        "h": "155b47f1b533dc15e520868b96b3ac0a6b2961187099b811a6790d487f84f098"
+      },
+      {
+        "i": "0MwqHHHzIPjymxSuJqc1A8IcCQgQ",
+        "n": 2,
+        "h": "3c335658f3904e5a182a0f151687c69be5652ccb71661b6451617e01e36a2d29"
+      },
+      {
+        "i": "XQPLsAE9pqUMeSB/iPP4",
+        "n": 2,
+        "h": "b263decb70d78b5cf3be1be73f5b4b0b202e973f9a11ccff06816f598123fa39"
+      },
+      {
+        "i": "SOptjF4sXsfL",
+        "n": 2,
+        "h": "88fc19ef0eccd0d075783ac129772f0738008088d11691202dcff1953f8f383c"
+      }
+    ]
   }
 ];

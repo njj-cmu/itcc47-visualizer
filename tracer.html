@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITCC47 Pseudocode Tracer</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="app-fixed">
+
+<header class="topbar">
+  <div class="topbar-title">
+    <span class="topbar-code">ITCC47</span> Pseudocode Tracer
+  </div>
+  <nav class="topbar-nav">
+    <a href="index.html">Sorting &amp; Searching</a>
+    <a href="writer.html">Algorithm Writer</a>
+    <a href="tracer.html" class="active">Pseudocode Tracer</a>
+    <a href="problems.html">Problem Sets</a>
+  </nav>
+</header>
+
+<div class="layout layout-2col">
+
+  <!-- EDITOR COLUMN -->
+  <main class="stage">
+    <div class="card editor-card">
+      <div class="editor-toolbar">
+        <button id="btn-examples" class="btn btn-toolbar">Load an example</button>
+        <button id="btn-grammar" class="btn btn-toolbar btn-cta">
+          <span class="cta-mark">?</span> Grammar cheatsheet
+        </button>
+        <span class="toolbar-spacer"></span>
+        <button id="btn-run" class="btn btn-primary btn-toolbar">Run</button>
+        <button id="btn-edit" class="btn btn-toolbar" disabled>Edit code</button>
+      </div>
+
+      <p id="status-line" class="muted status-line">Write or load pseudocode, then Run.</p>
+
+      <textarea id="code-box" class="code-box code-editor" spellcheck="false" rows="16"></textarea>
+      <div id="code-view" class="code-view hidden"></div>
+
+      <div class="inputs-block">
+        <label class="field-label" for="inputs-box">Input values <span class="muted">— used by READ, in order</span></label>
+        <textarea id="inputs-box" class="code-box inputs-box" rows="2" placeholder="e.g. 50, false, true"></textarea>
+      </div>
+
+      <div id="error-box" class="error-box hidden"></div>
+    </div>
+
+    <!-- pinned: stays visible however long the code gets -->
+    <div class="dock">
+      <div class="scrub-row">
+        <span class="scrub-label">Step</span>
+        <input type="range" id="step-slider" min="0" max="0" value="0" class="slider" disabled>
+        <span id="step-counter" class="scrub-count">0 / 0</span>
+      </div>
+
+      <div class="playback-row">
+        <button id="btn-play" class="btn btn-primary" disabled>Play</button>
+        <button id="btn-step" class="btn" disabled>Step</button>
+        <div class="speed-inline">
+          <label for="speed-slider">Speed</label>
+          <input type="range" id="speed-slider" min="1" max="10" value="6" class="slider">
+        </div>
+      </div>
+
+      <div class="state-grid">
+        <div class="state-panel">
+          <h2 class="panel-title">Variables</h2>
+          <div id="vars-box" class="vars-box muted">Run the pseudocode to see variable state.</div>
+        </div>
+        <div class="state-panel">
+          <h2 class="panel-title">Output</h2>
+          <div id="output-box" class="vars-box muted">(no output yet)</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- TRACE TABLE / OPERATION COUNTS -->
+  <aside class="trace-panel">
+    <div class="tabs">
+      <button id="tab-trace" class="tab active">Trace Table</button>
+      <button id="tab-ops" class="tab">Operations</button>
+    </div>
+
+    <div id="panel-trace">
+      <div class="trace-table-wrap">
+        <table class="trace-table">
+          <thead><tr><th>#</th><th>Line</th><th>Statement</th><th>Description</th></tr></thead>
+          <tbody id="trace-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="panel-ops" class="hidden">
+      <div id="ops-empty" class="muted field-note">Run the pseudocode to count operations.</div>
+
+      <div id="ops-content" class="hidden">
+        <div class="ops-total">
+          <span class="ops-total-label">T(n) for this input</span>
+          <strong id="ops-total-value">0</strong>
+        </div>
+
+        <label class="checkline">
+          <input type="checkbox" id="opt-control">
+          <span>Count loop control (FOR headers)</span>
+        </label>
+        <p class="muted field-note" id="control-note">Off matches the lecture, where T(n) = 7n + 6 charges nothing for the FOR header.</p>
+
+        <div class="trace-table-wrap ops-table-wrap">
+          <table class="trace-table">
+            <thead><tr><th>Line</th><th>Statement</th><th>Each</th><th>Runs</th><th>Total</th></tr></thead>
+            <tbody id="ops-body"></tbody>
+          </table>
+        </div>
+
+        <div id="loop-notes"></div>
+
+        <h3 class="panel-title ops-section">Growth</h3>
+        <p class="muted field-note">Re-runs the algorithm at increasing input sizes and measures the real count.</p>
+
+        <label class="field-label" for="sweep-input">Which input is n?</label>
+        <select id="sweep-input" class="text-input"></select>
+
+        <label class="field-label" for="sweep-max">Test n up to <span id="sweep-max-value">12</span></label>
+        <input type="range" id="sweep-max" min="4" max="30" value="12" class="slider">
+
+        <button id="btn-measure" class="btn btn-primary btn-wide">Measure growth</button>
+
+        <div id="growth-result" class="hidden">
+          <div class="growth-verdict">
+            <span class="growth-label" id="growth-label">—</span>
+            <span class="growth-detail muted" id="growth-detail"></span>
+          </div>
+          <div id="growth-chart" class="growth-chart"></div>
+          <div class="trace-table-wrap ops-table-wrap">
+            <table class="trace-table">
+              <thead><tr><th>n</th><th>Operations</th><th>Ratio</th></tr></thead>
+              <tbody id="growth-body"></tbody>
+            </table>
+          </div>
+          <p class="muted field-note">Measured over the range tested, not a proof. Growth beyond it may differ.</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+</div>
+
+<!-- EXAMPLES DIALOG -->
+<dialog id="dlg-examples" class="dlg">
+  <div class="dlg-head">
+    <h2>Load an example</h2>
+    <button class="dlg-close" data-close="dlg-examples" aria-label="Close">&times;</button>
+  </div>
+  <p class="muted dlg-sub">Worked examples from Topic 01. Loading one replaces the editor contents.</p>
+  <div class="algo-list" id="preset-list"></div>
+</dialog>
+
+<!-- GRAMMAR DIALOG -->
+<dialog id="dlg-grammar" class="dlg dlg-wide">
+  <div class="dlg-head">
+    <h2>Pseudocode grammar</h2>
+    <button class="dlg-close" data-close="dlg-grammar" aria-label="Close">&times;</button>
+  </div>
+  <p class="muted dlg-sub">The commands this tracer understands. Keywords are not case-sensitive.</p>
+
+  <div class="grammar-grid">
+    <section class="grammar-card">
+      <h3>Input, output, assignment</h3>
+      <pre>READ x
+WRITE x
+WRITE "some text"
+x &lt;- 10
+x &lt;- a + b</pre>
+      <p>The arrow <code>&lt;-</code> stores the value on the right into the name on the left. You may also type <code>←</code>.</p>
+    </section>
+
+    <section class="grammar-card">
+      <h3>Selection</h3>
+      <pre>IF condition THEN
+    statement
+ELSE IF condition THEN
+    statement
+ELSE
+    statement
+ENDIF</pre>
+      <p>Conditions are checked in order. The first one that is true wins.</p>
+    </section>
+
+    <section class="grammar-card">
+      <h3>Repetition</h3>
+      <pre>FOR i &lt;- 1 TO n DO
+    statement
+ENDFOR
+
+FOR EACH item IN list DO
+    statement
+ENDFOR
+
+WHILE condition DO
+    statement
+ENDWHILE</pre>
+    </section>
+
+    <section class="grammar-card">
+      <h3>CASE</h3>
+      <pre>CASE choice OF
+    1:
+        WRITE "Start"
+    2:
+        WRITE "Load"
+    DEFAULT:
+        WRITE "Invalid"
+ENDCASE</pre>
+    </section>
+
+    <section class="grammar-card">
+      <h3>Values and operators</h3>
+      <pre>[3, 8, 15]      list
+values[2]       list position
+TRUE  FALSE     booleans
++  -  *  /  %   arithmetic
+=  &lt;&gt;  &lt;  &gt;  &lt;=  &gt;=
+AND   OR   NOT
+# everything after # is a comment</pre>
+    </section>
+
+    <section class="grammar-card">
+      <h3>Stopping early</h3>
+      <pre>BREAK     leave the loop
+RETURN    leave with a value
+STOP      end the algorithm</pre>
+    </section>
+  </div>
+
+  <div class="grammar-notes">
+    <h3>Two things that catch people out</h3>
+    <p><strong>A bare <code>IF</code> right after <code>ELSE</code> reads as <code>ELSE IF</code>.</strong> If you need a genuinely nested <code>IF</code> as the first line of an <code>ELSE</code> block, put an assignment above it first.</p>
+    <p><strong><code>/</code> is integer division</strong> and floors the result, matching the way the lecture halves <code>n</code> at each step of a binary search.</p>
+  </div>
+
+  <div class="dlg-actions">
+    <button class="btn btn-primary" data-close="dlg-grammar">Got it</button>
+  </div>
+</dialog>
+
+<script src="interpreter.js"></script>
+<script src="complexity.js"></script>
+<script src="presets.js"></script>
+<script src="tracer-app.js"></script>
+</body>
+</html>

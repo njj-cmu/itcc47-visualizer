@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITCC47 Algorithm Writer</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-title">
+    <span class="topbar-code">ITCC47</span> Algorithm Writer
+  </div>
+  <nav class="topbar-nav">
+    <a href="index.html">Sorting &amp; Searching</a>
+    <a href="writer.html" class="active">Algorithm Writer</a>
+    <a href="tracer.html">Pseudocode Tracer</a>
+    <a href="problems.html">Problem Sets</a>
+  </nav>
+</header>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="panel">
+      <h2 class="panel-title">Examples</h2>
+      <div class="algo-list" id="preset-list"></div>
+    </div>
+
+    <div class="panel">
+      <h2 class="panel-title">Keys</h2>
+      <dl class="keylist">
+        <dt>Enter</dt><dd>new step</dd>
+        <dt>Tab</dt><dd>make it a sub-step</dd>
+        <dt>Shift + Tab</dt><dd>move back out</dd>
+        <dt>↑ ↓</dt><dd>move between steps</dd>
+        <dt>Alt + ↑ ↓</dt><dd>reorder the step</dd>
+        <dt>Backspace</dt><dd>delete an empty step</dd>
+      </dl>
+    </div>
+
+    <div class="panel">
+      <h2 class="panel-title">Step types</h2>
+      <p class="muted field-note">Detected from the first word.</p>
+      <div class="legend">
+        <span class="badge badge-input">input</span> Read, Get, Ask
+        <span class="badge badge-output">output</span> Display, Show, Print
+        <span class="badge badge-decision">decision</span> If, Otherwise
+        <span class="badge badge-loop">loop</span> For each, Repeat, While
+        <span class="badge badge-terminal">stop</span> Stop, Do not proceed
+        <span class="badge badge-action">action</span> anything else
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="stage">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h1 id="algo-name-display">Untitled algorithm</h1>
+          <p class="muted">Write one action per step. Press Tab to nest a step under the one above it.</p>
+        </div>
+      </div>
+
+      <input type="text" id="algo-name" class="text-input title-input" placeholder="Algorithm name">
+
+      <div id="steps" class="steps"></div>
+
+      <div class="controls-grid controls-4">
+        <button id="btn-add" class="btn">Add step</button>
+        <button id="btn-clear" class="btn">Clear all</button>
+        <button id="btn-copy" class="btn">Copy as text</button>
+        <button id="btn-to-tracer" class="btn btn-primary">Pseudocode skeleton →</button>
+      </div>
+      <p id="toast" class="toast hidden"></p>
+    </div>
+  </main>
+
+  <!-- CHECKS -->
+  <aside class="trace-panel">
+    <h2 class="panel-title">Checks</h2>
+    <p class="muted field-note">The five characteristics of a good algorithm.</p>
+    <div id="checks" class="checks"></div>
+  </aside>
+
+</div>
+
+<script src="tooltip.js"></script>
+<script src="writer-checks.js"></script>
+<script src="writer-presets.js"></script>
+<script src="writer-app.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main, pre-production]
+  pull_request:
+    branches: [main, pre-production]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # tools/test.js deliberately does not need problems.hidden.json, which is
+      # gitignored and exists only on the instructor's machine. It checks the
+      # interpreter, the shipped presets, and the integrity of the generated
+      # problems.data.js — including that no plaintext answer survived into it.
+      - name: Run tests
+        run: node tools/test.js

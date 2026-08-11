@@ -1,0 +1,18 @@
+# Instructor-only: hidden test inputs and their expected answers.
+# tools/build-problems.js turns this into hashed digests in problems.data.js.
+# If this file is ever committed, the hashing is pointless — that is exactly
+# what happened to its predecessor, problems.source.json.
+# Keep your own backup: it is not recoverable from this repo.
+problems.hidden.json
+
+# Course material (syllabus, laboratory package, lecture decks).
+# Large, and not ours to redistribute.
+context/
+
+# Windows Explorer folder metadata
+desktop.ini
+
+# Scratch files
+.tmp_*
+
+node_modules/

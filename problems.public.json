@@ -1,0 +1,365 @@
+[
+  {
+    "id": "sum-two",
+    "title": "Sum of Two Numbers",
+    "module": "Module 1",
+    "difficulty": "Warm-up",
+    "statement": "Read two numbers and display their sum.",
+    "rules": [
+      [
+        "Input",
+        "Two numbers, one per READ, in the order given."
+      ],
+      [
+        "Output",
+        "A single number: the sum."
+      ]
+    ],
+    "ioNote": "Display only the sum. No labels, no extra words.",
+    "starter": "READ first_number\nREAD second_number\n",
+    "visibleTests": [
+      {
+        "inputs": [
+          3,
+          4
+        ],
+        "expected": [
+          7
+        ],
+        "note": "the example from the lecture"
+      },
+      {
+        "inputs": [
+          100,
+          250
+        ],
+        "expected": [
+          350
+        ]
+      }
+    ]
+  },
+  {
+    "id": "delivery-fee",
+    "title": "Delivery Fee",
+    "module": "Module 1",
+    "difficulty": "Core",
+    "statement": "A delivery service charges a fee based on how far the customer is from the store. The owner describes the rule in vague terms, so it has already been clarified into exact boundaries below. Premium customers get a discount, but only when the distance is valid.",
+    "rules": [
+      [
+        "Distance is 0 or less",
+        "Display INVALID and do nothing else."
+      ],
+      [
+        "Distance is more than 0 but not more than 3",
+        "Fee is 30."
+      ],
+      [
+        "Distance is more than 3 but not more than 10",
+        "Fee is 50."
+      ],
+      [
+        "Distance is more than 10",
+        "Fee is 80."
+      ],
+      [
+        "Premium customer",
+        "Subtract 10 from the fee, only after a valid fee has been set."
+      ]
+    ],
+    "ioNote": "Input: the distance, then TRUE or FALSE for premium. Output: the fee, or exactly INVALID.",
+    "starter": "READ distance\nREAD is_premium\n",
+    "visibleTests": [
+      {
+        "inputs": [
+          7,
+          true
+        ],
+        "expected": [
+          40
+        ],
+        "note": "7 km falls in the 50 band, then 10 off for premium"
+      },
+      {
+        "inputs": [
+          2,
+          false
+        ],
+        "expected": [
+          30
+        ]
+      },
+      {
+        "inputs": [
+          0,
+          true
+        ],
+        "expected": [
+          "INVALID"
+        ],
+        "note": "invalid distance wins over the discount"
+      }
+    ]
+  },
+  {
+    "id": "library-fine",
+    "title": "Library Fine",
+    "module": "Module 1",
+    "difficulty": "Core",
+    "statement": "A library computes the fine for a borrowed book. The order in which you apply the rules changes the answer, so read them carefully before you start writing.",
+    "rules": [
+      [
+        "Overdue days is negative",
+        "Display INVALID and do nothing else."
+      ],
+      [
+        "The book is lost",
+        "The fine is exactly 500, whatever the overdue days."
+      ],
+      [
+        "Otherwise",
+        "The fine is overdue days times 10."
+      ],
+      [
+        "Maximum overdue fine",
+        "An overdue fine may not exceed 300."
+      ],
+      [
+        "Library member",
+        "Subtract 20 from the fine."
+      ],
+      [
+        "Minimum fine",
+        "The final fine may never be less than 0."
+      ]
+    ],
+    "ioNote": "Input: overdue days, then TRUE/FALSE for lost, then TRUE/FALSE for member. Output: the fine, or exactly INVALID.",
+    "starter": "READ overdue_days\nREAD book_lost\nREAD member\n",
+    "visibleTests": [
+      {
+        "inputs": [
+          50,
+          false,
+          true
+        ],
+        "expected": [
+          280
+        ],
+        "note": "capped at 300 first, then the member discount"
+      },
+      {
+        "inputs": [
+          10,
+          false,
+          false
+        ],
+        "expected": [
+          100
+        ]
+      },
+      {
+        "inputs": [
+          5,
+          true,
+          true
+        ],
+        "expected": [
+          500
+        ],
+        "note": "a lost book ignores the overdue calculation"
+      }
+    ]
+  },
+  {
+    "id": "package-class",
+    "title": "Package Classification",
+    "module": "Module 1",
+    "difficulty": "Core",
+    "statement": "A delivery system classifies a package by weight, and marks express deliveries. The checker compares your output character for character, so the exact wording matters as much as the logic.",
+    "rules": [
+      [
+        "Weight is 0 or less",
+        "The result is INVALID."
+      ],
+      [
+        "Weight is more than 0 but not more than 1",
+        "The result is SMALL."
+      ],
+      [
+        "Weight is more than 1 but not more than 5",
+        "The result is REGULAR."
+      ],
+      [
+        "Weight is more than 5",
+        "The result is BULKY."
+      ],
+      [
+        "Express and the weight is valid",
+        "Add _EXPRESS to the end of the result."
+      ],
+      [
+        "Express but the weight is invalid",
+        "The result stays INVALID."
+      ]
+    ],
+    "ioNote": "Input: the weight, then TRUE or FALSE for express. Output must be exactly one of: INVALID, SMALL, REGULAR, BULKY, SMALL_EXPRESS, REGULAR_EXPRESS, BULKY_EXPRESS.",
+    "starter": "READ weight\nREAD express\n",
+    "visibleTests": [
+      {
+        "inputs": [
+          7,
+          true
+        ],
+        "expected": [
+          "BULKY_EXPRESS"
+        ],
+        "note": "the example from the lecture"
+      },
+      {
+        "inputs": [
+          1,
+          false
+        ],
+        "expected": [
+          "SMALL"
+        ]
+      },
+      {
+        "inputs": [
+          0,
+          true
+        ],
+        "expected": [
+          "INVALID"
+        ],
+        "note": "no _EXPRESS on an invalid package"
+      }
+    ]
+  },
+  {
+    "id": "parking-fee",
+    "title": "Parking Fee",
+    "module": "Module 1",
+    "difficulty": "Core",
+    "statement": "A parking area computes a fee from the number of hours parked. The shape of this problem is the same as the library fine, so if you got that one right, check whether your ordering still holds here.",
+    "rules": [
+      [
+        "Hours is negative",
+        "Display INVALID and do nothing else."
+      ],
+      [
+        "The ticket is lost",
+        "The fee is exactly 500."
+      ],
+      [
+        "Otherwise",
+        "The fee is hours times 20."
+      ],
+      [
+        "Maximum regular fee",
+        "A regular parking fee may not exceed 200."
+      ],
+      [
+        "Employee",
+        "Subtract 40 from the fee."
+      ],
+      [
+        "Minimum fee",
+        "The final fee may never be less than 0."
+      ]
+    ],
+    "ioNote": "Input: hours, then TRUE/FALSE for ticket lost, then TRUE/FALSE for employee. Output: the fee, or exactly INVALID.",
+    "starter": "READ hours\nREAD ticket_lost\nREAD is_employee\n",
+    "visibleTests": [
+      {
+        "inputs": [
+          15,
+          false,
+          true
+        ],
+        "expected": [
+          160
+        ],
+        "note": "capped at 200 first, then the employee discount"
+      },
+      {
+        "inputs": [
+          3,
+          false,
+          false
+        ],
+        "expected": [
+          60
+        ]
+      }
+    ]
+  },
+  {
+    "id": "reward-points",
+    "title": "Reward Points",
+    "module": "Module 1",
+    "difficulty": "Challenge",
+    "statement": "A store awards reward points across several purchases. You will need a loop, a running total, and a count of the purchases that were rejected. Read the number of purchases first, then the member flag, then each purchase amount in turn.",
+    "rules": [
+      [
+        "Amount is 0 or less",
+        "It is invalid: count it and award no points for it."
+      ],
+      [
+        "Amount is 1000 or more",
+        "Award 50 points."
+      ],
+      [
+        "Amount is 500 or more but under 1000",
+        "Award 20 points."
+      ],
+      [
+        "Amount is under 500 but valid",
+        "Award 5 points."
+      ],
+      [
+        "Member",
+        "Award 10 extra points for each valid purchase."
+      ],
+      [
+        "Total of valid purchases is 3000 or more",
+        "Award 100 bonus points at the very end."
+      ]
+    ],
+    "ioNote": "Input: the number of purchases, then TRUE/FALSE for member, then that many amounts. Output three values in this order: the total of valid purchases, the reward points, then the number of invalid purchases.",
+    "starter": "READ n\nREAD is_member\ntotal <- 0\npoints <- 0\ninvalid_count <- 0\n",
+    "visibleTests": [
+      {
+        "inputs": [
+          5,
+          true,
+          200,
+          600,
+          -50,
+          1500,
+          800
+        ],
+        "expected": [
+          3100,
+          235,
+          1
+        ],
+        "note": "the traced example from the lecture"
+      },
+      {
+        "inputs": [
+          3,
+          false,
+          100,
+          200,
+          300
+        ],
+        "expected": [
+          600,
+          15,
+          0
+        ]
+      }
+    ]
+  }
+]

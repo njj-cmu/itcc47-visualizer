@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITCC47 Algorithm Visualizer</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-title">
+    <span class="topbar-code">ITCC47</span> Algorithm Visualizer
+  </div>
+  <nav class="topbar-nav">
+    <a href="index.html" class="active">Sorting &amp; Searching</a>
+    <a href="writer.html">Algorithm Writer</a>
+    <a href="tracer.html">Pseudocode Tracer</a>
+    <a href="problems.html">Problem Sets</a>
+  </nav>
+</header>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="panel">
+      <h2 class="panel-title">Sorting</h2>
+      <div class="algo-list" id="sorting-list"></div>
+    </div>
+    <div class="panel">
+      <h2 class="panel-title">Searching</h2>
+      <div class="algo-list" id="searching-list"></div>
+    </div>
+
+    <div class="panel">
+      <h2 class="panel-title">Data</h2>
+
+      <label class="field-label" for="size-slider">Array size: <span id="size-value">10</span></label>
+      <input type="range" id="size-slider" min="4" max="18" value="10" class="slider">
+
+      <label class="field-label" for="custom-input">Custom values (comma-separated)</label>
+      <div class="row">
+        <input type="text" id="custom-input" class="text-input" placeholder="e.g. 5,2,7,1,6,3,4">
+        <button id="apply-custom" class="btn btn-small">Apply</button>
+      </div>
+
+      <div id="target-field" class="hidden">
+        <label class="field-label" for="target-input">Search target</label>
+        <div class="row">
+          <input type="number" id="target-input" class="text-input" placeholder="value">
+          <button id="random-target" class="btn btn-small">Random</button>
+        </div>
+      </div>
+
+      <label class="field-label" for="speed-slider">Playback speed</label>
+      <input type="range" id="speed-slider" min="1" max="10" value="6" class="slider">
+    </div>
+  </aside>
+
+  <!-- MAIN VISUALIZATION CARD -->
+  <main class="stage">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h1 id="algo-title">Bubble Sort</h1>
+          <p id="algo-subtitle" class="muted"></p>
+        </div>
+        <div class="complexity-box" id="complexity-box"></div>
+      </div>
+
+      <div class="chart-wrap">
+        <div id="chart" class="chart"></div>
+      </div>
+
+      <p id="result-caption" class="result-caption">Press Play or Step to begin.</p>
+
+      <div class="scrub-row">
+        <span class="scrub-label">Step</span>
+        <input type="range" id="step-slider" min="0" max="0" value="0" class="slider">
+        <span id="step-counter" class="scrub-count">0 / 0</span>
+      </div>
+
+      <div class="controls-grid">
+        <button id="btn-shuffle" class="btn">Shuffle</button>
+        <button id="btn-play" class="btn btn-primary">Play</button>
+        <button id="btn-step" class="btn">Step</button>
+        <button id="btn-finish" class="btn">Finish pass</button>
+      </div>
+    </div>
+
+    <div class="blurb-panel">
+      <p id="algo-blurb" class="muted"></p>
+    </div>
+  </main>
+
+  <!-- TRACE TABLE -->
+  <aside class="trace-panel">
+    <h2 class="panel-title">Trace Table</h2>
+    <div class="trace-table-wrap">
+      <table class="trace-table">
+        <thead id="trace-head"></thead>
+        <tbody id="trace-body"></tbody>
+      </table>
+    </div>
+  </aside>
+
+</div>
+
+<script src="algorithms.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

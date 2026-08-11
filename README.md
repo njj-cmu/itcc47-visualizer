@@ -21,6 +21,15 @@ Open `index.html` in a browser. That is the whole setup — the project has no
 dependencies and no build step, so it works from a local folder, a USB stick, or
 a shared drive with no network.
 
+## Setting up for laboratory work
+
+The visualizer needs nothing installed. The *laboratory* exercises do — Python 3,
+Git and an editor — so [`setup/`](setup/) contains a check that finds what is
+missing, explains each fix, and proves the result by actually running a program.
+Students double-click `Check My Computer.cmd` and read the report it opens.
+
+See [`setup/README.md`](setup/README.md).
+
 ## For students
 
 Everything here is practice. Passing every check is strong evidence your

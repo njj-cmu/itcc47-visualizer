@@ -44,6 +44,7 @@
         <input type="text" id="custom-input" class="text-input" placeholder="e.g. 5,2,7,1,6,3,4">
         <button id="apply-custom" class="btn btn-small">Apply</button>
       </div>
+      <p id="data-error" class="field-error hidden" role="alert"></p>
 
       <div id="target-field" class="hidden">
         <label class="field-label" for="target-input">Search target</label>
@@ -73,11 +74,11 @@
         <div id="chart" class="chart"></div>
       </div>
 
-      <p id="result-caption" class="result-caption">Press Play or Step to begin.</p>
+      <p id="result-caption" class="result-caption" aria-live="polite">Press Play or Step to begin.</p>
 
       <div class="scrub-row">
         <span class="scrub-label">Step</span>
-        <input type="range" id="step-slider" min="0" max="0" value="0" class="slider">
+        <input type="range" id="step-slider" min="0" max="0" value="0" class="slider" aria-label="Timeline step">
         <span id="step-counter" class="scrub-count">0 / 0</span>
       </div>
 
@@ -97,7 +98,7 @@
   <!-- TRACE TABLE -->
   <aside class="trace-panel">
     <h2 class="panel-title">Trace Table</h2>
-    <div class="trace-table-wrap">
+    <div class="trace-table-wrap" tabindex="0" aria-label="Algorithm trace table">
       <table class="trace-table">
         <thead id="trace-head"></thead>
         <tbody id="trace-body"></tbody>
@@ -107,7 +108,9 @@
 
 </div>
 
+<script src="nav.js"></script>
 <script src="algorithms.js"></script>
+<script src="playback.js"></script>
 <script src="app.js"></script>
 <script src="sw-register.js" defer></script>
 </body>

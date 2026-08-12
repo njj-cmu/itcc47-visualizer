@@ -22,8 +22,14 @@
 
 <div class="layout layout-2col">
 
+  <div class="mobile-work-tabs" role="tablist" aria-label="Problem workspace">
+    <button id="mobile-tab-problem" class="tab active" role="tab" aria-selected="true" aria-controls="problem-pane" data-mobile-panel="problem">Problem</button>
+    <button id="mobile-tab-code" class="tab" role="tab" aria-selected="false" aria-controls="work-pane" tabindex="-1" data-mobile-panel="code">Code</button>
+    <button id="mobile-tab-results" class="tab" role="tab" aria-selected="false" aria-controls="work-pane" tabindex="-1" data-mobile-panel="results">Results</button>
+  </div>
+
   <!-- PROBLEM STATEMENT -->
-  <main class="stage">
+  <main id="problem-pane" class="stage" aria-labelledby="mobile-tab-problem">
     <div class="card problem-card">
       <div class="problem-head">
         <div>
@@ -53,7 +59,7 @@
   </main>
 
   <!-- WORK AREA -->
-  <aside class="trace-panel work-panel">
+  <aside id="work-pane" class="trace-panel work-panel">
     <div class="card editor-card work-card">
       <div class="editor-toolbar">
         <button id="btn-problems" class="btn btn-toolbar">Choose problem</button>
@@ -73,9 +79,9 @@
       </div>
 
       <textarea id="code-box" class="code-box code-editor" spellcheck="false" rows="14"
-        placeholder="Choose a problem to start writing."></textarea>
+        placeholder="Choose a problem to start writing." aria-label="Problem solution pseudocode"></textarea>
 
-      <div id="error-box" class="error-box hidden"></div>
+      <div id="error-box" class="error-box hidden" role="alert"></div>
     </div>
 
     <div class="dock results-dock">
@@ -83,7 +89,7 @@
         <h2 class="panel-title">Results</h2>
         <span id="results-score" class="results-score">not checked yet</span>
       </div>
-      <div id="results-body" class="results-body muted">
+      <div id="results-body" class="results-body muted" aria-live="polite">
         Write your answer, then press <strong>Check answer</strong>. Your pseudocode is run against
         every test case, including some you cannot see.
       </div>
@@ -159,7 +165,7 @@ AND   OR   NOT
 
   <div class="grammar-notes">
     <h3>Two things that catch people out</h3>
-    <p><strong>A bare <code>IF</code> right after <code>ELSE</code> reads as <code>ELSE IF</code>.</strong> If you need a nested <code>IF</code> as the first line of an <code>ELSE</code> block, put an assignment above it first.</p>
+    <p><strong><code>ELSE IF condition THEN</code> continues the same decision chain.</strong> An <code>IF</code> on the following indented line starts a genuinely nested decision inside the <code>ELSE</code> block.</p>
     <p><strong>Output must match exactly.</strong> <code>WRITE "INVALID"</code> passes; <code>WRITE "Invalid."</code> does not.</p>
   </div>
 
@@ -168,9 +174,12 @@ AND   OR   NOT
   </div>
 </dialog>
 
+<script src="nav.js"></script>
 <script src="sha256.js"></script>
 <script src="interpreter.js"></script>
+<script src="playback.js"></script>
 <script src="complexity.js"></script>
+<script src="evaluation.js"></script>
 <script src="problems.data.js"></script>
 <script src="problems-app.js"></script>
 <script src="sw-register.js" defer></script>

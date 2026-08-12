@@ -103,6 +103,7 @@ function fullRender(focusIndex, caretAtEnd) {
     ta.spellcheck = false;
     ta.value = step.text;
     ta.placeholder = i === 0 ? 'Read the number of overdue days' : '';
+    ta.setAttribute('aria-label', `Step ${numbers[i]}`);
     ta.addEventListener('input', onInput);
     ta.addEventListener('keydown', onKeyDown);
     ta.addEventListener('focus', () => { wstate.activeIndex = i; });

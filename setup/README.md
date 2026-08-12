@@ -10,7 +10,7 @@ Do this on your **personal laptop**. The computer laboratory machines are
 locked down and you generally cannot install software on them.
 
 > You do **not** need any of this to use the Algorithm Visualizer. That runs in
-> your browser with no setup at all — open `index.html` and start. This page is
+> your browser with no setup at all — open `index.html` and choose where to start. This page is
 > for the laboratory work, where you write and test real Python programs.
 
 ## Step 1 — Run the check

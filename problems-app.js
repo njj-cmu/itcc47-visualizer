@@ -15,6 +15,7 @@ const mobileTabs = [...document.querySelectorAll('[data-mobile-panel]')];
 const problemPane = document.getElementById('problem-pane');
 const workPane = document.getElementById('work-pane');
 const requestedModule = new URLSearchParams(window.location.search).get('module');
+const requestedProblem = new URLSearchParams(window.location.search).get('problem');
 const moduleProblems = requestedModule
   ? PROBLEMS.filter((problem) => problem.module === `Module ${requestedModule}`)
   : PROBLEMS;
@@ -45,10 +46,7 @@ const pels = {
   progressLine: document.getElementById('progress-line'),
   resultsScore: document.getElementById('results-score'),
   resultsBody: document.getElementById('results-body'),
-  problemList: document.getElementById('problem-list'),
-  dlgProblems: document.getElementById('dlg-problems'),
   dlgGrammar: document.getElementById('dlg-grammar'),
-  btnClearProgress: document.getElementById('btn-clear-progress'),
 };
 
 function esc(s) {
@@ -298,7 +296,6 @@ function renderProblemMeta() {
 function renderProgress() {
   const solved = moduleProblems.filter((p) => pstate.solved[p.id]).length;
   pels.progressLine.textContent = `${solved} of ${moduleProblems.length} solved`;
-  buildProblemList();
 }
 
 function selectProblem(problem) {
@@ -309,6 +306,7 @@ function selectProblem(problem) {
   pels.difficulty.textContent = problem.difficulty;
   pels.difficulty.className = `chip chip-diff diff-${problem.difficulty.toLowerCase().replace(/[^a-z]/g, '')}`;
   pels.statement.textContent = problem.statement;
+  pels.btnProblems.href = `problem-list.html?module=${problem.module.replace(/\D+/g, '')}`;
 
   pels.rules.innerHTML = problem.rules
     .map(([when, then]) => `<tr><th>${esc(when)}</th><td>${esc(then)}</td></tr>`)
@@ -335,33 +333,11 @@ function selectProblem(problem) {
   pels.resultsScore.textContent = 'not checked yet';
   pels.resultsScore.className = 'results-score';
   pels.resultsBody.className = 'results-body muted';
-  pels.resultsBody.innerHTML = 'Write your answer, then press <strong>Check answer</strong>. Your pseudocode is run against every test case, including some you cannot see.';
+  pels.resultsBody.innerHTML = 'Write your answer, then press <strong>Run Checks</strong>. Your pseudocode is run against every test case, including some you cannot see.';
 
   renderProblemMeta();
   renderProgress();
   selectMobilePanel('problem');
-}
-
-function buildProblemList() {
-  pels.problemList.innerHTML = '';
-  moduleProblems.forEach((p) => {
-    const btn = document.createElement('button');
-    btn.className = 'algo-btn problem-btn';
-    const selected = Boolean(pstate.problem && pstate.problem.id === p.id);
-    if (selected) btn.classList.add('active');
-    btn.setAttribute('aria-pressed', String(selected));
-    btn.innerHTML = `
-      <span class="problem-btn-mark ${pstate.solved[p.id] ? 'is-solved' : ''}">${pstate.solved[p.id] ? '✓' : ''}</span>
-      <span class="problem-btn-body">
-        <span class="problem-btn-title">${esc(p.title)}</span>
-        <span class="problem-btn-sub">${esc(p.module)} · ${esc(p.difficulty)}</span>
-      </span>`;
-    btn.addEventListener('click', () => {
-      selectProblem(p);
-      pels.dlgProblems.close();
-    });
-    pels.problemList.appendChild(btn);
-  });
 }
 
 // ---------- events ----------
@@ -406,17 +382,7 @@ pels.btnTrace.addEventListener('click', () => {
   } catch (e) { /* ignore */ }
 });
 
-pels.btnProblems.addEventListener('click', () => pels.dlgProblems.showModal());
 pels.btnGrammar.addEventListener('click', () => pels.dlgGrammar.showModal());
-
-pels.btnClearProgress.addEventListener('click', () => {
-  if (!confirm('Clear all saved progress and drafts in this browser?')) return;
-  pstate.solved = {};
-  pstate.drafts = {};
-  saveProgress();
-  if (pstate.problem) selectProblem(pstate.problem);
-  renderProgress();
-});
 
 document.querySelectorAll('[data-close]').forEach((btn) => {
   btn.addEventListener('click', () => document.getElementById(btn.dataset.close).close());
@@ -430,7 +396,7 @@ document.querySelectorAll('dialog.dlg').forEach((dlg) => {
 
 loadProgress();
 if (moduleProblems.length) {
-  selectProblem(moduleProblems[0]);
+  selectProblem(moduleProblems.find((problem) => problem.id === requestedProblem) || moduleProblems[0]);
 } else {
   window.location.replace('problems.html');
 }

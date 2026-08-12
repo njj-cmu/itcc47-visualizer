@@ -13,10 +13,11 @@
     <span class="topbar-code">ITCC47</span> Pseudocode Tracer
   </div>
   <nav class="topbar-nav">
-    <a href="index.html">Sorting &amp; Searching</a>
-    <a href="writer.html">Algorithm Writer</a>
-    <a href="tracer.html" class="active">Pseudocode Tracer</a>
-    <a href="problems.html">Problem Sets</a>
+    <a href="index.html" data-icon="start">Start</a>
+    <a href="visualizer.html" data-icon="visualize">Visualize</a>
+    <a href="writer.html" data-icon="writer">Algorithm Writer</a>
+    <a href="tracer.html" data-icon="tracer">Pseudocode Tracer</a>
+    <a href="problems.html" data-icon="problems">Problem Sets</a>
   </nav>
 </header>
 
@@ -26,13 +27,13 @@
   <main class="stage">
     <div class="card editor-card">
       <div class="editor-toolbar">
-        <button id="btn-examples" class="btn btn-toolbar">Load an example</button>
-        <button id="btn-grammar" class="btn btn-toolbar btn-cta">
-          <span class="cta-mark">?</span> Grammar cheatsheet
-        </button>
+        <button id="btn-examples" class="btn btn-toolbar btn-load" data-icon="example">Load Example</button>
+        <button id="btn-grammar" class="btn btn-toolbar btn-cta" data-icon="grammar">Pseudocode Grammar</button>
+        <button class="btn btn-toolbar editor-touch-control" type="button" data-editor-action="outdent" data-editor-target="code-box" data-icon="outdent">Outdent</button>
+        <button class="btn btn-toolbar editor-touch-control" type="button" data-editor-action="indent" data-editor-target="code-box" data-icon="indent">Indent</button>
         <span class="toolbar-spacer"></span>
-        <button id="btn-run" class="btn btn-primary btn-toolbar">Run</button>
-        <button id="btn-edit" class="btn btn-toolbar" disabled>Edit code</button>
+        <button id="btn-run" class="btn btn-run btn-toolbar" data-icon="play">Run</button>
+        <button id="btn-edit" class="btn btn-edit btn-toolbar" data-icon="edit" disabled>Edit Code</button>
       </div>
 
       <p id="status-line" class="muted status-line" role="status" aria-live="polite">Write or load pseudocode, then Run.</p>
@@ -152,7 +153,7 @@
 <!-- EXAMPLES DIALOG -->
 <dialog id="dlg-examples" class="dlg">
   <div class="dlg-head">
-    <h2>Load an example</h2>
+    <h2>Load Example</h2>
     <button class="dlg-close" data-close="dlg-examples" aria-label="Close">&times;</button>
   </div>
   <p class="muted dlg-sub">Worked examples from Topic 01. Loading one replaces the editor contents.</p>
@@ -162,7 +163,7 @@
 <!-- GRAMMAR DIALOG -->
 <dialog id="dlg-grammar" class="dlg dlg-wide">
   <div class="dlg-head">
-    <h2>Pseudocode grammar</h2>
+    <h2>Pseudocode Grammar</h2>
     <button class="dlg-close" data-close="dlg-grammar" aria-label="Close">&times;</button>
   </div>
   <p class="muted dlg-sub">The commands this tracer understands. Keywords are not case-sensitive.</p>
@@ -248,6 +249,7 @@ STOP      end the algorithm</pre>
 </dialog>
 
 <script src="nav.js"></script>
+<script src="editor-tools.js"></script>
 <script src="interpreter.js"></script>
 <script src="complexity.js"></script>
 <script src="playback.js"></script>

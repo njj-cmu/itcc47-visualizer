@@ -13,10 +13,11 @@
     <span class="topbar-code">ITCC47</span> Problem Practice
   </div>
   <nav class="topbar-nav">
-    <a href="index.html">Sorting &amp; Searching</a>
-    <a href="writer.html">Algorithm Writer</a>
-    <a href="tracer.html">Pseudocode Tracer</a>
-    <a href="problems.html" class="active">Problem Sets</a>
+    <a href="index.html" data-icon="start">Start</a>
+    <a href="visualizer.html" data-icon="visualize">Visualize</a>
+    <a href="writer.html" data-icon="writer">Algorithm Writer</a>
+    <a href="tracer.html" data-icon="tracer">Pseudocode Tracer</a>
+    <a href="problems.html" data-icon="problems">Problem Sets</a>
   </nav>
 </header>
 
@@ -62,13 +63,13 @@
   <aside id="work-pane" class="trace-panel work-panel">
     <div class="card editor-card work-card">
       <div class="editor-toolbar">
-        <a class="btn btn-toolbar catalog-back" href="problems.html">All modules</a>
-        <button id="btn-problems" class="btn btn-toolbar">Choose problem</button>
-        <button id="btn-grammar" class="btn btn-toolbar btn-cta">
-          <span class="cta-mark">?</span> Grammar
-        </button>
+        <a class="btn btn-toolbar btn-modules catalog-back" href="problems.html" data-icon="modules">All Modules</a>
+        <a id="btn-problems" class="btn btn-toolbar" href="problem-list.html" data-icon="problemsList">All Problems</a>
+        <button id="btn-grammar" class="btn btn-toolbar btn-cta" data-icon="grammar">Pseudocode Grammar</button>
+        <button class="btn btn-toolbar editor-touch-control" type="button" data-editor-action="outdent" data-editor-target="code-box" data-icon="outdent">Outdent</button>
+        <button class="btn btn-toolbar editor-touch-control" type="button" data-editor-action="indent" data-editor-target="code-box" data-icon="indent">Indent</button>
         <span class="toolbar-spacer"></span>
-        <button id="btn-check" class="btn btn-primary btn-toolbar" disabled>Check answer</button>
+        <button id="btn-check" class="btn btn-run btn-toolbar" data-icon="play" disabled>Run Checks</button>
       </div>
 
       <div class="work-subbar">
@@ -91,7 +92,7 @@
         <span id="results-score" class="results-score">not checked yet</span>
       </div>
       <div id="results-body" class="results-body muted" aria-live="polite">
-        Write your answer, then press <strong>Check answer</strong>. Your pseudocode is run against
+        Write your answer, then press <strong>Run Checks</strong>. Your pseudocode is run against
         every test case, including some you cannot see.
       </div>
     </div>
@@ -99,23 +100,10 @@
 
 </div>
 
-<!-- PROBLEM PICKER -->
-<dialog id="dlg-problems" class="dlg">
-  <div class="dlg-head">
-    <h2>Problem sets</h2>
-    <button class="dlg-close" data-close="dlg-problems" aria-label="Close">&times;</button>
-  </div>
-  <p class="muted dlg-sub">Your progress is saved in this browser only.</p>
-  <div class="algo-list" id="problem-list"></div>
-  <div class="dlg-actions">
-    <button id="btn-clear-progress" class="btn btn-small">Clear all progress</button>
-  </div>
-</dialog>
-
 <!-- GRAMMAR DIALOG -->
 <dialog id="dlg-grammar" class="dlg dlg-wide">
   <div class="dlg-head">
-    <h2>Pseudocode grammar</h2>
+    <h2>Pseudocode Grammar</h2>
     <button class="dlg-close" data-close="dlg-grammar" aria-label="Close">&times;</button>
   </div>
   <p class="muted dlg-sub">The commands the checker understands. Keywords are not case-sensitive.</p>
@@ -176,6 +164,7 @@ AND   OR   NOT
 </dialog>
 
 <script src="nav.js"></script>
+<script src="editor-tools.js"></script>
 <script src="sha256.js"></script>
 <script src="interpreter.js"></script>
 <script src="playback.js"></script>

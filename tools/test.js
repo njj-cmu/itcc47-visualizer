@@ -315,7 +315,7 @@ ok('service worker ignores non-GET requests', /request\.method\s*!==\s*'GET'/.te
 ok('service worker ignores cross-origin requests', swSource.includes('url.origin !== self.location.origin'));
 
 // Every page must register the worker, or that page is not available offline.
-['index.html', 'writer.html', 'tracer.html', 'problems.html', 'practice.html'].forEach((page) => {
+['index.html', 'visualizer.html', 'writer.html', 'tracer.html', 'problems.html', 'problem-list.html', 'practice.html'].forEach((page) => {
   const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
   ok(`${page} registers the offline worker`, html.includes('sw-register.js'));
 });

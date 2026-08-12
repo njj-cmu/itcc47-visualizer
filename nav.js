@@ -1,16 +1,54 @@
-/* Shared responsive navigation for every static entry page. */
+/* Shared icon system and responsive navigation for every static entry page. */
 (function () {
+  const icons = {
+    start: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5M9 20v-6h6v6"/>',
+    visualize: '<path d="M4 19V9m5 10V5m5 14v-7m5 7V3"/><path d="M2 21h20"/>',
+    writer: '<path d="M4 5h16M4 10h10M4 15h16M4 20h8"/>',
+    tracer: '<path d="M8 4H4v4h4V4Zm12 12h-4v4h4v-4ZM6 8v4a4 4 0 0 0 4 4h6m0-10h-5m3-3 3 3-3 3"/>',
+    problems: '<path d="M9 5h6M9 3h6v4H9z"/><path d="M7 5H5v16h14V5h-2M8 12h8m-8 4h6"/>',
+    menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    play: '<path d="m8 5 11 7-11 7V5Z"/>',
+    edit: '<path d="m4 20 4.5-1 10-10-3.5-3.5-10 10L4 20Z"/><path d="m13.5 6.5 3.5 3.5"/>',
+    example: '<path d="M4 4h16v16H4zM8 8h8m-8 4h5m-5 4h7"/>',
+    grammar: '<path d="M3 5.5A5.5 5.5 0 0 1 8.5 4H11v16H8.5A5.5 5.5 0 0 0 3 21V5.5Zm18 0A5.5 5.5 0 0 0 15.5 4H13v16h2.5a5.5 5.5 0 0 1 5.5 1V5.5Z"/>',
+    modules: '<path d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z"/>',
+    problemsList: '<path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/>',
+    indent: '<path d="M3 6h8M3 10h8M3 14h8M3 18h8m11-10 4 4-4 4m-2-4h6"/>',
+    outdent: '<path d="M13 6h8m-8 4h8m-8 4h8m-8 4h8M9 8l-4 4 4 4m-4-4h6"/>',
+    arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>',
+    reset: '<path d="M4 4v6h6M5.5 15a7 7 0 1 0 .5-7"/>',
+  };
+
+  function svg(name) {
+    const body = icons[name];
+    return body ? `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>` : '';
+  }
+  window.ITCC47Icons = svg;
+
+  document.querySelectorAll('[data-icon]').forEach((element) => {
+    if (element.querySelector('.ui-icon')) return;
+    element.insertAdjacentHTML('afterbegin', svg(element.dataset.icon));
+  });
+
   const nav = document.querySelector('.topbar-nav');
   if (!nav) return;
   nav.id = nav.id || 'primary-navigation';
-  nav.querySelectorAll('a.active').forEach((link) => link.setAttribute('aria-current', 'page'));
+  const page = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+  nav.querySelectorAll('a').forEach((link) => {
+    const href = (link.getAttribute('href') || '').split('?')[0].toLowerCase();
+    const active = href === page || (page === 'practice.html' && href === 'problems.html') || (page === 'problem-list.html' && href === 'problems.html');
+    link.classList.toggle('active', active);
+    if (active) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
 
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'nav-toggle';
   button.setAttribute('aria-controls', nav.id);
   button.setAttribute('aria-expanded', 'false');
-  button.innerHTML = '<span aria-hidden="true">☰</span><span class="nav-toggle-label">Menu</span>';
+  button.innerHTML = `${svg('menu')}<span class="nav-toggle-label">Menu</span>`;
   nav.parentNode.insertBefore(button, nav);
 
   function close(returnFocus) {

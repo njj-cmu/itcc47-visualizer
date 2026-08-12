@@ -32,25 +32,35 @@ function tokenize(src) {
   const lines = text.split('\n');
   const tokens = [];
   for (let lineNo = 0; lineNo < lines.length; lineNo++) {
-    let line = lines[lineNo];
-    const hashIdx = line.indexOf('#');
-    if (hashIdx !== -1) line = line.slice(0, hashIdx);
+    const line = lines[lineNo];
+    const push = (type, value, column) => tokens.push({ type, value, line: lineNo + 1, column: column + 1 });
     let i = 0;
     while (i < line.length) {
       const ch = line[i];
       if (/\s/.test(ch)) { i++; continue; }
+      if (ch === '#') break;
       if (ch === '"') {
+        const start = i;
         let j = i + 1;
         let str = '';
         while (j < line.length && line[j] !== '"') { str += line[j]; j++; }
-        tokens.push({ type: 'string', value: str, line: lineNo + 1 });
+        if (j >= line.length) {
+          throw new TracerError('String is missing its closing quote', lineNo + 1, start + 1,
+            'E_UNTERMINATED_STRING', 'Add a double quote at the end of the text.');
+        }
+        push('string', str, start);
         i = j + 1;
         continue;
       }
       if (/[0-9]/.test(ch) || (ch === '.' && /[0-9]/.test(line[i + 1] || ''))) {
         let j = i;
         while (j < line.length && /[0-9.]/.test(line[j])) j++;
-        tokens.push({ type: 'number', value: parseFloat(line.slice(i, j)), line: lineNo + 1 });
+        const raw = line.slice(i, j);
+        if (!/^(?:\d+(?:\.\d+)?|\.\d+)$/.test(raw)) {
+          throw new TracerError(`Malformed number '${raw}'`, lineNo + 1, i + 1,
+            'E_MALFORMED_NUMBER', 'Use at most one decimal point.');
+        }
+        push('number', parseFloat(raw), i);
         i = j;
         continue;
       }
@@ -60,29 +70,30 @@ function tokenize(src) {
         const word = line.slice(i, j);
         const upper = word.toUpperCase();
         if (KEYWORDS.has(upper)) {
-          tokens.push({ type: 'keyword', value: upper, line: lineNo + 1 });
+          push('keyword', upper, i);
         } else {
-          tokens.push({ type: 'ident', value: word, line: lineNo + 1 });
+          push('ident', word, i);
         }
         i = j;
         continue;
       }
       if (ch === '<' && line[i + 1] === '-') {
-        tokens.push({ type: 'op', value: '<-', line: lineNo + 1 });
+        push('op', '<-', i);
         i += 2;
         continue;
       }
-      if (ch === '<' && line[i + 1] === '=') { tokens.push({ type: 'op', value: '<=', line: lineNo + 1 }); i += 2; continue; }
-      if (ch === '>' && line[i + 1] === '=') { tokens.push({ type: 'op', value: '>=', line: lineNo + 1 }); i += 2; continue; }
-      if (ch === '<' && line[i + 1] === '>') { tokens.push({ type: 'op', value: '<>', line: lineNo + 1 }); i += 2; continue; }
-      if (ch === '!' && line[i + 1] === '=') { tokens.push({ type: 'op', value: '<>', line: lineNo + 1 }); i += 2; continue; }
-      if (ch === '=' && line[i + 1] === '=') { tokens.push({ type: 'op', value: '=', line: lineNo + 1 }); i += 2; continue; }
+      if (ch === '<' && line[i + 1] === '=') { push('op', '<=', i); i += 2; continue; }
+      if (ch === '>' && line[i + 1] === '=') { push('op', '>=', i); i += 2; continue; }
+      if (ch === '<' && line[i + 1] === '>') { push('op', '<>', i); i += 2; continue; }
+      if (ch === '!' && line[i + 1] === '=') { push('op', '<>', i); i += 2; continue; }
+      if (ch === '=' && line[i + 1] === '=') { push('op', '=', i); i += 2; continue; }
       if ('+-*/%=<>,:[]()'.includes(ch)) {
-        tokens.push({ type: 'op', value: ch, line: lineNo + 1 });
+        push('op', ch, i);
         i++;
         continue;
       }
-      throw new TracerError(`Unrecognized character '${ch}'`, lineNo + 1);
+      throw new TracerError(`Unrecognized character '${ch}'`, lineNo + 1, i + 1,
+        'E_UNKNOWN_CHARACTER', 'Use only the operators shown in the grammar guide.');
     }
     tokens.push({ type: 'newline', line: lineNo + 1 });
   }
@@ -91,9 +102,12 @@ function tokenize(src) {
 }
 
 class TracerError extends Error {
-  constructor(message, line) {
-    super(line ? `Line ${line}: ${message}` : message);
+  constructor(message, line, column, code = 'E_TRACER', hint = '') {
+    super(line ? `Line ${line}${column ? `, column ${column}` : ''}: ${message}` : message);
     this.line = line;
+    this.column = column || null;
+    this.code = code;
+    this.hint = hint;
   }
 }
 
@@ -107,6 +121,7 @@ class Parser {
   constructor(tokens) {
     this.tokens = tokens.filter((t) => t.type !== 'newline');
     this.pos = 0;
+    this.loopDepth = 0;
   }
 
   peek(offset = 0) { return this.tokens[this.pos + offset]; }
@@ -126,7 +141,10 @@ class Parser {
     if (!this.at('op', value)) this.err(`Expected '${value}'`);
     return this.next();
   }
-  err(msg) { throw new TracerError(msg, this.peek() ? this.peek().line : undefined); }
+  err(msg, code = 'E_PARSE', hint = '') {
+    const token = this.peek();
+    throw new TracerError(msg, token ? token.line : undefined, token ? token.column : undefined, code, hint);
+  }
 
   parseProgram() {
     const stmts = this.parseBlock(() => this.at('eof'));
@@ -136,7 +154,13 @@ class Parser {
   parseBlock(isEnd) {
     const stmts = [];
     while (!isEnd() && !this.at('eof')) {
-      stmts.push(this.parseStmt());
+      const stmt = this.parseStmt();
+      stmts.push(stmt);
+      const previous = this.tokens[this.pos - 1];
+      const next = this.peek();
+      if (previous && next && next.type !== 'eof' && next.line === previous.line) {
+        this.err('Write only one statement per line', 'E_STATEMENT_BOUNDARY', 'Move the next statement to a new line.');
+      }
     }
     return stmts;
   }
@@ -149,12 +173,15 @@ class Parser {
     if (this.atKeyword('FOR')) return this.parseFor();
     if (this.atKeyword('WHILE')) return this.parseWhile();
     if (this.atKeyword('CASE')) return this.parseCase();
-    if (this.atKeyword('BREAK')) { this.next(); return { type: 'Break', line: t.line }; }
+    if (this.atKeyword('BREAK')) {
+      if (this.loopDepth === 0) this.err('BREAK can only be used inside a loop', 'E_BREAK_OUTSIDE_LOOP', 'Remove BREAK or place it inside FOR/WHILE.');
+      this.next(); return { type: 'Break', line: t.line };
+    }
     if (this.atKeyword('STOP')) { this.next(); return { type: 'Stop', line: t.line }; }
     if (this.atKeyword('RETURN')) {
-      this.next();
+      const returnToken = this.next();
       let expr = null;
-      if (!this.atStmtEnd()) expr = this.parseExpr();
+      if (!this.atStmtEnd() && this.peek().line === returnToken.line) expr = this.parseExpr();
       return { type: 'Return', expr, line: t.line };
     }
     if (this.at('ident')) return this.parseAssign();
@@ -231,21 +258,27 @@ class Parser {
     const line = this.next().line;
     if (this.atKeyword('EACH')) {
       this.next();
+      if (!this.at('ident')) this.err('Expected a loop variable after FOR EACH', 'E_EXPECTED_IDENTIFIER');
       const varName = this.next().value;
       this.expectKeyword('IN');
       const listExpr = this.parseExpr();
       this.expectKeyword('DO');
+      this.loopDepth++;
       const block = this.parseBlock(() => this.atKeyword('ENDFOR'));
+      this.loopDepth--;
       this.expectKeyword('ENDFOR');
       return { type: 'ForEach', varName, listExpr, block, line, text: `FOR EACH ${varName} IN ${exprToText(listExpr)} DO` };
     }
+    if (!this.at('ident')) this.err('Expected a loop variable after FOR', 'E_EXPECTED_IDENTIFIER');
     const varName = this.next().value;
     this.expectOp('<-');
     const start = this.parseExpr();
     this.expectKeyword('TO');
     const end = this.parseExpr();
     this.expectKeyword('DO');
+    this.loopDepth++;
     const block = this.parseBlock(() => this.atKeyword('ENDFOR'));
+    this.loopDepth--;
     this.expectKeyword('ENDFOR');
     return { type: 'For', varName, start, end, block, line, text: `FOR ${varName} <- ${exprToText(start)} TO ${exprToText(end)} DO` };
   }
@@ -254,7 +287,9 @@ class Parser {
     const line = this.next().line;
     const condition = this.parseExpr();
     this.expectKeyword('DO');
+    this.loopDepth++;
     const block = this.parseBlock(() => this.atKeyword('ENDWHILE'));
+    this.loopDepth--;
     this.expectKeyword('ENDWHILE');
     return { type: 'While', condition, block, line, text: `WHILE ${exprToText(condition)} DO` };
   }
@@ -294,16 +329,16 @@ class Parser {
   parseExpr() { return this.parseOr(); }
   parseOr() {
     let left = this.parseAnd();
-    while (this.atKeyword('OR')) { this.next(); left = { type: 'Logical', op: 'OR', left, right: this.parseAnd() }; }
+    while (this.atKeyword('OR')) { this.next(); left = { type: 'Logical', op: 'OR', left, right: this.parseAnd(), line: left.line }; }
     return left;
   }
   parseAnd() {
     let left = this.parseNot();
-    while (this.atKeyword('AND')) { this.next(); left = { type: 'Logical', op: 'AND', left, right: this.parseNot() }; }
+    while (this.atKeyword('AND')) { this.next(); left = { type: 'Logical', op: 'AND', left, right: this.parseNot(), line: left.line }; }
     return left;
   }
   parseNot() {
-    if (this.atKeyword('NOT')) { this.next(); return { type: 'Unary', op: 'NOT', expr: this.parseNot() }; }
+    if (this.atKeyword('NOT')) { const token = this.next(); return { type: 'Unary', op: 'NOT', expr: this.parseNot(), line: token.line }; }
     return this.parseComparison();
   }
   parseComparison() {
@@ -311,7 +346,7 @@ class Parser {
     if (this.at('op') && ['<', '>', '<=', '>=', '=', '<>'].includes(this.peek().value)) {
       const op = this.next().value;
       const right = this.parseAdditive();
-      return { type: 'Binary', op, left, right };
+      return { type: 'Binary', op, left, right, line: left.line };
     }
     return left;
   }
@@ -319,7 +354,7 @@ class Parser {
     let left = this.parseMultiplicative();
     while (this.at('op') && ['+', '-'].includes(this.peek().value)) {
       const op = this.next().value;
-      left = { type: 'Binary', op, left, right: this.parseMultiplicative() };
+      left = { type: 'Binary', op, left, right: this.parseMultiplicative(), line: left.line };
     }
     return left;
   }
@@ -327,12 +362,12 @@ class Parser {
     let left = this.parseUnary();
     while (this.at('op') && ['*', '/', '%'].includes(this.peek().value)) {
       const op = this.next().value;
-      left = { type: 'Binary', op, left, right: this.parseUnary() };
+      left = { type: 'Binary', op, left, right: this.parseUnary(), line: left.line };
     }
     return left;
   }
   parseUnary() {
-    if (this.at('op', '-')) { this.next(); return { type: 'Unary', op: '-', expr: this.parseUnary() }; }
+    if (this.at('op', '-')) { const token = this.next(); return { type: 'Unary', op: '-', expr: this.parseUnary(), line: token.line }; }
     return this.parsePostfix();
   }
   parsePostfix() {
@@ -341,16 +376,16 @@ class Parser {
       this.next();
       const index = this.parseExpr();
       this.expectOp(']');
-      expr = { type: 'Index', target: expr, index };
+      expr = { type: 'Index', target: expr, index, line: expr.line || this.peek().line };
     }
     return expr;
   }
   parsePrimary() {
     const t = this.peek();
-    if (t.type === 'number') { this.next(); return { type: 'Number', value: t.value }; }
-    if (t.type === 'string') { this.next(); return { type: 'String', value: t.value }; }
-    if (this.atKeyword('TRUE')) { this.next(); return { type: 'Bool', value: true }; }
-    if (this.atKeyword('FALSE')) { this.next(); return { type: 'Bool', value: false }; }
+    if (t.type === 'number') { this.next(); return { type: 'Number', value: t.value, line: t.line }; }
+    if (t.type === 'string') { this.next(); return { type: 'String', value: t.value, line: t.line }; }
+    if (this.atKeyword('TRUE')) { this.next(); return { type: 'Bool', value: true, line: t.line }; }
+    if (this.atKeyword('FALSE')) { this.next(); return { type: 'Bool', value: false, line: t.line }; }
     if (this.at('op', '(')) {
       this.next();
       const e = this.parseExpr();
@@ -365,9 +400,9 @@ class Parser {
         while (this.at('op', ',')) { this.next(); items.push(this.parseExpr()); }
       }
       this.expectOp(']');
-      return { type: 'ArrayLit', items };
+      return { type: 'ArrayLit', items, line: t.line };
     }
-    if (t.type === 'ident') { this.next(); return { type: 'Ident', name: t.value }; }
+    if (t.type === 'ident') { this.next(); return { type: 'Ident', name: t.value, line: t.line }; }
     this.err(`Unexpected token in expression '${t.value !== undefined ? t.value : t.type}'`);
   }
 }
@@ -424,8 +459,12 @@ function evalExpr(node, env) {
     case 'ArrayLit': return node.items.map((it) => evalExpr(it, env));
     case 'Index': {
       const base = evalExpr(node.target, env);
-      const idx = Math.floor(evalExpr(node.index, env));
-      if (!Array.isArray(base)) throw new TracerError(`${exprToText(node.target)} is not a list`);
+      const rawIndex = evalExpr(node.index, env);
+      if (!Number.isInteger(rawIndex)) throw new TracerError('List position must be a whole number', node.line, null, 'E_INVALID_INDEX');
+      const idx = rawIndex;
+      if (!Array.isArray(base)) throw new TracerError(`${exprToText(node.target)} is not a list`, node.line);
+      if (idx < 0 || idx >= base.length) throw new TracerError(`List position ${idx} is outside 0–${base.length - 1}`, node.line, null,
+        'E_INDEX_OUT_OF_BOUNDS', 'Check the loop boundary or list position.');
       return base[idx];
     }
     case 'Unary': {
@@ -447,8 +486,12 @@ function evalExpr(node, env) {
         case '+': return (typeof l === 'string' || typeof r === 'string') ? `${fmtValue(l)}${fmtValue(r)}` : l + r;
         case '-': return l - r;
         case '*': return l * r;
-        case '/': return Math.floor(l / r);
-        case '%': return l % r;
+        case '/':
+          if (r === 0) throw new TracerError('Cannot divide by zero', node.line, null, 'E_DIVIDE_BY_ZERO');
+          return Math.floor(l / r);
+        case '%':
+          if (r === 0) throw new TracerError('Cannot divide by zero', node.line, null, 'E_DIVIDE_BY_ZERO');
+          return l % r;
         case '<': return l < r;
         case '>': return l > r;
         case '<=': return l <= r;
@@ -472,7 +515,12 @@ function assignLValue(target, value, env) {
     return;
   }
   if (!Array.isArray(env[target.name])) throw new TracerError(`${target.name} is not a list`, target.line);
-  const idx = Math.floor(evalExpr(target.index, env));
+  const idx = evalExpr(target.index, env);
+  if (!Number.isInteger(idx)) throw new TracerError('List position must be a whole number', target.line, null, 'E_INVALID_INDEX');
+  const canAppend = idx === env[target.name].length || (env[target.name].length === 0 && idx === 1);
+  if (idx < 0 || (idx >= env[target.name].length && !canAppend)) throw new TracerError(
+    `List position ${idx} skips beyond the next available position`, target.line, null,
+    'E_INDEX_OUT_OF_BOUNDS', 'Use the next 0-based or 1-based position without skipping an item.');
   env[target.name][idx] = value;
 }
 
@@ -531,13 +579,11 @@ function* execBlock(stmts, env, ctx) {
 function* execStmt(stmt, env, ctx) {
   switch (stmt.type) {
     case 'Read': {
-      let val;
       if (ctx.inputs.length === 0) {
-        val = null;
-        ctx.warnings.push(`Line ${stmt.line}: ran out of input values, used null.`);
-      } else {
-        val = ctx.inputs.shift();
+        throw new TracerError(`READ ${stmt.target.text} needs another input value`, stmt.line, null,
+          'E_INPUT_EXHAUSTED', 'Add the missing value to the Input values box.');
       }
+      const val = ctx.inputs.shift();
       assignLValue(stmt.target, val, env);
       // receive the value + store it
       yield mkStep(stmt.line, stmt.text, `Read ${stmt.target.text} = ${fmtValue(val)}`, env, 'read',
@@ -688,7 +734,7 @@ function* runProgram(ast, inputValues) {
   try {
     yield* execBlock(ast, env, ctx);
   } catch (e) {
-    if (e instanceof ReturnSignal || e instanceof StopSignal || e instanceof BreakSignal) {
+    if (e instanceof ReturnSignal || e instanceof StopSignal) {
       // clean termination
     } else {
       throw e;

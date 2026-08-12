@@ -18,6 +18,32 @@ function makeStep(arr, highlight, description, stats, flags = {}) {
   };
 }
 
+function eventType(step) {
+  const h = step.highlight || {};
+  if (step.final) return 'complete';
+  if (h.preprocess) return 'preprocess';
+  if (h.found !== undefined) return 'found';
+  if (h.swap) return 'swap';
+  if (h.move) return 'move';
+  if (h.compare || h.mid !== undefined) return 'compare';
+  if (h.range) return 'range';
+  return 'state';
+}
+
+function finalizeTimeline(key, steps) {
+  return steps.map((step, index) => ITCC47Playback.timelineEvent({
+    id: `${key}:${index}`,
+    domain: 'array',
+    type: eventType(step),
+    message: step.description,
+    frame: Object.freeze({ array: step.array, highlight: step.highlight }),
+    metrics: step.stats,
+    segment: step.stats.pass == null ? null : `pass:${step.stats.pass}`,
+    boundary: step.passEnd,
+    terminal: step.final,
+  }));
+}
+
 function allIndices(n) {
   return Array.from({ length: n }, (_, i) => i);
 }
@@ -27,6 +53,11 @@ const ALGORITHMS = {
     name: 'Bubble Sort',
     category: 'sorting',
     complexity: { best: 'O(n)', avg: 'O(n²)', worst: 'O(n²)', space: 'O(1)' },
+    metrics: [
+      { key: 'pass', short: 'Pass', label: 'Pass' },
+      { key: 'comparisons', short: 'Cmp', label: 'Comparisons' },
+      { key: 'swaps', short: 'Swp', label: 'Swaps' },
+    ],
     blurb: 'Repeatedly steps through the list, compares adjacent items, and swaps them if they are out of order. Each pass bubbles the next-largest value into place.',
     run(input) {
       const arr = [...input];
@@ -59,7 +90,7 @@ const ALGORITHMS = {
       }
       for (let k = 0; k < n; k++) sorted.add(k);
       steps.push(makeStep(arr, { sorted: [...sorted] }, 'Array fully sorted.', { pass: null, comparisons, swaps }, { final: true }));
-      return steps;
+      return finalizeTimeline('bubble', steps);
     },
   },
 
@@ -67,6 +98,11 @@ const ALGORITHMS = {
     name: 'Selection Sort',
     category: 'sorting',
     complexity: { best: 'O(n²)', avg: 'O(n²)', worst: 'O(n²)', space: 'O(1)' },
+    metrics: [
+      { key: 'pass', short: 'Pass', label: 'Pass' },
+      { key: 'comparisons', short: 'Cmp', label: 'Comparisons' },
+      { key: 'swaps', short: 'Swp', label: 'Swaps' },
+    ],
     blurb: 'Each pass scans the unsorted region for the minimum value, then swaps it into the next open position at the front.',
     run(input) {
       const arr = [...input];
@@ -100,7 +136,7 @@ const ALGORITHMS = {
       }
       for (let k = 0; k < n; k++) sorted.add(k);
       steps.push(makeStep(arr, { sorted: [...sorted] }, 'Array fully sorted.', { pass: null, comparisons, swaps }, { final: true }));
-      return steps;
+      return finalizeTimeline('selection', steps);
     },
   },
 
@@ -108,6 +144,11 @@ const ALGORITHMS = {
     name: 'Insertion Sort',
     category: 'sorting',
     complexity: { best: 'O(n)', avg: 'O(n²)', worst: 'O(n²)', space: 'O(1)' },
+    metrics: [
+      { key: 'pass', short: 'Pass', label: 'Pass' },
+      { key: 'comparisons', short: 'Cmp', label: 'Comparisons' },
+      { key: 'moves', short: 'Mov', label: 'Moves' },
+    ],
     blurb: 'Builds a sorted region from the left. Each new item is picked up and shifted left into its correct place among the already-sorted items.',
     run(input) {
       const arr = [...input];
@@ -117,20 +158,20 @@ const ALGORITHMS = {
       let moves = 0;
       const sorted = new Set([0]);
 
-      steps.push(makeStep(arr, { sorted: [0] }, 'Starting Insertion Sort. First item is trivially sorted.', { pass: 0, comparisons, swaps: moves }));
+      steps.push(makeStep(arr, { sorted: [0] }, 'Starting Insertion Sort. First item is trivially sorted.', { pass: 0, comparisons, moves }));
 
       for (let i = 1; i < n; i++) {
         const pass = i;
         const key = arr[i];
         let j = i - 1;
-        steps.push(makeStep(arr, { active: [i], sorted: [...sorted] }, `Pass ${pass}: pick up ${key} (index ${i}) to insert.`, { pass, comparisons, swaps: moves }));
+        steps.push(makeStep(arr, { active: [i], sorted: [...sorted] }, `Pass ${pass}: pick up ${key} (index ${i}) to insert.`, { pass, comparisons, moves }));
         while (j >= 0) {
           comparisons++;
-          steps.push(makeStep(arr, { compare: [j, j + 1], sorted: [...sorted] }, `Compare ${key} with ${arr[j]}`, { pass, comparisons, swaps: moves }));
+          steps.push(makeStep(arr, { compare: [j, j + 1], sorted: [...sorted] }, `Compare ${key} with ${arr[j]}`, { pass, comparisons, moves }));
           if (arr[j] > key) {
             arr[j + 1] = arr[j];
             moves++;
-            steps.push(makeStep(arr, { swap: [j + 1], sorted: [...sorted] }, `${arr[j + 1]} > ${key} → shift right`, { pass, comparisons, swaps: moves }));
+            steps.push(makeStep(arr, { move: [j, j + 1], sorted: [...sorted] }, `${arr[j + 1]} > ${key} → shift right`, { pass, comparisons, moves }));
             j--;
           } else {
             break;
@@ -138,10 +179,10 @@ const ALGORITHMS = {
         }
         arr[j + 1] = key;
         for (let k = 0; k <= i; k++) sorted.add(k);
-        steps.push(makeStep(arr, { sorted: [...sorted] }, `Insert ${key} at index ${j + 1}. Sorted region size ${i + 1}.`, { pass, comparisons, swaps: moves }, { passEnd: true }));
+        steps.push(makeStep(arr, { sorted: [...sorted] }, `Insert ${key} at index ${j + 1}. Sorted region size ${i + 1}.`, { pass, comparisons, moves }, { passEnd: true }));
       }
-      steps.push(makeStep(arr, { sorted: allIndices(n) }, 'Array fully sorted.', { pass: null, comparisons, swaps: moves }, { final: true }));
-      return steps;
+      steps.push(makeStep(arr, { sorted: allIndices(n) }, 'Array fully sorted.', { pass: null, comparisons, moves }, { final: true }));
+      return finalizeTimeline('insertion', steps);
     },
   },
 
@@ -149,6 +190,7 @@ const ALGORITHMS = {
     name: 'Linear Search',
     category: 'searching',
     complexity: { best: 'O(1)', avg: 'O(n)', worst: 'O(n)', space: 'O(1)' },
+    metrics: [{ key: 'comparisons', short: 'Cmp', label: 'Comparisons' }],
     blurb: 'Checks every item in order, from the start, until the target is found or the list runs out.',
     needsTarget: true,
     run(input, target) {
@@ -160,12 +202,12 @@ const ALGORITHMS = {
         comparisons++;
         if (arr[i] === target) {
           steps.push(makeStep(arr, { found: i }, `arr[${i}] = ${arr[i]} matches ${target}. Found!`, { comparisons }, { final: true }));
-          return steps;
+          return finalizeTimeline('linear', steps);
         }
         steps.push(makeStep(arr, { active: [i] }, `arr[${i}] = ${arr[i]} ≠ ${target}. Keep searching.`, { comparisons }));
       }
       steps.push(makeStep(arr, {}, `Reached the end. ${target} was not found.`, { comparisons }, { final: true }));
-      return steps;
+      return finalizeTimeline('linear', steps);
     },
   },
 
@@ -173,22 +215,33 @@ const ALGORITHMS = {
     name: 'Binary Search',
     category: 'searching',
     complexity: { best: 'O(1)', avg: 'O(log n)', worst: 'O(log n)', space: 'O(1)' },
+    metrics: [{ key: 'comparisons', short: 'Cmp', label: 'Comparisons' }],
     blurb: 'Requires a sorted array. Repeatedly checks the middle of the remaining range and discards the half that cannot contain the target.',
     needsTarget: true,
     needsSorted: true,
     run(input, target) {
+      const original = [...input];
       const arr = [...input].sort((a, b) => a - b);
       const steps = [];
       let comparisons = 0;
       let lo = 0;
       let hi = arr.length - 1;
-      steps.push(makeStep(arr, { range: [lo, hi] }, `Searching sorted array for ${target}. Range: index ${lo}–${hi}.`, { comparisons }));
+      const alreadySorted = original.every((value, i) => i === 0 || original[i - 1] <= value);
+      steps.push(makeStep(original, { preprocess: true }, alreadySorted
+        ? 'Binary search requires sorted data. This array is already sorted, so no preprocessing was needed.'
+        : 'Binary search requires sorted data. This visualizer creates a sorted copy before searching. Sorting has a separate cost, typically O(n log n), and is not included in the search comparison count. For one search on unsorted data, linear search may be cheaper.', { comparisons }));
+      if (!alreadySorted) {
+        steps.push(makeStep(arr, { preprocess: true, range: [lo, hi] },
+          'Sorted copy ready. The Binary Search comparison count starts at zero.',
+          { comparisons }));
+      }
+      steps.push(makeStep(arr, { range: [lo, hi] }, `Searching the sorted array for ${target}. Range: index ${lo}–${hi}.`, { comparisons }));
       while (lo <= hi) {
         const mid = Math.floor((lo + hi) / 2);
         comparisons++;
         if (arr[mid] === target) {
           steps.push(makeStep(arr, { found: mid, range: [lo, hi] }, `arr[${mid}] = ${arr[mid]} matches ${target}. Found!`, { comparisons }, { final: true }));
-          return steps;
+          return finalizeTimeline('binary', steps);
         }
         if (arr[mid] < target) {
           steps.push(makeStep(arr, { mid, range: [lo, hi] }, `arr[${mid}] = ${arr[mid]} < ${target} → search right half.`, { comparisons }));
@@ -202,7 +255,7 @@ const ALGORITHMS = {
         }
       }
       steps.push(makeStep(arr, {}, `Search range is empty. ${target} was not found.`, { comparisons }, { final: true }));
-      return steps;
+      return finalizeTimeline('binary', steps);
     },
   },
 };

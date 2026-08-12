@@ -17,6 +17,7 @@ function collectSteps(ast, inputs, maxSteps = MAX_STEPS) {
   const steps = [];
   let truncated = false;
   let error = null;
+  let result = null;
   try {
     let r = gen.next();
     while (!r.done) {
@@ -24,10 +25,36 @@ function collectSteps(ast, inputs, maxSteps = MAX_STEPS) {
       if (steps.length >= maxSteps) { truncated = true; break; }
       r = gen.next();
     }
+    if (r.done) result = r.value;
   } catch (e) {
     error = e;
   }
-  return { steps, truncated, error };
+  const events = typeof ITCC47Playback === 'undefined' ? steps : steps.map((step, index) => ITCC47Playback.timelineEvent({
+    id: `pseudocode:${index}`,
+    domain: 'pseudocode',
+    type: step.kind || 'exec',
+    message: step.description,
+    frame: Object.freeze({
+      vars: step.vars,
+      outputValue: step.outputValue,
+      loopLine: step.loopLine,
+      loopIterations: step.loopIterations,
+      iteration: step.iteration,
+    }),
+    metrics: { cost: step.cost || 0, controlCost: step.controlCost || 0 },
+    source: { line: step.line, code: step.code },
+    terminal: step.kind === 'return' || step.kind === 'stop',
+  }));
+  return {
+    steps: events,
+    events,
+    outcome: error ? 'error' : (truncated ? 'truncated' : 'complete'),
+    result,
+    diagnostics: error ? [{ code: error.code || 'E_RUNTIME', line: error.line || null, column: error.column || null,
+      message: error.message || String(error), hint: error.hint || '' }] : [],
+    truncated,
+    error,
+  };
 }
 
 // ---------- per-line counting ----------
@@ -36,18 +63,19 @@ function summarizeCounts(steps, sourceLines, includeControl) {
   const rows = new Map();
 
   steps.forEach((s) => {
-    const unit = s.cost + (includeControl ? s.controlCost : 0);
-    if (!rows.has(s.line)) {
-      rows.set(s.line, { line: s.line, code: (sourceLines[s.line - 1] || s.code || '').trim(), each: unit, times: 0, total: 0 });
+    const unit = s.metrics.cost + (includeControl ? s.metrics.controlCost : 0);
+    const line = s.source.line;
+    if (!rows.has(line)) {
+      rows.set(line, { line, code: (sourceLines[line - 1] || s.source.code || '').trim(), each: unit, times: 0, total: 0 });
     }
-    const row = rows.get(s.line);
+    const row = rows.get(line);
     // A FOR line yields an entry step and per-iteration steps with different
     // control costs; report the dominant per-execution figure but keep the
     // total exact.
     row.times += 1;
     row.total += unit;
     row.each = row.times > 0 ? row.total / row.times : unit;
-    rows.set(s.line, row);
+    rows.set(line, row);
   });
 
   const list = [...rows.values()].sort((a, b) => a.line - b.line);
@@ -78,7 +106,7 @@ function loopDiagnostics(ast, steps, sourceLines) {
   loopLines.forEach((loop) => {
     if (loop.type === 'While') {
       // A WHILE yields one step per condition check: n checks means n-1 body runs.
-      const checks = steps.filter((s) => s.loopLine === loop.line).length;
+      const checks = steps.filter((s) => s.frame.loopLine === loop.line).length;
       if (Math.max(0, checks - 1) === 0) {
         notes.push({
           line: loop.line,
@@ -89,8 +117,8 @@ function loopDiagnostics(ast, steps, sourceLines) {
       return;
     }
     // FOR / FOR EACH report their true body-execution count on the closing step.
-    const finish = steps.find((s) => s.loopLine === loop.line && s.loopIterations !== undefined);
-    if (finish && finish.loopIterations === 0) {
+    const finish = steps.find((s) => s.frame.loopLine === loop.line && s.frame.loopIterations !== undefined);
+    if (finish && finish.frame.loopIterations === 0) {
       notes.push({
         line: loop.line,
         severity: 'warning',
@@ -142,7 +170,7 @@ function sweep(ast, baseInputs, inputIndex, sizes, includeControl) {
 
     const { steps, truncated, error } = collectSteps(ast, inputs, 60000);
     if (error) return { points, error: error.message || String(error) };
-    const total = steps.reduce((s, st) => s + st.cost + (includeControl ? st.controlCost : 0), 0);
+    const total = steps.reduce((s, st) => s + st.metrics.cost + (includeControl ? st.metrics.controlCost : 0), 0);
     points.push({ n, total, truncated });
     if (truncated) break;
   }

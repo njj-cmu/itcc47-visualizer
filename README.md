@@ -9,7 +9,8 @@ account, nothing to submit.
 | [`index.html`](index.html) | Sorting and searching, stepped through one comparison at a time, with a trace table |
 | [`writer.html`](writer.html) | Write an algorithm in plain language; it is checked against the five characteristics from Topic 01 |
 | [`tracer.html`](tracer.html) | Run course pseudocode step by step — variable state, output, per-line operation counts, and a measured growth curve |
-| [`problems.html`](problems.html) | Practice problems, checked against visible examples and hidden cases |
+| [`problems.html`](problems.html) | Browse equal-height module cards and see which problem sets are available |
+| [`practice.html`](practice.html) | Solve a selected module's pseudocode problems against visible examples and hidden cases |
 
 The three pseudocode tools hand off to each other: the Writer exports a skeleton
 into the Tracer, and a problem draft can be opened in the Tracer to see where it
@@ -43,9 +44,18 @@ examples pass but a hidden case does not, that is where to look.
 ## Working on it
 
 ```bash
-node tools/test.js              # interpreter, presets, and problem-data checks
+node tools/test.js              # dependency-free interpreter, engine, and content checks
+npm run test:unit               # the same dependency-free unit command
+npm run test:e2e                # laptop, phone, offline, and file-mode browser checks
+npm run test:a11y               # Axe WCAG checks in laptop and phone viewports
+npm run check                   # complete release check
 node tools/build-problems.js    # regenerate problems.data.js (instructor only)
 ```
+
+Playwright Chromium and Axe are development/CI dependencies only. The pages
+still ship as plain HTML, CSS, and JavaScript with no runtime packages. The
+shared engine contracts and the boundary between public practice and a future
+authenticated grading portal are documented in [`docs/architecture.md`](docs/architecture.md).
 
 `tools/test.js` needs nothing but Node. `tools/build-problems.js` additionally
 needs `problems.hidden.json`, which is gitignored and not in this repository —

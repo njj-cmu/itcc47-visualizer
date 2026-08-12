@@ -11,11 +11,19 @@ const PROGRESS_KEY = 'itcc47.problems.v1';
 const CODE_KEY = 'itcc47.problems.code.v1';
 const HANDOFF_KEY = 'itcc47.tracer.handoff';
 const STEP_CAP = 20000;
+const mobileTabs = [...document.querySelectorAll('[data-mobile-panel]')];
+const problemPane = document.getElementById('problem-pane');
+const workPane = document.getElementById('work-pane');
+const requestedModule = new URLSearchParams(window.location.search).get('module');
+const moduleProblems = requestedModule
+  ? PROBLEMS.filter((problem) => problem.module === `Module ${requestedModule}`)
+  : PROBLEMS;
 
 const pstate = {
   problem: null,
   solved: {},   // id -> true
   drafts: {},   // id -> code
+  lastEvaluation: null,
 };
 
 const pels = {
@@ -45,6 +53,20 @@ const pels = {
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function selectMobilePanel(name, focus = false) {
+  mobileTabs.forEach((tab) => {
+    const selected = tab.dataset.mobilePanel === name;
+    tab.classList.toggle('active', selected);
+    tab.setAttribute('aria-selected', String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+    if (selected && focus) tab.focus();
+  });
+  problemPane.classList.toggle('mobile-panel-hidden', name !== 'problem');
+  workPane.classList.toggle('mobile-panel-hidden', name === 'problem');
+  workPane.classList.toggle('mobile-code', name === 'code');
+  workPane.classList.toggle('mobile-results', name === 'results');
 }
 
 // ---------- persistence ----------
@@ -78,11 +100,11 @@ function canon(values) {
   return values.map((v) => {
     if (typeof v === 'boolean') return v ? 'true' : 'false';
     return String(v);
-  }).join('');
+  }).join('\u0001');
 }
 
 function outputsOf(steps) {
-  return steps.filter((s) => s.kind === 'write').map((s) => s.outputValue);
+  return steps.filter((s) => s.type === 'write').map((s) => s.frame.outputValue);
 }
 
 /** Execute the student's program against one case; returns outputs or a failure reason. */
@@ -155,6 +177,13 @@ function checkAnswer() {
   try {
     ast = parsePseudocode(pels.codeBox.value);
   } catch (e) {
+    pstate.lastEvaluation = ITCC47Evaluation.createResult({
+      activityId: problem.id,
+      activityVersion: problem.contentVersion,
+      status: 'error', passed: 0, total: 0, cases: [], outputs: [],
+      diagnostics: [{ code: e.code || 'E_PARSE', line: e.line || null, column: e.column || null,
+        message: e.message, hint: e.hint || '' }],
+    });
     pels.errorBox.textContent = e instanceof TracerError ? e.message : `Unexpected error: ${e.message}`;
     pels.errorBox.classList.remove('hidden');
     pels.resultsScore.textContent = 'could not run';
@@ -171,6 +200,22 @@ function checkAnswer() {
   const total = visible.length + hidden.length;
   const passed = passedVisible + passedHidden;
   const allPass = passed === total;
+
+  pstate.lastEvaluation = ITCC47Evaluation.createResult({
+    activityId: problem.id,
+    activityVersion: problem.contentVersion,
+    status: allPass ? 'passed' : 'failed',
+    passed,
+    total,
+    cases: [
+      ...visible.map((row, i) => ({ id: `visible:${i}`, visible: true, passed: row.result.pass,
+        diagnostic: row.result.reason || null })),
+      ...hidden.map((row, i) => ({ id: `hidden:${i}`, visible: false, passed: row.result.pass,
+        diagnostic: row.result.reason || null })),
+    ],
+    diagnostics: [],
+    outputs: visible.map((row) => row.result.actual || []),
+  });
 
   if (allPass) {
     pstate.solved[problem.id] = true;
@@ -251,8 +296,8 @@ function renderProblemMeta() {
 }
 
 function renderProgress() {
-  const solved = PROBLEMS.filter((p) => pstate.solved[p.id]).length;
-  pels.progressLine.textContent = `${solved} of ${PROBLEMS.length} solved`;
+  const solved = moduleProblems.filter((p) => pstate.solved[p.id]).length;
+  pels.progressLine.textContent = `${solved} of ${moduleProblems.length} solved`;
   buildProblemList();
 }
 
@@ -294,14 +339,17 @@ function selectProblem(problem) {
 
   renderProblemMeta();
   renderProgress();
+  selectMobilePanel('problem');
 }
 
 function buildProblemList() {
   pels.problemList.innerHTML = '';
-  PROBLEMS.forEach((p) => {
+  moduleProblems.forEach((p) => {
     const btn = document.createElement('button');
     btn.className = 'algo-btn problem-btn';
-    if (pstate.problem && pstate.problem.id === p.id) btn.classList.add('active');
+    const selected = Boolean(pstate.problem && pstate.problem.id === p.id);
+    if (selected) btn.classList.add('active');
+    btn.setAttribute('aria-pressed', String(selected));
     btn.innerHTML = `
       <span class="problem-btn-mark ${pstate.solved[p.id] ? 'is-solved' : ''}">${pstate.solved[p.id] ? '✓' : ''}</span>
       <span class="problem-btn-body">
@@ -324,7 +372,24 @@ pels.codeBox.addEventListener('input', () => {
   saveProgress();
 });
 
-pels.btnCheck.addEventListener('click', checkAnswer);
+pels.btnCheck.addEventListener('click', () => {
+  checkAnswer();
+  if (window.matchMedia('(max-width: 700px)').matches) selectMobilePanel('results', true);
+});
+
+mobileTabs.forEach((tab, index) => {
+  tab.addEventListener('click', () => selectMobilePanel(tab.dataset.mobilePanel));
+  tab.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    let next = index;
+    if (event.key === 'ArrowLeft') next = (index - 1 + mobileTabs.length) % mobileTabs.length;
+    if (event.key === 'ArrowRight') next = (index + 1) % mobileTabs.length;
+    if (event.key === 'Home') next = 0;
+    if (event.key === 'End') next = mobileTabs.length - 1;
+    selectMobilePanel(mobileTabs[next].dataset.mobilePanel, true);
+  });
+});
 
 pels.btnReset.addEventListener('click', () => {
   if (!pstate.problem) return;
@@ -364,4 +429,8 @@ document.querySelectorAll('dialog.dlg').forEach((dlg) => {
 // ---------- init ----------
 
 loadProgress();
-selectProblem(PROBLEMS[0]);
+if (moduleProblems.length) {
+  selectProblem(moduleProblems[0]);
+} else {
+  window.location.replace('problems.html');
+}

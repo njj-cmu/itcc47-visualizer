@@ -6,7 +6,7 @@
 <title>ITCC47 Problem Sets</title>
 <link rel="stylesheet" href="styles.css">
 </head>
-<body class="app-fixed">
+<body class="catalog-page">
 
 <header class="topbar">
   <div class="topbar-title">
@@ -20,168 +20,23 @@
   </nav>
 </header>
 
-<div class="layout layout-2col">
+<main class="catalog-main">
+  <header class="catalog-intro">
+    <h1>Choose a module</h1>
+    <p>Practice structured pseudocode, exact output, tracing, and algorithm analysis at your own pace.</p>
+  </header>
 
-  <div class="mobile-work-tabs" role="tablist" aria-label="Problem workspace">
-    <button id="mobile-tab-problem" class="tab active" role="tab" aria-selected="true" aria-controls="problem-pane" data-mobile-panel="problem">Problem</button>
-    <button id="mobile-tab-code" class="tab" role="tab" aria-selected="false" aria-controls="work-pane" tabindex="-1" data-mobile-panel="code">Code</button>
-    <button id="mobile-tab-results" class="tab" role="tab" aria-selected="false" aria-controls="work-pane" tabindex="-1" data-mobile-panel="results">Results</button>
-  </div>
+  <div id="module-grid" class="module-grid" aria-label="ITCC47 modules"></div>
 
-  <!-- PROBLEM STATEMENT -->
-  <main id="problem-pane" class="stage" aria-labelledby="mobile-tab-problem">
-    <div class="card problem-card">
-      <div class="problem-head">
-        <div>
-          <h1 id="p-title">Choose a problem</h1>
-          <div class="problem-meta">
-            <span id="p-module" class="chip">Module 1</span>
-            <span id="p-difficulty" class="chip chip-diff">Warm-up</span>
-            <span id="p-solved" class="chip chip-solved hidden">Solved</span>
-          </div>
-        </div>
-      </div>
-
-      <p id="p-statement" class="problem-statement">
-        Pick a problem from the list to begin. You write your answer in pseudocode, and it is
-        checked by actually running it against a set of test cases.
-      </p>
-
-      <h2 class="panel-title problem-section">Rules</h2>
-      <table class="rules-table"><tbody id="p-rules"></tbody></table>
-
-      <h2 class="panel-title problem-section">Input and output</h2>
-      <p id="p-io" class="problem-io"></p>
-
-      <h2 class="panel-title problem-section">Examples</h2>
-      <div id="p-examples" class="examples"></div>
-    </div>
-  </main>
-
-  <!-- WORK AREA -->
-  <aside id="work-pane" class="trace-panel work-panel">
-    <div class="card editor-card work-card">
-      <div class="editor-toolbar">
-        <button id="btn-problems" class="btn btn-toolbar">Choose problem</button>
-        <button id="btn-grammar" class="btn btn-toolbar btn-cta">
-          <span class="cta-mark">?</span> Grammar
-        </button>
-        <span class="toolbar-spacer"></span>
-        <button id="btn-check" class="btn btn-primary btn-toolbar" disabled>Check answer</button>
-      </div>
-
-      <div class="work-subbar">
-        <span id="progress-line" class="muted">0 of 6 solved</span>
-        <div class="work-subbar-actions">
-          <button id="btn-trace" class="btn btn-small" disabled>Open in Tracer</button>
-          <button id="btn-reset" class="btn btn-small" disabled>Reset code</button>
-        </div>
-      </div>
-
-      <textarea id="code-box" class="code-box code-editor" spellcheck="false" rows="14"
-        placeholder="Choose a problem to start writing." aria-label="Problem solution pseudocode"></textarea>
-
-      <div id="error-box" class="error-box hidden" role="alert"></div>
-    </div>
-
-    <div class="dock results-dock">
-      <div class="results-head">
-        <h2 class="panel-title">Results</h2>
-        <span id="results-score" class="results-score">not checked yet</span>
-      </div>
-      <div id="results-body" class="results-body muted" aria-live="polite">
-        Write your answer, then press <strong>Check answer</strong>. Your pseudocode is run against
-        every test case, including some you cannot see.
-      </div>
-    </div>
+  <aside class="practice-note" aria-label="Practice data notice">
+    <span class="practice-note-icon" aria-hidden="true">i</span>
+    <p>This is a public practice area. Your progress stays in this browser and is not a grade.</p>
   </aside>
-
-</div>
-
-<!-- PROBLEM PICKER -->
-<dialog id="dlg-problems" class="dlg">
-  <div class="dlg-head">
-    <h2>Problem sets</h2>
-    <button class="dlg-close" data-close="dlg-problems" aria-label="Close">&times;</button>
-  </div>
-  <p class="muted dlg-sub">Your progress is saved in this browser only.</p>
-  <div class="algo-list" id="problem-list"></div>
-  <div class="dlg-actions">
-    <button id="btn-clear-progress" class="btn btn-small">Clear all progress</button>
-  </div>
-</dialog>
-
-<!-- GRAMMAR DIALOG -->
-<dialog id="dlg-grammar" class="dlg dlg-wide">
-  <div class="dlg-head">
-    <h2>Pseudocode grammar</h2>
-    <button class="dlg-close" data-close="dlg-grammar" aria-label="Close">&times;</button>
-  </div>
-  <p class="muted dlg-sub">The commands the checker understands. Keywords are not case-sensitive.</p>
-
-  <div class="grammar-grid">
-    <section class="grammar-card">
-      <h3>Input, output, assignment</h3>
-      <pre>READ x
-WRITE x
-WRITE "some text"
-x &lt;- 10
-x &lt;- a + b</pre>
-      <p>The arrow <code>&lt;-</code> stores the value on the right into the name on the left.</p>
-    </section>
-
-    <section class="grammar-card">
-      <h3>Selection</h3>
-      <pre>IF condition THEN
-    statement
-ELSE IF condition THEN
-    statement
-ELSE
-    statement
-ENDIF</pre>
-      <p>Conditions are checked in order. The first true one wins.</p>
-    </section>
-
-    <section class="grammar-card">
-      <h3>Repetition</h3>
-      <pre>FOR i &lt;- 1 TO n DO
-    statement
-ENDFOR
-
-WHILE condition DO
-    statement
-ENDWHILE</pre>
-    </section>
-
-    <section class="grammar-card">
-      <h3>Values and operators</h3>
-      <pre>TRUE  FALSE     booleans
-+  -  *  /  %   arithmetic
-=  &lt;&gt;  &lt;  &gt;  &lt;=  &gt;=
-AND   OR   NOT
-# comment</pre>
-    </section>
-  </div>
-
-  <div class="grammar-notes">
-    <h3>Two things that catch people out</h3>
-    <p><strong><code>ELSE IF condition THEN</code> continues the same decision chain.</strong> An <code>IF</code> on the following indented line starts a genuinely nested decision inside the <code>ELSE</code> block.</p>
-    <p><strong>Output must match exactly.</strong> <code>WRITE "INVALID"</code> passes; <code>WRITE "Invalid."</code> does not.</p>
-  </div>
-
-  <div class="dlg-actions">
-    <button class="btn btn-primary" data-close="dlg-grammar">Got it</button>
-  </div>
-</dialog>
+</main>
 
 <script src="nav.js"></script>
-<script src="sha256.js"></script>
-<script src="interpreter.js"></script>
-<script src="playback.js"></script>
-<script src="complexity.js"></script>
-<script src="evaluation.js"></script>
 <script src="problems.data.js"></script>
-<script src="problems-app.js"></script>
+<script src="problems-catalog.js"></script>
 <script src="sw-register.js" defer></script>
 </body>
 </html>

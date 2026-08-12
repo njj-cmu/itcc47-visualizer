@@ -223,6 +223,9 @@ const ROUNDS = engine.get('PROBLEM_ROUNDS');
 const Hash = engine.get('Hash');
 
 ok('problems.data.js has problems', PROBLEMS.length > 0);
+['CH01-PS01', 'CH01-PS02', 'CH01-PS03', 'CH01-PS04', 'CH01-PS05'].forEach((id) => {
+  ok(`${id}: additional Chapter 1 problem is shipped`, PROBLEMS.some((problem) => problem.id === id));
+});
 ok('round count is set', ROUNDS > 0);
 
 PROBLEMS.forEach((p) => {
@@ -312,7 +315,7 @@ ok('service worker ignores non-GET requests', /request\.method\s*!==\s*'GET'/.te
 ok('service worker ignores cross-origin requests', swSource.includes('url.origin !== self.location.origin'));
 
 // Every page must register the worker, or that page is not available offline.
-['index.html', 'writer.html', 'tracer.html', 'problems.html'].forEach((page) => {
+['index.html', 'writer.html', 'tracer.html', 'problems.html', 'practice.html'].forEach((page) => {
   const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
   ok(`${page} registers the offline worker`, html.includes('sw-register.js'));
 });

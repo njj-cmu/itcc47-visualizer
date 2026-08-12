@@ -1097,5 +1097,585 @@ const PROBLEMS = [
         "h": "088cda0880cc11a843c81c68eed5feb249d2b0a43a96d317c439a5f52906d0d5"
       }
     ]
+  },
+  {
+    "id": "CH01-PS01",
+    "title": "Edge Gateway Request Admission",
+    "module": "Module 1",
+    "difficulty": "Medium",
+    "contentVersion": 1,
+    "statement": "An edge gateway must classify one incoming packet. Validation always happens first, permanently blocked TCP ports cannot be bypassed, and maintenance mode changes which otherwise-valid traffic may pass. Translate the precedence into one deterministic decision that produces exactly one result.",
+    "rules": [
+      [
+        "Input",
+        "Read protocol, port, packet size, authenticated, then maintenance mode."
+      ],
+      [
+        "Invalid packet",
+        "INVALID if protocol is not TCP, UDP, or ICMP; size is outside 1..1500; TCP/UDP port is outside 1..65535; or ICMP port is not 0."
+      ],
+      [
+        "Permanently blocked",
+        "Valid TCP traffic on port 23 or 445 is BLOCKED, even when authenticated."
+      ],
+      [
+        "Maintenance mode",
+        "Block TCP and UDP, except authenticated TCP on port 22. Valid ICMP is allowed."
+      ],
+      [
+        "Privileged port",
+        "Outside maintenance, TCP/UDP ports below 1024 require authentication."
+      ],
+      [
+        "Default",
+        "Any other valid packet is ALLOW."
+      ],
+      [
+        "Complexity",
+        "Expected worst case: O(1), because the number of checks is fixed."
+      ]
+    ],
+    "ioNote": "Output exactly one of INVALID, BLOCKED, AUTH_REQUIRED, or ALLOW. No labels or explanation.",
+    "starter": "READ protocol\nREAD port\nREAD packet_size\nREAD authenticated\nREAD maintenance_mode\n",
+    "salt": "b3e03c3e2b0cecd627b8557137188e66",
+    "visibleTests": [
+      {
+        "inputs": [
+          "TCP",
+          22,
+          1200,
+          true,
+          true
+        ],
+        "expected": [
+          "ALLOW"
+        ],
+        "note": "the authenticated maintenance exception"
+      },
+      {
+        "inputs": [
+          "ICMP",
+          80,
+          64,
+          true,
+          false
+        ],
+        "expected": [
+          "INVALID"
+        ],
+        "note": "ICMP must use port 0"
+      }
+    ],
+    "hidden": [
+      {
+        "i": "N3uRjW42RTmThuJ2GDACGWNlZ4PhyTpKO6QJ",
+        "n": 1,
+        "h": "d8038131f237d9905434e44b785671b11153f6375e72599b1ea0b29031bcee42"
+      },
+      {
+        "i": "7M/MVb6+t9I+teETTBgWfItK8FJGScc=",
+        "n": 1,
+        "h": "d8038131f237d9905434e44b785671b11153f6375e72599b1ea0b29031bcee42"
+      },
+      {
+        "i": "nupF6Ni2rwUWKTbM6LeBA9nqtRWOtgEZ/A==",
+        "n": 1,
+        "h": "62c70c2be91208925c8c1fcd8ce0f9c0abfec3508673e0c17914e5beb55ed0bb"
+      },
+      {
+        "i": "trNhalyKludLpcedoiGjueM7wbbvLjDocg==",
+        "n": 1,
+        "h": "62c70c2be91208925c8c1fcd8ce0f9c0abfec3508673e0c17914e5beb55ed0bb"
+      },
+      {
+        "i": "/MrDrr+41nqrvhMSnGqMIaEL79AV9lbnWfU=",
+        "n": 1,
+        "h": "08108a07ca425e755dd6303b68c603b919bcb3cfe999bf6dc77a808b88ffb2de"
+      },
+      {
+        "i": "Hno2Ji6G1/G3rQc+qPwQ1ALzMU/J/hkvDg==",
+        "n": 1,
+        "h": "62c70c2be91208925c8c1fcd8ce0f9c0abfec3508673e0c17914e5beb55ed0bb"
+      },
+      {
+        "i": "RKi7sJ/YxYMP3w6ilG1oa8GJBmc/h9ws+Ds=",
+        "n": 1,
+        "h": "2c4315fdc7f88b0dd1cc2b475fac8fc810039ea92dd4cec5a6bcb8de66857212"
+      },
+      {
+        "i": "+L2ULJe67uUb1dTDBvTk/kG1xcmgMTDOrlE=",
+        "n": 1,
+        "h": "2c4315fdc7f88b0dd1cc2b475fac8fc810039ea92dd4cec5a6bcb8de66857212"
+      }
+    ]
+  },
+  {
+    "id": "CH01-PS02",
+    "title": "API Gateway Billing and SLA Audit",
+    "module": "Module 1",
+    "difficulty": "Medium-Hard",
+    "contentVersion": 1,
+    "statement": "Process a batch of API request records. Invalid records must be counted and skipped before they can affect billing or SLA totals. Valid records may affect billing, server-error, and slow-request counters independently.",
+    "rules": [
+      [
+        "Input",
+        "Read n, then for each request read status code, payload KB, latency ms, and cache hit."
+      ],
+      [
+        "Invalid record",
+        "Status outside 200..599, negative payload, or negative latency: increment invalid count and skip every other rule."
+      ],
+      [
+        "Status 200..399",
+        "Charge 1 unit for 0..64 KB, 2 for 65..256 KB, or 4 above 256 KB. A cache hit subtracts 1, but the charge stays at least 1."
+      ],
+      [
+        "Status 400..499",
+        "Charge exactly 1 unit; ignore the cache flag."
+      ],
+      [
+        "Status 500..599",
+        "Charge 0 and increment server error count."
+      ],
+      [
+        "SLA",
+        "Every valid request over 750 ms is slow. NO_DATA if none are valid; BREACH if more than 20% are slow; otherwise OK."
+      ],
+      [
+        "Complexity",
+        "Expected worst case: O(n), with fixed work for each request."
+      ]
+    ],
+    "ioNote": "Output four values in order: billing units, server error count, invalid count, then SLA status.",
+    "starter": "READ n\nbilling_units <- 0\nserver_error_count <- 0\ninvalid_count <- 0\nvalid_count <- 0\nslow_count <- 0\n",
+    "salt": "f6761f3c95a6dcaf04e3f5f81a282480",
+    "visibleTests": [
+      {
+        "inputs": [
+          6,
+          200,
+          32,
+          200,
+          false,
+          200,
+          200,
+          900,
+          true,
+          404,
+          10,
+          100,
+          false,
+          503,
+          0,
+          1200,
+          false,
+          700,
+          10,
+          20,
+          false,
+          201,
+          300,
+          500,
+          false
+        ],
+        "expected": [
+          7,
+          1,
+          1,
+          "BREACH"
+        ],
+        "note": "invalid records affect neither billing nor SLA"
+      },
+      {
+        "inputs": [
+          2,
+          500,
+          0,
+          100,
+          false,
+          204,
+          0,
+          750,
+          true
+        ],
+        "expected": [
+          1,
+          1,
+          0,
+          "OK"
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "ZI04",
+        "n": 4,
+        "h": "422b9a09ce1ef8c2682935fbcde026c9bf619da84d0409aa667b03f7373229b6"
+      },
+      {
+        "i": "MLNA6Of3PFxOW0gnBY5iN6idtg==",
+        "n": 4,
+        "h": "b1954044260eb04e610affa6d32d1e4b7b31c562d3afc2445dbcca6328a5e46e"
+      },
+      {
+        "i": "pOg0+76G+GpFCaI4rtC13QlXSJeG28RConFO7hmq3iULyDkVrHKC1B5XEz3UbmoUajXrZ30yWrRS/5JDDr9UVNTHY1jXOl+Q+OFe4GsUusXx9+Y=",
+        "n": 4,
+        "h": "cfa9c55ae944af6603db5136d6e6098a3336c6fe41ba23a636ca9d79a10f21ae"
+      },
+      {
+        "i": "AbtU0U0AkZp8y9bX4bh31Zo=",
+        "n": 4,
+        "h": "ff3c274544e69134fc397507a926fb09c439b0bbcd074a37738de6d362c3ac8c"
+      },
+      {
+        "i": "0ajnSqDOu4UxbgX9gJeM2JaaN9tCAnrKrFn2SgJJ2eU3qe4=",
+        "n": 4,
+        "h": "f0696824dacc62103f1c39d0982f6b6a676dfdc6439b37071318d202c5bb4e3a"
+      },
+      {
+        "i": "QMD5AeQLjHSZLuR2a4EX854HzpAA5qL0KbHN6XeC+myYR8KgksOneK+pxcnq5IHuNno8uQ==",
+        "n": 4,
+        "h": "231093c5d6cb2dfa623cad613b16d1ef4e2e6602d478f7b51bfd1ffa62976efb"
+      }
+    ]
+  },
+  {
+    "id": "CH01-PS03",
+    "title": "Authentication Risk and Automatic Lockout",
+    "module": "Module 1",
+    "difficulty": "Hard",
+    "contentVersion": 1,
+    "statement": "Examine authentication events for one account while maintaining risk, consecutive failures, invalid events, and the number of records actually read. A lockout stops input processing immediately, so unread events must never affect the result.",
+    "rules": [
+      [
+        "Event 1: SUCCESS",
+        "Reset consecutive failures and subtract 2 risk, without allowing risk below 0."
+      ],
+      [
+        "Event 2: PASSWORD_FAIL",
+        "Add 1 consecutive failure and 2 risk."
+      ],
+      [
+        "Event 3: MFA_FAIL",
+        "Add 1 consecutive failure and 3 risk."
+      ],
+      [
+        "Event 4: TIMEOUT",
+        "Reset consecutive failures and add 1 risk."
+      ],
+      [
+        "Invalid event",
+        "Increment invalid count; do not change risk or the current failure streak."
+      ],
+      [
+        "Lockout",
+        "After a valid event, lock when failures reach 3 or risk reaches 7, then stop reading."
+      ],
+      [
+        "Complexity",
+        "Expected worst case: O(n). Early lockout can reduce a particular run, not the worst case."
+      ]
+    ],
+    "ioNote": "Output status (OPEN or LOCKED), processed count, risk score, then invalid count.",
+    "starter": "READ n\nrisk_score <- 0\nconsecutive_failures <- 0\ninvalid_count <- 0\nprocessed_count <- 0\nstatus <- \"OPEN\"\n",
+    "salt": "a55ae9f9f05d8474cb7dd14d91a6bd4a",
+    "visibleTests": [
+      {
+        "inputs": [
+          8,
+          2,
+          9,
+          3,
+          4,
+          2,
+          1,
+          2,
+          3
+        ],
+        "expected": [
+          "LOCKED",
+          5,
+          8,
+          1
+        ],
+        "note": "processing stops as soon as risk reaches the threshold"
+      },
+      {
+        "inputs": [
+          4,
+          2,
+          1,
+          4,
+          9
+        ],
+        "expected": [
+          "OPEN",
+          4,
+          1,
+          1
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "6T6XPmSCLf0E1GlkkQ==",
+        "n": 4,
+        "h": "a7fc41de7fe8a4a1684cec044c91a6d2ead46134feca8d6140187a95b3aecbde"
+      },
+      {
+        "i": "wjiPkLZkbf99Njdm7A==",
+        "n": 4,
+        "h": "e5069ae27e21cad345405cc90399e02893f75c875977c4c2f6c9c6fc3374b5e0"
+      },
+      {
+        "i": "JuYIJgIzDnUc",
+        "n": 4,
+        "h": "78bb7e6f378bdd236b5e8f6adeaa22279b11001ab7def1434f131440dfd47fc6"
+      },
+      {
+        "i": "ZZ1O",
+        "n": 4,
+        "h": "9eaf92ffcd6f8b4c4716a49ca149afc6b29e9a833bec878cb2301db4197174a6"
+      },
+      {
+        "i": "CHS++bVcrMrhaiQ=",
+        "n": 4,
+        "h": "7da37b69a307a6746a9ba96274a9c614a857fe36bb2952e2ea9a8a0a83e4c65c"
+      },
+      {
+        "i": "Oben9ftXIbdRic/LIlP1",
+        "n": 4,
+        "h": "aec6edc77ef72401112f99bf083aa88add77179fa8eb957f7d9e8ab588dc3fe1"
+      }
+    ]
+  },
+  {
+    "id": "CH01-PS04",
+    "title": "Container Deployment Admission Controller",
+    "module": "Module 1",
+    "difficulty": "Hard",
+    "contentVersion": 1,
+    "statement": "Process deployment requests against a cluster's remaining resources. Each request passes through validation, image security, workload configuration, and capacity checks. Resource state changes only when the complete deployment is accepted.",
+    "rules": [
+      [
+        "Input",
+        "Read available CPU, available memory, n, then workload type, replicas, CPU per replica, memory per replica, and signed image for each request."
+      ],
+      [
+        "Invalid",
+        "Type outside 1..3 or any non-positive replica/resource value increments invalid count and skips the request."
+      ],
+      [
+        "Security",
+        "A valid unsigned image increments security rejected and skips capacity work."
+      ],
+      [
+        "Overhead",
+        "Per replica: WEB adds 1 CPU/128 MB; WORKER adds 2 CPU/256 MB; DATABASE adds 2 CPU/512 MB."
+      ],
+      [
+        "Database configuration",
+        "DATABASE base memory below 1024 MB increments config rejected."
+      ],
+      [
+        "Capacity",
+        "Accept only when both complete CPU and memory requirements fit. Never partially deploy or partially subtract resources."
+      ],
+      [
+        "Complexity",
+        "Expected worst case: O(n), with one fixed decision pipeline per request."
+      ]
+    ],
+    "ioNote": "First output line: accepted security_rejected config_rejected capacity_rejected invalid. Second line: remaining_cpu remaining_memory.",
+    "starter": "READ available_cpu\nREAD available_memory\nREAD n\naccepted_count <- 0\nsecurity_reject_count <- 0\nconfig_reject_count <- 0\ncapacity_reject_count <- 0\ninvalid_count <- 0\n",
+    "salt": "bd88360a88b513e08c9a50faee4d55b5",
+    "visibleTests": [
+      {
+        "inputs": [
+          40,
+          8192,
+          5,
+          1,
+          2,
+          3,
+          512,
+          true,
+          3,
+          2,
+          4,
+          1024,
+          true,
+          2,
+          3,
+          4,
+          512,
+          false,
+          3,
+          1,
+          2,
+          512,
+          true,
+          1,
+          5,
+          4,
+          700,
+          true
+        ],
+        "expected": [
+          "2 1 1 1 0",
+          "20 3840"
+        ],
+        "note": "only complete approved deployments consume resources"
+      },
+      {
+        "inputs": [
+          10,
+          1024,
+          1,
+          1,
+          1,
+          2,
+          256,
+          true
+        ],
+        "expected": [
+          "1 0 0 0 0",
+          "7 640"
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "41pHSEgCZZJiCPcetuccg0ldeEGdTxyP",
+        "n": 2,
+        "h": "6fb8393d66ca6ec06721d983b118a8837a36e7f1d208d86d361c48fe675a0d58"
+      },
+      {
+        "i": "MpliMvig0/EVRlLxWOJ8WCeDeqHB4AfS6A==",
+        "n": 2,
+        "h": "56064bb31ba8c9d2da5aff1d83251913eb3d78e2278f6cce6e01b8ac90e66302"
+      },
+      {
+        "i": "BdF40LzqalglafX8hpKgii0BbOeZSgPknQAS",
+        "n": 2,
+        "h": "83c5c4d4ffb38daa6aa0354d9f6842943d13fef069743c1cafb737ab4bf34695"
+      },
+      {
+        "i": "ZcHbBrxRTAbfEeQNGVBfg+0RMBbKqS7v",
+        "n": 2,
+        "h": "0d8b3b9dbac409e57bb9f8ff034c96ce74355bac76ab2409edab09c4f1d3601b"
+      },
+      {
+        "i": "LNeRlMN6k+1v/sD/OlSdzBzsP36KVjKdKw==",
+        "n": 2,
+        "h": "40dd63ef3a6aea03a8c8f93f2c1e91a6cc5699d09b807ae6463f2da25067d576"
+      },
+      {
+        "i": "bEmHxD99Cj5P+vpHnHq8wCJCw59D+u/ayg4oqepUnKNt8/iJXl4Yug==",
+        "n": 2,
+        "h": "d956c11e727fbfd14cba25efe08bbaaf4f4bc41119f407637384cb7a88be73e9"
+      }
+    ]
+  },
+  {
+    "id": "CH01-PS05",
+    "title": "Binary Fault Isolation Under a Probe Budget",
+    "module": "Module 1",
+    "difficulty": "Medium-Hard",
+    "contentVersion": 1,
+    "statement": "Repeatedly halve a set of candidate nodes while respecting both a probe budget and a timeout. A probe may begin only when every stopping condition allows it; odd candidate counts must round upward.",
+    "rules": [
+      [
+        "Invalid",
+        "INVALID when candidates <= 0, max probes < 0, probe time <= 0, or timeout < 0."
+      ],
+      [
+        "Probe condition",
+        "Continue only while candidates > 1, probes remain, and one more probe fits within the timeout."
+      ],
+      [
+        "Probe update",
+        "Replace candidates with (candidates + 1) DIV 2, then increment probes and elapsed time."
+      ],
+      [
+        "Result",
+        "ISOLATED only when one candidate remains; otherwise UNRESOLVED."
+      ],
+      [
+        "Complexity",
+        "Expected behavior is O(log n) when budgets are sufficient because each probe removes about half."
+      ]
+    ],
+    "ioNote": "For valid input output status, probes used, remaining candidates, then elapsed time. For invalid input output only INVALID.",
+    "starter": "READ candidates\nREAD max_probes\nREAD probe_time_ms\nREAD timeout_ms\n",
+    "salt": "4ab186299af1251d541920012cae1ed7",
+    "visibleTests": [
+      {
+        "inputs": [
+          1000,
+          20,
+          120,
+          1000
+        ],
+        "expected": [
+          "UNRESOLVED",
+          8,
+          4,
+          960
+        ],
+        "note": "a ninth probe would exceed the timeout"
+      },
+      {
+        "inputs": [
+          9,
+          4,
+          25,
+          100
+        ],
+        "expected": [
+          "ISOLATED",
+          4,
+          1,
+          100
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "msgUo+ui8wLwUzY=",
+        "n": 1,
+        "h": "b96669a59362950d0ee8fab5b61928cda42fff30d09eb3248f513883051a3b3e"
+      },
+      {
+        "i": "yGOJXXcKvlAQKQ==",
+        "n": 4,
+        "h": "e0c9941e49e4bebf2b4a18dc4639d5f753f74898e7081f847987e5ae46a8abd8"
+      },
+      {
+        "i": "KWfh8e2uLnpq09vaJw==",
+        "n": 4,
+        "h": "4b309b355afa5de2868fa64743db43d99d499fac18de5f8128602673207fc200"
+      },
+      {
+        "i": "YGPYjK7GsKMBpi8d",
+        "n": 4,
+        "h": "02a6e1e946f20ab2672cfd18a80a30d060051b5ab185be1636148e58fdd01d41"
+      },
+      {
+        "i": "HObVHarNJnI2",
+        "n": 4,
+        "h": "c36fac1fac7aed47df3e104240554eb058c84290b876956ee07a1df1cdf5947d"
+      },
+      {
+        "i": "+518gKY8ijMTng==",
+        "n": 4,
+        "h": "b81fd6dbd4fa3f56f460cdc81edf7c753a64633c193200aef1d40a1a34ed0688"
+      },
+      {
+        "i": "FRmpFtAu5W5RTCCu6Q==",
+        "n": 1,
+        "h": "b96669a59362950d0ee8fab5b61928cda42fff30d09eb3248f513883051a3b3e"
+      }
+    ]
   }
 ];

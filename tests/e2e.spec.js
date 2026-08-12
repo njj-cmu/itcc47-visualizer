@@ -29,6 +29,14 @@ test('start page gives students a clear route into practice', async ({ page }) =
   await expect(page.getByRole('heading', { name: 'Choose a module' })).toBeVisible();
 });
 
+test('Explore the Tools performs a guided transition and moves focus', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.getByRole('link', { name: 'Explore the Tools' }).click();
+  await expect(page).toHaveURL(/#tools$/);
+  await expect(page.locator('#tools')).toHaveClass(/is-arriving/);
+  await expect(page.getByRole('heading', { name: 'Open a tool' })).toBeFocused();
+});
+
 test('sorting can step, play, pause, and scrub backward', async ({ page }) => {
   await page.goto('/visualizer.html');
   await page.getByRole('button', { name: 'Step' }).click();
@@ -79,7 +87,7 @@ test('problem work tabs reach code and results on a phone', async ({ page }, tes
   await expect(page.locator('#results-body')).toBeVisible();
 });
 
-test('module catalog opens an intermediate problem list before practice', async ({ page }) => {
+test('module catalog opens an intermediate problem list before practice', async ({ page }, testInfo) => {
   await page.goto('/problems.html');
   await expect(page.getByRole('heading', { name: 'Choose a module' })).toBeVisible();
   await expect(page.locator('.module-card')).toHaveCount(8);
@@ -93,6 +101,21 @@ test('module catalog opens an intermediate problem list before practice', async 
   await expect(page).toHaveURL(/practice\.html\?module=1&problem=/);
   await expect(page.locator('#p-module')).toHaveText('Module 1');
   await expect(page.locator('#progress-line')).toContainText('of 11 solved');
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
+  await expect(page.getByRole('link', { name: 'Back to Problem List' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'All Problems' })).toHaveCount(0);
+});
+
+test('difficulty tags use a distinct increasing-intensity palette', async ({ page }) => {
+  await page.goto('/problem-list.html?module=1');
+  await expect(page.locator('.diff-warmup').first()).toBeVisible();
+  await expect(page.locator('.diff-core').first()).toBeVisible();
+  await expect(page.locator('.diff-challenge').first()).toBeVisible();
+  await expect(page.locator('.diff-medium').first()).toBeVisible();
+  await expect(page.locator('.diff-mediumhard').first()).toBeVisible();
+  await expect(page.locator('.diff-hard').first()).toBeVisible();
+  const colors = await page.locator('.chip-diff').evaluateAll((chips) => chips.map((chip) => getComputedStyle(chip).backgroundColor));
+  expect(new Set(colors).size).toBeGreaterThan(2);
 });
 
 test('touch indentation works in both structured and pseudocode editors', async ({ page }, testInfo) => {

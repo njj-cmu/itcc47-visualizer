@@ -16,6 +16,7 @@
     indent: '<path d="M3 6h8M3 10h8M3 14h8M3 18h8m11-10 4 4-4 4m-2-4h6"/>',
     outdent: '<path d="M13 6h8m-8 4h8m-8 4h8m-8 4h8M9 8l-4 4 4 4m-4-4h6"/>',
     arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
+    back: '<path d="M19 12H5m5-5-5 5 5 5"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>',
     reset: '<path d="M4 4v6h6M5.5 15a7 7 0 1 0 .5-7"/>',
   };

@@ -35,10 +35,13 @@
       <div class="module-card-footer">
         ${available
           ? `<span class="module-status status-available">Available · ${count} problem${count === 1 ? '' : 's'}</span>
-             <a class="btn btn-primary module-action" href="practice.html?module=${module.number}">Open problem sets <span aria-hidden="true">→</span></a>`
+             <a class="btn btn-primary module-action" href="problem-list.html?module=${module.number}" data-icon="problemsList">Choose a problem</a>`
           : `<span class="module-status status-pending">Not implemented</span>
              <span class="module-action module-action-disabled" aria-disabled="true">Not implemented</span>`}
       </div>`;
     grid.appendChild(article);
+  });
+  document.querySelectorAll('#module-grid [data-icon]').forEach((element) => {
+    if (window.ITCC47Icons) element.insertAdjacentHTML('afterbegin', window.ITCC47Icons(element.dataset.icon));
   });
 })();

@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 
-const entries = ['index.html', 'writer.html', 'tracer.html', 'problems.html', 'practice.html?module=1'];
+const entries = ['index.html', 'visualizer.html', 'writer.html', 'tracer.html', 'problems.html', 'problem-list.html?module=1', 'practice.html?module=1'];
 
 for (const entry of entries) {
   test(`${entry} has no horizontal overflow`, async ({ page }) => {
@@ -18,11 +18,27 @@ test('mobile navigation opens and moves focus', async ({ page }, testInfo) => {
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.getByRole('link', { name: 'Sorting & Searching' })).toBeFocused();
+  await expect(page.getByRole('link', { name: 'Start', exact: true })).toBeFocused();
+});
+
+test('start page gives students a clear route into practice', async ({ page }) => {
+  await page.goto('/index.html');
+  await expect(page.getByRole('heading', { name: /Start with a problem/ })).toBeVisible();
+  await page.getByRole('link', { name: /Start practicing/ }).click();
+  await expect(page).toHaveURL(/problems\.html$/);
+  await expect(page.getByRole('heading', { name: 'Choose a module' })).toBeVisible();
+});
+
+test('Explore the Tools performs a guided transition and moves focus', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.getByRole('link', { name: 'Explore the Tools' }).click();
+  await expect(page).toHaveURL(/#tools$/);
+  await expect(page.locator('#tools')).toHaveClass(/is-arriving/);
+  await expect(page.getByRole('heading', { name: 'Open a tool' })).toBeFocused();
 });
 
 test('sorting can step, play, pause, and scrub backward', async ({ page }) => {
-  await page.goto('/index.html');
+  await page.goto('/visualizer.html');
   await page.getByRole('button', { name: 'Step' }).click();
   await expect(page.locator('#step-slider')).toHaveValue('1');
   await page.getByRole('button', { name: 'Play' }).click();
@@ -33,13 +49,13 @@ test('sorting can step, play, pause, and scrub backward', async ({ page }) => {
 });
 
 test('binary search explains its sorted copy before searching', async ({ page }) => {
-  await page.goto('/index.html');
+  await page.goto('/visualizer.html');
   await page.getByRole('button', { name: 'Binary Search' }).click();
   await expect(page.locator('#result-caption')).toContainText('Binary search requires sorted data');
 });
 
 test('custom signed data is rendered and oversized data is rejected inline', async ({ page }) => {
-  await page.goto('/index.html');
+  await page.goto('/visualizer.html');
   const input = page.getByLabel('Custom values (comma-separated)');
   await input.fill('-8, -2, 0, 5');
   await page.getByRole('button', { name: 'Apply' }).click();
@@ -66,22 +82,56 @@ test('problem work tabs reach code and results on a phone', async ({ page }, tes
   await page.getByRole('tab', { name: 'Code' }).click();
   await expect(page.locator('#code-box')).toBeVisible();
   await expect(page.locator('#problem-pane')).toBeHidden();
-  await page.getByRole('button', { name: 'Check answer' }).click();
+  await page.getByRole('button', { name: 'Run Checks' }).click();
   await expect(page.getByRole('tab', { name: 'Results' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#results-body')).toBeVisible();
 });
 
-test('module catalog shows equal-height availability cards and opens Module 1', async ({ page }) => {
+test('module catalog opens an intermediate problem list before practice', async ({ page }, testInfo) => {
   await page.goto('/problems.html');
   await expect(page.getByRole('heading', { name: 'Choose a module' })).toBeVisible();
   await expect(page.locator('.module-card')).toHaveCount(8);
   await expect(page.getByText('Not implemented', { exact: true })).toHaveCount(12);
   const heights = await page.locator('.module-card').evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height));
   expect(new Set(heights.map((height) => Math.round(height))).size).toBe(1);
-  await page.getByRole('link', { name: /Open problem sets/ }).first().click();
-  await expect(page).toHaveURL(/practice\.html\?module=1$/);
+  await page.getByRole('link', { name: /Choose a problem/ }).first().click();
+  await expect(page).toHaveURL(/problem-list\.html\?module=1$/);
+  await expect(page.getByRole('heading', { name: 'Module 1: select a problem' })).toBeVisible();
+  await page.locator('.problem-choice-action').first().click();
+  await expect(page).toHaveURL(/practice\.html\?module=1&problem=/);
   await expect(page.locator('#p-module')).toHaveText('Module 1');
   await expect(page.locator('#progress-line')).toContainText('of 11 solved');
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
+  await expect(page.getByRole('link', { name: 'Back to Problem List' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'All Problems' })).toHaveCount(0);
+});
+
+test('difficulty tags use a distinct increasing-intensity palette', async ({ page }) => {
+  await page.goto('/problem-list.html?module=1');
+  await expect(page.locator('.diff-warmup').first()).toBeVisible();
+  await expect(page.locator('.diff-core').first()).toBeVisible();
+  await expect(page.locator('.diff-challenge').first()).toBeVisible();
+  await expect(page.locator('.diff-medium').first()).toBeVisible();
+  await expect(page.locator('.diff-mediumhard').first()).toBeVisible();
+  await expect(page.locator('.diff-hard').first()).toBeVisible();
+  const colors = await page.locator('.chip-diff').evaluateAll((chips) => chips.map((chip) => getComputedStyle(chip).backgroundColor));
+  expect(new Set(colors).size).toBeGreaterThan(2);
+});
+
+test('touch indentation works in both structured and pseudocode editors', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone');
+  await page.goto('/writer.html');
+  const secondStep = page.locator('.step-input').nth(1);
+  await secondStep.focus();
+  await page.getByRole('button', { name: 'Indent step' }).click();
+  await expect(page.locator('.step-row').nth(1)).toHaveCSS('padding-left', '20px');
+
+  await page.goto('/tracer.html');
+  const editor = page.locator('#code-box');
+  await editor.fill('IF ready THEN\nWRITE "yes"\nENDIF');
+  await editor.evaluate((element) => { element.setSelectionRange(14, 25); });
+  await page.getByRole('button', { name: 'Indent', exact: true }).click();
+  await expect(editor).toHaveValue('IF ready THEN\n    WRITE "yes"\nENDIF');
 });
 
 test('all entry pages open from file URLs and permit an interaction', async ({ page }) => {
@@ -91,13 +141,13 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
     await page.goto(fileUrl);
     await expect(page.locator('body')).toBeVisible();
   }
-  await page.goto(`file:///${path.resolve(__dirname, '..', 'index.html').replace(/\\/g, '/')}`);
+  await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}`);
   await page.getByRole('button', { name: 'Step' }).click();
   await expect(page.locator('#step-slider')).toHaveValue('1');
 });
 
 test('cached navigation remains available offline', async ({ page, context }, testInfo) => {
-  await page.goto('/index.html');
+  await page.goto('/visualizer.html');
   await page.evaluate(async () => {
     if ('serviceWorker' in navigator) await navigator.serviceWorker.ready;
   });

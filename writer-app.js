@@ -21,6 +21,8 @@ const wels = {
   btnClear: document.getElementById('btn-clear'),
   btnCopy: document.getElementById('btn-copy'),
   btnToTracer: document.getElementById('btn-to-tracer'),
+  btnIndent: document.getElementById('btn-indent'),
+  btnOutdent: document.getElementById('btn-outdent'),
   toast: document.getElementById('toast'),
 };
 
@@ -92,6 +94,7 @@ function fullRender(focusIndex, caretAtEnd) {
     row.className = 'step-row';
     row.dataset.idx = String(i);
     row.style.marginLeft = `${step.level * 26}px`;
+    row.style.setProperty('--step-level', String(step.level));
 
     const num = document.createElement('span');
     num.className = 'step-num';
@@ -106,7 +109,7 @@ function fullRender(focusIndex, caretAtEnd) {
     ta.setAttribute('aria-label', `Step ${numbers[i]}`);
     ta.addEventListener('input', onInput);
     ta.addEventListener('keydown', onKeyDown);
-    ta.addEventListener('focus', () => { wstate.activeIndex = i; });
+    ta.addEventListener('focus', () => { wstate.activeIndex = i; updateNestingControls(); });
 
     const badge = document.createElement('span');
     badge.className = 'badge';
@@ -173,6 +176,7 @@ function softUpdate() {
 
   renderChecks();
   wels.nameDisplay.textContent = wstate.name.trim() || 'Untitled algorithm';
+  updateNestingControls();
   save();
 }
 
@@ -278,6 +282,26 @@ function onInput(e) {
   softUpdate();
 }
 
+function canIndent(idx) {
+  if (idx <= 0) return false;
+  return wstate.steps[idx].level < Math.min(wstate.steps[idx - 1].level + 1, MAX_LEVEL);
+}
+
+function updateNestingControls() {
+  const idx = Math.max(0, Math.min(wstate.activeIndex, wstate.steps.length - 1));
+  wels.btnIndent.disabled = !canIndent(idx);
+  wels.btnOutdent.disabled = wstate.steps[idx].level === 0;
+}
+
+function changeIndent(idx, delta) {
+  const end = blockEnd(idx);
+  if ((delta > 0 && !canIndent(idx)) || (delta < 0 && wstate.steps[idx].level === 0)) return;
+  for (let k = idx; k < end; k++) {
+    wstate.steps[k].level = Math.max(0, Math.min(MAX_LEVEL, wstate.steps[k].level + delta));
+  }
+  fullRender(idx, true);
+}
+
 function onKeyDown(e) {
   const row = e.target.closest('.step-row');
   const idx = Number(row.dataset.idx);
@@ -293,19 +317,7 @@ function onKeyDown(e) {
 
   if (e.key === 'Tab') {
     e.preventDefault();
-    const delta = e.shiftKey ? -1 : 1;
-    const end = blockEnd(idx);
-    const cur = wstate.steps[idx].level;
-    if (delta > 0) {
-      const maxLevel = idx === 0 ? 0 : Math.min(wstate.steps[idx - 1].level + 1, MAX_LEVEL);
-      if (cur >= maxLevel) return;
-    } else if (cur === 0) {
-      return;
-    }
-    for (let k = idx; k < end; k++) {
-      wstate.steps[k].level = Math.max(0, Math.min(MAX_LEVEL, wstate.steps[k].level + delta));
-    }
-    fullRender(idx, true);
+    changeIndent(idx, e.shiftKey ? -1 : 1);
     return;
   }
 
@@ -488,6 +500,9 @@ wels.btnAdd.addEventListener('click', () => {
   wstate.steps.push({ text: '', level: 0 });
   fullRender(wstate.steps.length - 1, true);
 });
+
+wels.btnIndent.addEventListener('click', () => changeIndent(wstate.activeIndex, 1));
+wels.btnOutdent.addEventListener('click', () => changeIndent(wstate.activeIndex, -1));
 
 wels.btnClear.addEventListener('click', () => {
   if (!confirm('Clear all steps?')) return;

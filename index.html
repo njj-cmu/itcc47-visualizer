@@ -3,115 +3,50 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ITCC47 Algorithm Visualizer</title>
+<title>ITCC47 Learning Lab</title>
 <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-
+<body class="start-page">
 <header class="topbar">
-  <div class="topbar-title">
-    <span class="topbar-code">ITCC47</span> Algorithm Visualizer
-  </div>
+  <div class="topbar-title"><span class="topbar-code">ITCC47</span> Learning Lab</div>
   <nav class="topbar-nav">
-    <a href="index.html" class="active">Sorting &amp; Searching</a>
-    <a href="writer.html">Algorithm Writer</a>
-    <a href="tracer.html">Pseudocode Tracer</a>
-    <a href="problems.html">Problem Sets</a>
+    <a href="index.html" data-icon="start">Start</a>
+    <a href="visualizer.html" data-icon="visualize">Visualize</a>
+    <a href="writer.html" data-icon="writer">Algorithm Writer</a>
+    <a href="tracer.html" data-icon="tracer">Pseudocode Tracer</a>
+    <a href="problems.html" data-icon="problems">Problem Sets</a>
   </nav>
 </header>
-
-<div class="layout">
-
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
-    <div class="panel">
-      <h2 class="panel-title">Sorting</h2>
-      <div class="algo-list" id="sorting-list"></div>
+<main class="start-main">
+  <section class="start-hero" aria-labelledby="start-heading">
+    <h1 id="start-heading"><span>Start</span> with a problem, then use the tools when you need them.</h1>
+    <p>Choose a module, solve one focused exercise, and use the visualizer or tracer to understand each step.</p>
+    <div class="start-actions">
+      <a class="btn btn-run start-primary" href="problems.html" data-icon="play">Start practicing</a>
+      <a id="explore-tools" class="btn start-secondary" href="#tools" data-icon="writer">Explore the Tools</a>
     </div>
-    <div class="panel">
-      <h2 class="panel-title">Searching</h2>
-      <div class="algo-list" id="searching-list"></div>
+  </section>
+
+  <ol class="learning-path" aria-label="Practice workflow">
+    <li><span>1</span>Choose a module</li>
+    <li><span>2</span>Select a problem</li>
+    <li><span>3</span>Write pseudocode</li>
+    <li><span>4</span>Check and trace</li>
+  </ol>
+
+  <section id="tools" class="tool-section" aria-labelledby="tools-heading">
+    <h2 id="tools-heading">Open a tool</h2>
+    <div class="tool-rail">
+      <a href="visualizer.html" data-icon="visualize"><span><strong>Visualize an algorithm</strong><small>See how data and steps change as the algorithm runs.</small></span><span class="tool-arrow" data-icon="arrow" aria-hidden="true"></span></a>
+      <a href="writer.html" data-icon="writer"><span><strong>Plan in plain language</strong><small>Build clear, nested steps before writing pseudocode.</small></span><span class="tool-arrow" data-icon="arrow" aria-hidden="true"></span></a>
+      <a href="tracer.html" data-icon="tracer"><span><strong>Trace pseudocode</strong><small>Step through your logic and inspect each line.</small></span><span class="tool-arrow" data-icon="arrow" aria-hidden="true"></span></a>
     </div>
+  </section>
 
-    <div class="panel">
-      <h2 class="panel-title">Data</h2>
-
-      <label class="field-label" for="size-slider">Array size: <span id="size-value">10</span></label>
-      <input type="range" id="size-slider" min="4" max="18" value="10" class="slider">
-
-      <label class="field-label" for="custom-input">Custom values (comma-separated)</label>
-      <div class="row">
-        <input type="text" id="custom-input" class="text-input" placeholder="e.g. 5,2,7,1,6,3,4">
-        <button id="apply-custom" class="btn btn-small">Apply</button>
-      </div>
-      <p id="data-error" class="field-error hidden" role="alert"></p>
-
-      <div id="target-field" class="hidden">
-        <label class="field-label" for="target-input">Search target</label>
-        <div class="row">
-          <input type="number" id="target-input" class="text-input" placeholder="value">
-          <button id="random-target" class="btn btn-small">Random</button>
-        </div>
-      </div>
-
-      <label class="field-label" for="speed-slider">Playback speed</label>
-      <input type="range" id="speed-slider" min="1" max="10" value="6" class="slider">
-    </div>
+  <aside class="practice-note start-note" aria-label="Practice data notice" data-icon="info">
+    <p><strong>This is a public practice site.</strong> No accounts, no grades, and no personal data collected.</p>
   </aside>
-
-  <!-- MAIN VISUALIZATION CARD -->
-  <main class="stage">
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <h1 id="algo-title">Bubble Sort</h1>
-          <p id="algo-subtitle" class="muted"></p>
-        </div>
-        <div class="complexity-box" id="complexity-box"></div>
-      </div>
-
-      <div class="chart-wrap">
-        <div id="chart" class="chart"></div>
-      </div>
-
-      <p id="result-caption" class="result-caption" aria-live="polite">Press Play or Step to begin.</p>
-
-      <div class="scrub-row">
-        <span class="scrub-label">Step</span>
-        <input type="range" id="step-slider" min="0" max="0" value="0" class="slider" aria-label="Timeline step">
-        <span id="step-counter" class="scrub-count">0 / 0</span>
-      </div>
-
-      <div class="controls-grid">
-        <button id="btn-shuffle" class="btn">Shuffle</button>
-        <button id="btn-play" class="btn btn-primary">Play</button>
-        <button id="btn-step" class="btn">Step</button>
-        <button id="btn-finish" class="btn">Finish pass</button>
-      </div>
-    </div>
-
-    <div class="blurb-panel">
-      <p id="algo-blurb" class="muted"></p>
-    </div>
-  </main>
-
-  <!-- TRACE TABLE -->
-  <aside class="trace-panel">
-    <h2 class="panel-title">Trace Table</h2>
-    <div class="trace-table-wrap" tabindex="0" aria-label="Algorithm trace table">
-      <table class="trace-table">
-        <thead id="trace-head"></thead>
-        <tbody id="trace-body"></tbody>
-      </table>
-    </div>
-  </aside>
-
-</div>
-
-<script src="nav.js"></script>
-<script src="algorithms.js"></script>
-<script src="playback.js"></script>
-<script src="app.js"></script>
-<script src="sw-register.js" defer></script>
+</main>
+<script src="nav.js"></script><script src="start-page.js"></script><script src="sw-register.js" defer></script>
 </body>
 </html>

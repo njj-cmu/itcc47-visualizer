@@ -6,6 +6,7 @@
  * SHA-256 digests (4000 rounds). They are one-way: there is no key here
  * and nothing to decrypt. Hidden inputs are obfuscated, not encrypted.
  */
+const PROBLEM_SCHEMA_VERSION = 1;
 const PROBLEM_ROUNDS = 4000;
 const PROBLEMS = [
   {
@@ -13,6 +14,7 @@ const PROBLEMS = [
     "title": "Sum of Two Numbers",
     "module": "Module 1",
     "difficulty": "Warm-up",
+    "contentVersion": 1,
     "statement": "Read two numbers and display their sum.",
     "rules": [
       [
@@ -76,6 +78,7 @@ const PROBLEMS = [
     "title": "Delivery Fee",
     "module": "Module 1",
     "difficulty": "Core",
+    "contentVersion": 1,
     "statement": "A delivery service charges a fee based on how far the customer is from the store. The owner describes the rule in vague terms, so it has already been clarified into exact boundaries below. Premium customers get a discount, but only when the distance is valid.",
     "rules": [
       [
@@ -176,6 +179,7 @@ const PROBLEMS = [
     "title": "Library Fine",
     "module": "Module 1",
     "difficulty": "Core",
+    "contentVersion": 1,
     "statement": "A library computes the fine for a borrowed book. The order in which you apply the rules changes the answer, so read them carefully before you start writing.",
     "rules": [
       [
@@ -283,6 +287,7 @@ const PROBLEMS = [
     "title": "Package Classification",
     "module": "Module 1",
     "difficulty": "Core",
+    "contentVersion": 1,
     "statement": "A delivery system classifies a package by weight, and marks express deliveries. The checker compares your output character for character, so the exact wording matters as much as the logic.",
     "rules": [
       [
@@ -382,6 +387,7 @@ const PROBLEMS = [
     "title": "Parking Fee",
     "module": "Module 1",
     "difficulty": "Core",
+    "contentVersion": 1,
     "statement": "A parking area computes a fee from the number of hours parked. The shape of this problem is the same as the library fine, so if you got that one right, check whether your ordering still holds here.",
     "rules": [
       [
@@ -473,6 +479,7 @@ const PROBLEMS = [
     "title": "Reward Points",
     "module": "Module 1",
     "difficulty": "Challenge",
+    "contentVersion": 1,
     "statement": "A store awards reward points across several purchases. You will need a loop, a running total, and a count of the purchases that were rejected. Read the number of purchases first, then the member flag, then each purchase amount in turn.",
     "rules": [
       [
@@ -569,6 +576,7 @@ const PROBLEMS = [
     "title": "Total of a List",
     "module": "Module 2",
     "difficulty": "Warm-up",
+    "contentVersion": 1,
     "statement": "Read how many numbers there are, then read that many numbers, and display their total. This is the pattern every later list problem is built on: read a count, then loop exactly that many times.",
     "rules": [
       [
@@ -643,6 +651,7 @@ const PROBLEMS = [
     "title": "Largest in a List",
     "module": "Module 2",
     "difficulty": "Core",
+    "contentVersion": 1,
     "statement": "Read how many numbers there are, then read that many numbers, and display the largest. Think carefully about what the largest value starts as — a wrong starting value passes the obvious tests and fails the interesting ones.",
     "rules": [
       [
@@ -725,6 +734,7 @@ const PROBLEMS = [
     "title": "Position in a List",
     "module": "Module 2",
     "difficulty": "Core",
+    "contentVersion": 1,
     "statement": "Read how many numbers there are, then that many numbers, and finally the value to look for. Display the position of the first match, counting from 1. Because the value to look for arrives last, you have to keep the numbers somewhere before you can search them.",
     "rules": [
       [
@@ -823,6 +833,7 @@ const PROBLEMS = [
     "title": "Above the Average",
     "module": "Module 2",
     "difficulty": "Challenge",
+    "contentVersion": 1,
     "statement": "Read how many numbers there are, then that many numbers. Display the average, then how many of the numbers are above it. You cannot know the average until you have seen every number, so this one cannot be done in a single pass.",
     "rules": [
       [
@@ -907,6 +918,7 @@ const PROBLEMS = [
     "title": "Any Repeats?",
     "module": "Module 2",
     "difficulty": "Challenge",
+    "contentVersion": 1,
     "statement": "Read how many numbers there are, then that many numbers. Display YES if any number appears more than once, and NO if every number is different. Comparing every number against every other one is the straightforward approach — notice how much work that becomes as the list grows.",
     "rules": [
       [
@@ -993,6 +1005,7 @@ const PROBLEMS = [
     "title": "Binary Search, Counted",
     "module": "Module 2",
     "difficulty": "Challenge",
+    "contentVersion": 1,
     "statement": "Read how many numbers there are, then that many numbers already in ascending order, then the value to look for. Display whether it was found, and how many middle values you had to examine. Compare that count against the length of the list — that gap is the whole reason binary search matters.",
     "rules": [
       [

@@ -6,9 +6,9 @@ const state = {
   target: null,
   steps: [],
   stepIndex: 0,
-  playing: false,
-  playTimer: null,
 };
+
+const MAX_VISUAL_VALUES = 18;
 
 const els = {
   sortingList: document.getElementById('sorting-list'),
@@ -17,6 +17,7 @@ const els = {
   sizeValue: document.getElementById('size-value'),
   customInput: document.getElementById('custom-input'),
   applyCustom: document.getElementById('apply-custom'),
+  dataError: document.getElementById('data-error'),
   targetField: document.getElementById('target-field'),
   targetInput: document.getElementById('target-input'),
   randomTarget: document.getElementById('random-target'),
@@ -37,6 +38,16 @@ const els = {
   traceBody: document.getElementById('trace-body'),
 };
 
+const playback = ITCC47Playback.createController({
+  speed: Number(els.speedSlider.value),
+  delayForSpeed: (level) => 1100 - level * 100,
+  onChange(playbackState) {
+    state.stepIndex = playbackState.index;
+    els.btnPlay.textContent = playbackState.status === 'playing' ? 'Pause' : 'Play';
+    if (playbackState.currentEvent) renderAll();
+  },
+});
+
 // ---------- data helpers ----------
 
 function randomArray(size, min = 5, max = 99) {
@@ -50,6 +61,11 @@ function setArray(arr) {
     els.targetInput.value = state.target;
   }
   recompute();
+}
+
+function showDataError(message) {
+  els.dataError.textContent = message;
+  els.dataError.classList.toggle('hidden', !message);
 }
 
 function currentAlgo() {
@@ -73,12 +89,14 @@ function buildSidebar() {
 
 function updateSidebarActive() {
   document.querySelectorAll('.algo-btn').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.key === state.algoKey);
+    const selected = btn.dataset.key === state.algoKey;
+    btn.classList.toggle('active', selected);
+    btn.setAttribute('aria-pressed', String(selected));
   });
 }
 
 function selectAlgorithm(key) {
-  stopPlaying();
+  playback.pause(false);
   state.algoKey = key;
   updateSidebarActive();
   const algo = currentAlgo();
@@ -96,10 +114,9 @@ function selectAlgorithm(key) {
 function recompute() {
   const algo = currentAlgo();
   state.steps = algo.run(state.baseArray, state.target);
-  state.stepIndex = 0;
   els.stepSlider.max = String(state.steps.length - 1);
   buildTraceTable();
-  renderAll();
+  playback.load(state.steps);
 }
 
 // ---------- chart ----------
@@ -108,6 +125,7 @@ function classifyIndex(i, highlight) {
   if (!highlight) return 'default';
   if (highlight.found === i) return 'found';
   if (highlight.swap && highlight.swap.includes(i)) return 'swap';
+  if (highlight.move && highlight.move.includes(i)) return 'move';
   if (highlight.compare && highlight.compare.includes(i)) return 'compare';
   if (highlight.mid === i) return 'mid';
   if (highlight.active && highlight.active.includes(i)) return 'active';
@@ -119,21 +137,35 @@ function classifyIndex(i, highlight) {
 }
 
 function renderChart(step) {
-  const max = Math.max(...state.baseArray, 1);
+  const values = step.frame.array;
+  const min = Math.min(0, ...values);
+  const max = Math.max(0, ...values);
+  const range = Math.max(max - min, 1);
+  const zeroPct = ((0 - min) / range) * 100;
   els.chart.innerHTML = '';
-  step.array.forEach((value, i) => {
+  const zero = document.createElement('div');
+  zero.className = 'chart-zero';
+  zero.style.bottom = `${zeroPct}%`;
+  zero.setAttribute('aria-hidden', 'true');
+  els.chart.appendChild(zero);
+
+  values.forEach((value, i) => {
     const col = document.createElement('div');
     col.className = 'bar-col';
 
     const bar = document.createElement('div');
-    const state_ = classifyIndex(i, step.highlight);
+    const state_ = classifyIndex(i, step.frame.highlight);
     bar.className = `bar bar-${state_}`;
-    bar.style.height = `${(value / max) * 100}%`;
+    bar.classList.add(value < 0 ? 'bar-negative' : 'bar-positive');
+    const heightPct = (Math.abs(value) / range) * 100;
+    bar.style.height = `${Math.max(heightPct, value === 0 ? 1 : 0)}%`;
+    bar.style.bottom = `${value >= 0 ? zeroPct : zeroPct - heightPct}%`;
 
     const label = document.createElement('span');
     label.className = 'bar-value';
     label.textContent = value;
     bar.appendChild(label);
+    bar.setAttribute('aria-label', `Index ${i}, value ${value}`);
 
     const idx = document.createElement('span');
     idx.className = 'bar-index';
@@ -148,25 +180,17 @@ function renderChart(step) {
 // ---------- trace table ----------
 
 function buildTraceTable() {
-  const sorting = currentAlgo().category === 'sorting';
-  els.traceHead.innerHTML = sorting
-    ? '<tr><th>#</th><th>Description</th><th>Pass</th><th>Cmp</th><th>Swp</th></tr>'
-    : '<tr><th>#</th><th>Description</th><th>Cmp</th></tr>';
+  const metrics = currentAlgo().metrics;
+  els.traceHead.innerHTML = `<tr><th>#</th><th>Description</th>${metrics.map((m) => `<th title="${m.label}">${m.short}</th>`).join('')}</tr>`;
 
   els.traceBody.innerHTML = '';
   state.steps.forEach((step, i) => {
     const tr = document.createElement('tr');
     tr.id = `trace-row-${i}`;
     tr.addEventListener('click', () => {
-      stopPlaying();
-      state.stepIndex = i;
-      renderAll();
+      playback.seek(i);
     });
-    if (sorting) {
-      tr.innerHTML = `<td>${i}</td><td>${step.description}</td><td>${step.stats.pass ?? '—'}</td><td>${step.stats.comparisons}</td><td>${step.stats.swaps}</td>`;
-    } else {
-      tr.innerHTML = `<td>${i}</td><td>${step.description}</td><td>${step.stats.comparisons}</td>`;
-    }
+    tr.innerHTML = `<td>${i}</td><td>${step.message}</td>${metrics.map((m) => `<td>${step.metrics[m.key] ?? '—'}</td>`).join('')}`;
     els.traceBody.appendChild(tr);
   });
 }
@@ -196,73 +220,22 @@ function renderAll() {
     <div class="complexity-item"><span>Space</span><strong>${algo.complexity.space}</strong></div>
   `;
 
-  if (algo.category === 'sorting') {
-    els.algoSubtitle.textContent = `Pass ${step.stats.pass ?? '—'} · Comparisons ${step.stats.comparisons} · Swaps ${step.stats.swaps}`;
-  } else {
-    els.algoSubtitle.textContent = `Target ${state.target} · Comparisons ${step.stats.comparisons}`;
-  }
+  const metricText = algo.metrics
+    .filter((m) => m.key !== 'pass' || step.metrics[m.key] != null)
+    .map((m) => `${m.label} ${step.metrics[m.key] ?? 0}`)
+    .join(' · ');
+  els.algoSubtitle.textContent = `${algo.needsTarget ? `Target ${state.target} · ` : ''}${metricText}`;
 
   renderChart(step);
-  els.resultCaption.textContent = step.description;
+  els.resultCaption.textContent = step.message;
   els.stepSlider.value = String(state.stepIndex);
   els.stepCounter.textContent = `${state.stepIndex} / ${state.steps.length - 1}`;
   updateTraceHighlight();
 
-  const atEnd = state.stepIndex >= state.steps.length - 1;
+  const atEnd = playback.getState().atEnd;
   els.btnStep.disabled = atEnd;
   els.btnPlay.disabled = atEnd;
   els.btnFinish.disabled = atEnd;
-  if (atEnd) stopPlaying();
-}
-
-// ---------- playback ----------
-
-function stepForward() {
-  if (state.stepIndex < state.steps.length - 1) {
-    state.stepIndex++;
-    renderAll();
-  } else {
-    stopPlaying();
-  }
-}
-
-function finishSegment() {
-  stopPlaying();
-  let i = state.stepIndex;
-  while (i < state.steps.length - 1 && !state.steps[i].passEnd && !state.steps[i].final) {
-    i++;
-  }
-  state.stepIndex = i;
-  renderAll();
-}
-
-function speedDelay() {
-  const level = Number(els.speedSlider.value);
-  return 1100 - level * 100;
-}
-
-function startPlaying() {
-  if (state.stepIndex >= state.steps.length - 1) return;
-  state.playing = true;
-  els.btnPlay.textContent = 'Pause';
-  state.playTimer = setInterval(() => {
-    stepForward();
-    if (state.stepIndex >= state.steps.length - 1) stopPlaying();
-  }, speedDelay());
-}
-
-function stopPlaying() {
-  state.playing = false;
-  els.btnPlay.textContent = 'Play';
-  if (state.playTimer) {
-    clearInterval(state.playTimer);
-    state.playTimer = null;
-  }
-}
-
-function togglePlaying() {
-  if (state.playing) stopPlaying();
-  else startPlaying();
 }
 
 // ---------- events ----------
@@ -271,33 +244,41 @@ els.sizeSlider.addEventListener('input', () => {
   els.sizeValue.textContent = els.sizeSlider.value;
 });
 els.sizeSlider.addEventListener('change', () => {
-  stopPlaying();
+  playback.pause(false);
   state.target = null;
   setArray(randomArray(Number(els.sizeSlider.value)));
 });
 
 els.applyCustom.addEventListener('click', () => {
-  const parsed = els.customInput.value
+  const parts = els.customInput.value
     .split(/[,\s]+/)
-    .map((s) => parseInt(s, 10))
-    .filter((n) => !Number.isNaN(n));
-  if (parsed.length < 2) {
-    alert('Enter at least 2 numeric values, separated by commas.');
+    .filter(Boolean);
+  if (parts.some((part) => !/^-?\d+$/.test(part))) {
+    showDataError('Use whole numbers only, such as -4, 0, and 12.');
     return;
   }
-  const clamped = parsed.slice(0, 24);
-  stopPlaying();
-  els.sizeSlider.value = String(clamped.length);
-  els.sizeValue.textContent = clamped.length;
+  const parsed = parts.map(Number);
+  if (parsed.length < 2) {
+    showDataError('Enter at least 2 integer values, separated by commas or spaces.');
+    return;
+  }
+  if (parsed.length > MAX_VISUAL_VALUES) {
+    showDataError(`Use at most ${MAX_VISUAL_VALUES} values so every item remains readable.`);
+    return;
+  }
+  showDataError('');
+  playback.pause(false);
+  els.sizeSlider.value = String(parsed.length);
+  els.sizeValue.textContent = parsed.length;
   state.target = null;
-  setArray(clamped);
+  setArray(parsed);
 });
 
 els.targetInput.addEventListener('change', () => {
   const v = parseInt(els.targetInput.value, 10);
   if (!Number.isNaN(v)) {
     state.target = v;
-    stopPlaying();
+    playback.pause(false);
     recompute();
   }
 });
@@ -308,27 +289,26 @@ els.randomTarget.addEventListener('click', () => {
     ? state.baseArray[Math.floor(Math.random() * state.baseArray.length)]
     : Math.floor(Math.random() * 99) + 5;
   els.targetInput.value = state.target;
-  stopPlaying();
+  playback.pause(false);
   recompute();
 });
 
 els.btnShuffle.addEventListener('click', () => {
-  stopPlaying();
+  playback.pause(false);
   state.target = null;
   setArray(randomArray(Number(els.sizeSlider.value)));
 });
 
-els.btnPlay.addEventListener('click', togglePlaying);
+els.btnPlay.addEventListener('click', () => playback.toggle());
 els.btnStep.addEventListener('click', () => {
-  stopPlaying();
-  stepForward();
+  playback.step(1);
 });
-els.btnFinish.addEventListener('click', finishSegment);
+els.btnFinish.addEventListener('click', () => playback.finishSegment());
+
+els.speedSlider.addEventListener('input', () => playback.setSpeed(els.speedSlider.value));
 
 els.stepSlider.addEventListener('input', () => {
-  stopPlaying();
-  state.stepIndex = Number(els.stepSlider.value);
-  renderAll();
+  playback.seek(Number(els.stepSlider.value));
 });
 
 // ---------- init ----------

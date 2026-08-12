@@ -35,9 +35,9 @@
         <button id="btn-edit" class="btn btn-toolbar" disabled>Edit code</button>
       </div>
 
-      <p id="status-line" class="muted status-line">Write or load pseudocode, then Run.</p>
+      <p id="status-line" class="muted status-line" role="status" aria-live="polite">Write or load pseudocode, then Run.</p>
 
-      <textarea id="code-box" class="code-box code-editor" spellcheck="false" rows="16"></textarea>
+      <textarea id="code-box" class="code-box code-editor" spellcheck="false" rows="16" aria-label="Pseudocode editor"></textarea>
       <div id="code-view" class="code-view hidden"></div>
 
       <div class="inputs-block">
@@ -45,14 +45,14 @@
         <textarea id="inputs-box" class="code-box inputs-box" rows="2" placeholder="e.g. 50, false, true"></textarea>
       </div>
 
-      <div id="error-box" class="error-box hidden"></div>
+      <div id="error-box" class="error-box hidden" role="alert"></div>
     </div>
 
     <!-- pinned: stays visible however long the code gets -->
     <div class="dock">
       <div class="scrub-row">
         <span class="scrub-label">Step</span>
-        <input type="range" id="step-slider" min="0" max="0" value="0" class="slider" disabled>
+        <input type="range" id="step-slider" min="0" max="0" value="0" class="slider" aria-label="Timeline step" disabled>
         <span id="step-counter" class="scrub-count">0 / 0</span>
       </div>
 
@@ -80,13 +80,13 @@
 
   <!-- TRACE TABLE / OPERATION COUNTS -->
   <aside class="trace-panel">
-    <div class="tabs">
-      <button id="tab-trace" class="tab active">Trace Table</button>
-      <button id="tab-ops" class="tab">Operations</button>
+    <div class="tabs" role="tablist" aria-label="Tracer details">
+      <button id="tab-trace" class="tab active" role="tab" aria-selected="true" aria-controls="panel-trace">Trace Table</button>
+      <button id="tab-ops" class="tab" role="tab" aria-selected="false" aria-controls="panel-ops" tabindex="-1">Operations</button>
     </div>
 
-    <div id="panel-trace">
-      <div class="trace-table-wrap">
+    <div id="panel-trace" role="tabpanel" aria-labelledby="tab-trace">
+      <div class="trace-table-wrap" tabindex="0" aria-label="Pseudocode trace table">
         <table class="trace-table">
           <thead><tr><th>#</th><th>Line</th><th>Statement</th><th>Description</th></tr></thead>
           <tbody id="trace-body"></tbody>
@@ -94,7 +94,7 @@
       </div>
     </div>
 
-    <div id="panel-ops" class="hidden">
+    <div id="panel-ops" class="hidden" role="tabpanel" aria-labelledby="tab-ops">
       <div id="ops-empty" class="muted field-note">Run the pseudocode to count operations.</div>
 
       <div id="ops-content" class="hidden">
@@ -109,7 +109,7 @@
         </label>
         <p class="muted field-note" id="control-note">Off matches the lecture, where T(n) = 7n + 6 charges nothing for the FOR header.</p>
 
-        <div class="trace-table-wrap ops-table-wrap">
+        <div class="trace-table-wrap ops-table-wrap" tabindex="0" aria-label="Operation counts table">
           <table class="trace-table">
             <thead><tr><th>Line</th><th>Statement</th><th>Each</th><th>Runs</th><th>Total</th></tr></thead>
             <tbody id="ops-body"></tbody>
@@ -135,7 +135,7 @@
             <span class="growth-detail muted" id="growth-detail"></span>
           </div>
           <div id="growth-chart" class="growth-chart"></div>
-          <div class="trace-table-wrap ops-table-wrap">
+          <div class="trace-table-wrap ops-table-wrap" tabindex="0" aria-label="Growth measurements table">
             <table class="trace-table">
               <thead><tr><th>n</th><th>Operations</th><th>Ratio</th></tr></thead>
               <tbody id="growth-body"></tbody>
@@ -238,7 +238,7 @@ STOP      end the algorithm</pre>
 
   <div class="grammar-notes">
     <h3>Two things that catch people out</h3>
-    <p><strong>A bare <code>IF</code> right after <code>ELSE</code> reads as <code>ELSE IF</code>.</strong> If you need a genuinely nested <code>IF</code> as the first line of an <code>ELSE</code> block, put an assignment above it first.</p>
+    <p><strong><code>ELSE IF condition THEN</code> continues the same decision chain.</strong> An <code>IF</code> on the following indented line starts a genuinely nested decision inside the <code>ELSE</code> block.</p>
     <p><strong><code>/</code> is integer division</strong> and floors the result, matching the way the lecture halves <code>n</code> at each step of a binary search.</p>
   </div>
 
@@ -247,8 +247,10 @@ STOP      end the algorithm</pre>
   </div>
 </dialog>
 
+<script src="nav.js"></script>
 <script src="interpreter.js"></script>
 <script src="complexity.js"></script>
+<script src="playback.js"></script>
 <script src="presets.js"></script>
 <script src="tracer-app.js"></script>
 <script src="sw-register.js" defer></script>

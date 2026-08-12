@@ -20,5 +20,7 @@ jobs:
       # gitignored and exists only on the instructor's machine. It checks the
       # interpreter, the shipped presets, and the integrity of the generated
       # problems.data.js — including that no plaintext answer survived into it.
-      - name: Run tests
-        run: node tools/test.js
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run release checks
+        run: npm run check

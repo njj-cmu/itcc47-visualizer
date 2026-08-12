@@ -3,8 +3,6 @@
 const tstate = {
   steps: [],
   stepIndex: 0,
-  playing: false,
-  playTimer: null,
   running: false,
   sourceLines: [],
 };
@@ -50,6 +48,16 @@ const tels = {
   dlgExamples: document.getElementById('dlg-examples'),
   dlgGrammar: document.getElementById('dlg-grammar'),
 };
+
+const tracerPlayback = ITCC47Playback.createController({
+  speed: Number(tels.speedSlider.value),
+  delayForSpeed: (level) => 1300 - level * 110,
+  onChange(playbackState) {
+    tstate.stepIndex = playbackState.index;
+    tels.btnPlay.textContent = playbackState.status === 'playing' ? 'Pause' : 'Play';
+    if (tstate.running && playbackState.currentEvent) renderStep();
+  },
+});
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -115,7 +123,7 @@ function buildCodeView(source) {
 }
 
 function runCode() {
-  stopPlaying();
+  tracerPlayback.pause(false);
   clearError();
   const source = tels.codeBox.value;
   let ast;
@@ -145,7 +153,6 @@ function runCode() {
   }
 
   tstate.steps = steps;
-  tstate.stepIndex = 0;
   tstate.running = true;
   tstate.ast = ast;
   tstate.inputs = inputs;
@@ -162,7 +169,7 @@ function runCode() {
 
   buildTraceTable();
   renderOperations();
-  if (steps.length > 0) renderStep();
+  tracerPlayback.load(steps);
 }
 
 // ---------- operation counting ----------
@@ -239,7 +246,7 @@ function renderGrowth() {
 }
 
 function exitRunMode() {
-  stopPlaying();
+  tracerPlayback.load([]);
   tstate.running = false;
   tstate.steps = [];
   tstate.stepIndex = 0;
@@ -270,13 +277,11 @@ function buildTraceTable() {
   tstate.steps.forEach((step, i) => {
     const tr = document.createElement('tr');
     tr.id = `trace-row-${i}`;
-    tr.className = `trace-row-${step.kind}`;
+    tr.className = `trace-row-${step.type}`;
     tr.addEventListener('click', () => {
-      stopPlaying();
-      tstate.stepIndex = i;
-      renderStep();
+      tracerPlayback.seek(i);
     });
-    tr.innerHTML = `<td>${i}</td><td>${step.line}</td><td><code>${escapeHtml(step.code)}</code></td><td>${escapeHtml(step.description)}</td>`;
+    tr.innerHTML = `<td>${i}</td><td>${step.source.line}</td><td><code>${escapeHtml(step.source.code)}</code></td><td>${escapeHtml(step.message)}</td>`;
     tels.traceBody.appendChild(tr);
   });
 }
@@ -288,7 +293,7 @@ function renderStep() {
   if (!step) return;
 
   document.querySelectorAll('.code-line.current-line').forEach((el) => el.classList.remove('current-line'));
-  const lineEl = tels.codeView.querySelector(`[data-line="${step.line}"]`);
+  const lineEl = tels.codeView.querySelector(`[data-line="${step.source.line}"]`);
   if (lineEl) {
     lineEl.classList.add('current-line');
     const card = document.querySelector('.editor-card');
@@ -296,12 +301,12 @@ function renderStep() {
     keepInView(card, lineEl, toolbar ? toolbar.offsetHeight : 0);
   }
 
-  const varNames = Object.keys(step.vars);
+  const varNames = Object.keys(step.frame.vars);
   tels.varsBox.innerHTML = varNames.length
-    ? varNames.map((k) => `<div class="var-row"><span class="var-name">${escapeHtml(k)}</span><span class="var-value">${escapeHtml(step.vars[k])}</span></div>`).join('')
+    ? varNames.map((k) => `<div class="var-row"><span class="var-name">${escapeHtml(k)}</span><span class="var-value">${escapeHtml(step.frame.vars[k])}</span></div>`).join('')
     : '<span class="muted">(no variables yet)</span>';
 
-  const outputs = tstate.steps.slice(0, tstate.stepIndex + 1).filter((s) => s.kind === 'write').map((s) => s.outputValue);
+  const outputs = tstate.steps.slice(0, tstate.stepIndex + 1).filter((s) => s.type === 'write').map((s) => s.frame.outputValue);
   tels.outputBox.innerHTML = outputs.length
     ? outputs.map((v) => `<div class="var-row"><span class="var-value">${escapeHtml(fmtValue(v))}</span></div>`).join('')
     : '<span class="muted">(no output yet)</span>';
@@ -319,77 +324,51 @@ function renderStep() {
     keepInView(wrap, row, head ? head.offsetHeight : 0);
   }
 
-  const atEnd = tstate.stepIndex >= tstate.steps.length - 1;
+  const atEnd = tracerPlayback.getState().atEnd;
   tels.btnStep.disabled = atEnd;
   tels.btnPlay.disabled = atEnd;
-  if (atEnd) stopPlaying();
-}
-
-// ---------- playback ----------
-
-function stepForward() {
-  if (tstate.stepIndex < tstate.steps.length - 1) {
-    tstate.stepIndex++;
-    renderStep();
-  } else {
-    stopPlaying();
-  }
-}
-
-function speedDelay() {
-  const level = Number(tels.speedSlider.value);
-  return 1300 - level * 110;
-}
-
-function startPlaying() {
-  if (tstate.stepIndex >= tstate.steps.length - 1) return;
-  tstate.playing = true;
-  tels.btnPlay.textContent = 'Pause';
-  tstate.playTimer = setInterval(() => {
-    stepForward();
-    if (tstate.stepIndex >= tstate.steps.length - 1) stopPlaying();
-  }, speedDelay());
-}
-
-function stopPlaying() {
-  tstate.playing = false;
-  tels.btnPlay.textContent = 'Play';
-  if (tstate.playTimer) {
-    clearInterval(tstate.playTimer);
-    tstate.playTimer = null;
-  }
-}
-
-function togglePlaying() {
-  if (tstate.playing) stopPlaying();
-  else startPlaying();
 }
 
 // ---------- events ----------
 
 tels.btnRun.addEventListener('click', runCode);
 tels.btnEdit.addEventListener('click', exitRunMode);
-tels.btnPlay.addEventListener('click', togglePlaying);
+tels.btnPlay.addEventListener('click', () => tracerPlayback.toggle());
 tels.btnStep.addEventListener('click', () => {
-  stopPlaying();
-  stepForward();
+  tracerPlayback.step(1);
 });
 tels.stepSlider.addEventListener('input', () => {
-  stopPlaying();
-  tstate.stepIndex = Number(tels.stepSlider.value);
-  renderStep();
+  tracerPlayback.seek(Number(tels.stepSlider.value));
 });
+tels.speedSlider.addEventListener('input', () => tracerPlayback.setSpeed(tels.speedSlider.value));
 
 function selectTab(which) {
   const ops = which === 'ops';
   tels.tabOps.classList.toggle('active', ops);
   tels.tabTrace.classList.toggle('active', !ops);
+  tels.tabOps.setAttribute('aria-selected', String(ops));
+  tels.tabTrace.setAttribute('aria-selected', String(!ops));
+  tels.tabOps.tabIndex = ops ? 0 : -1;
+  tels.tabTrace.tabIndex = ops ? -1 : 0;
   tels.panelOps.classList.toggle('hidden', !ops);
   tels.panelTrace.classList.toggle('hidden', ops);
 }
 
 tels.tabTrace.addEventListener('click', () => selectTab('trace'));
 tels.tabOps.addEventListener('click', () => selectTab('ops'));
+[tels.tabTrace, tels.tabOps].forEach((tab, index, tabs) => {
+  tab.addEventListener('keydown', (event) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    let next = index;
+    if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+    if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+    if (event.key === 'Home') next = 0;
+    if (event.key === 'End') next = tabs.length - 1;
+    tabs[next].click();
+    tabs[next].focus();
+  });
+});
 
 tels.optControl.addEventListener('change', () => {
   renderOperations();

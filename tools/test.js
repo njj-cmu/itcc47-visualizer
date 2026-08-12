@@ -113,11 +113,84 @@ ok('BREAK exits the loop', eq(tryOutputs('FOR i <- 1 TO 9 DO\n IF i > 2 THEN\n  
 ok('STOP ends the program', eq(tryOutputs('WRITE 1\nSTOP\nWRITE 2', []), [1]));
 ok('CASE matches', eq(tryOutputs('x <- 2\nCASE x OF\n 1: WRITE "one"\n 2: WRITE "two"\n DEFAULT: WRITE "other"\nENDCASE', []), ['two']));
 ok('CASE falls back to DEFAULT', eq(tryOutputs('x <- 9\nCASE x OF\n 1: WRITE "one"\n DEFAULT: WRITE "other"\nENDCASE', []), ['other']));
+ok('# inside a string is not a comment', eq(tryOutputs('WRITE "#VALUE" # real comment', []), ['#VALUE']));
+ok('unterminated string is rejected', !parses('WRITE "missing'));
+ok('malformed number is rejected', !parses('WRITE 1.2.3'));
+ok('two statements on one line are rejected', !parses('x <- 1 WRITE x'));
+ok('BREAK outside a loop is rejected', !parses('BREAK'));
+ok('invalid FOR variable is rejected', !parses('FOR 1 <- 1 TO 3 DO\n WRITE 1\nENDFOR'));
+
+let diagnostic = null;
+try { parse('WRITE "missing'); } catch (e) { diagnostic = e; }
+ok('parse diagnostics include code, line, and column', diagnostic && diagnostic.code === 'E_UNTERMINATED_STRING' && diagnostic.line === 1 && diagnostic.column === 7);
+
+let missingInput = null;
+try { outputs('READ x\nWRITE x', []); } catch (e) { missingInput = e; }
+ok('missing READ input is a friendly runtime error', missingInput && missingInput.code === 'E_INPUT_EXHAUSTED' && missingInput.line === 1);
+
+let badRead = null;
+try { outputs('a <- [1]\nWRITE a[1]', []); } catch (e) { badRead = e; }
+ok('out-of-bounds list read is rejected', badRead && badRead.code === 'E_INDEX_OUT_OF_BOUNDS');
+ok('one-based list construction remains supported', eq(tryOutputs('a <- []\na[1] <- 9\nWRITE a[1]', []), [9]));
+
+let zeroDivision = null;
+try { outputs('WRITE 4 / 0', []); } catch (e) { zeroDivision = e; }
+ok('division by zero is rejected on the correct line', zeroDivision && zeroDivision.code === 'E_DIVIDE_BY_ZERO' && zeroDivision.line === 1);
 
 // reading an unassigned variable should be an error, not silently undefined
 let threw = false;
 try { outputs('WRITE mystery', []); } catch (e) { threw = true; }
 ok('unassigned variable is an error', threw);
+
+// ---------- shared playback contract ----------
+
+section('shared playback');
+
+let scheduled = 0;
+let cancelled = 0;
+const playbackEngine = load(['playback.js'], {
+  setTimeout: () => { scheduled++; return scheduled; },
+  clearTimeout: () => { cancelled++; },
+});
+const Playback = playbackEngine.get('ITCC47Playback');
+const timeline = [0, 1, 2, 3].map((i) => Playback.timelineEvent({
+  id: `test:${i}`, domain: 'test', type: i === 3 ? 'complete' : 'state', message: String(i),
+  frame: { value: i }, metrics: {}, boundary: i === 2, terminal: i === 3,
+}));
+const seen = [];
+const controller = Playback.createController({ onChange: (s) => seen.push(`${s.status}:${s.index}`) });
+controller.load(timeline);
+ok('playback loads at the first event', controller.getState().index === 0 && controller.getState().status === 'paused');
+controller.step();
+ok('playback steps forward', controller.getState().index === 1);
+controller.seek(0);
+ok('playback seeks backward', controller.getState().index === 0);
+controller.finishSegment();
+ok('playback finishes at the next boundary', controller.getState().index === 2);
+controller.setSpeed(9);
+ok('playback speed updates', controller.getState().speed === 9);
+controller.seek(0);
+controller.play();
+controller.pause();
+ok('playback schedules and cancels one timer', scheduled === 1 && cancelled === 1);
+controller.seek(3);
+ok('terminal seek marks playback complete', controller.getState().status === 'complete');
+controller.dispose();
+ok('disposed playback has no events', controller.getState().total === 0);
+
+const algorithmEngine = load(['playback.js', 'algorithms.js'], { setTimeout, clearTimeout });
+const ALGORITHMS = algorithmEngine.get('ALGORITHMS');
+const binaryEvents = ALGORITHMS.binary.run([4, -2, 9, 1], 9);
+ok('binary search begins with its sorted-data precondition', binaryEvents[0].type === 'preprocess' && binaryEvents[0].frame.array.join(',') === '4,-2,9,1');
+ok('binary precondition explains preprocessing cost', binaryEvents[0].message.includes('O(n log n)') && binaryEvents[0].message.includes('linear search may be cheaper'));
+ok('binary search shows a separate sorted-copy frame', binaryEvents[1].type === 'preprocess' && binaryEvents[1].frame.array.join(',') === '-2,1,4,9');
+ok('binary preprocessing does not mutate the original frame', binaryEvents[0].frame.array.join(',') === '4,-2,9,1');
+const alreadySortedEvents = ALGORITHMS.binary.run([-3, -3, 0, 8], -3);
+ok('binary search recognizes sorted input with duplicates', alreadySortedEvents[0].message.includes('already sorted') && alreadySortedEvents[0].frame.array.join(',') === '-3,-3,0,8');
+ok('insertion sort declares moves instead of swaps', ALGORITHMS.insertion.metrics.some((m) => m.key === 'moves') && !ALGORITHMS.insertion.metrics.some((m) => m.key === 'swaps'));
+ok('insertion move events use the declared move metric', ALGORITHMS.insertion.run([3, -1, 2]).some((event) => event.metrics.moves > 0 && event.frame.highlight.move));
+const appSource = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
+ok('visual input uses one 18-value limit', appSource.includes('const MAX_VISUAL_VALUES = 18') && /parsed\.length > MAX_VISUAL_VALUES/.test(appSource));
 
 // ---------- shipped content ----------
 
@@ -231,8 +304,10 @@ ok('precache list covers every shipped asset', missing.length === 0,
 ok('precache list has no stale entries', extra.length === 0,
   extra.length ? `no longer exist: ${extra.join(', ')} — run: node tools/build-sw.js` : '');
 ok('precache includes the site root', listed.includes('./'));
-ok('service worker names a cache', /const CACHE\s*=\s*'[^']+'/.test(swSource));
+ok('service worker uses the practice cache prefix', swSource.includes("const CACHE_PREFIX = 'itcc47-practice-'"));
+ok('service worker precaches atomically', swSource.includes('cache.addAll(PRECACHE)'));
 ok('service worker cleans up old caches', swSource.includes('caches.delete'));
+ok('service worker preserves unrelated origin caches', swSource.includes('n.startsWith(CACHE_PREFIX) && n !== CACHE'));
 ok('service worker ignores non-GET requests', /request\.method\s*!==\s*'GET'/.test(swSource));
 ok('service worker ignores cross-origin requests', swSource.includes('url.origin !== self.location.origin'));
 
@@ -255,6 +330,19 @@ function isIgnored(file) {
 
 ok('no answer file is publishable', sourceLeak.length === 0,
   sourceLeak.length ? `${sourceLeak.join(', ')} exists and is not gitignored` : '');
+
+// Practice results must be deterministic and contain no identity or clock data.
+const evaluationEngine = load(['evaluation.js']);
+const Evaluation = evaluationEngine.get('ITCC47Evaluation');
+const evaluationSpec = {
+  activityId: 'practice:test', activityVersion: 2, status: 'passed',
+  passed: 1, total: 1, cases: [{ id: 'visible:0', passed: true }], outputs: [[7]], diagnostics: [],
+};
+const evaluationA = Evaluation.createResult(evaluationSpec);
+const evaluationB = Evaluation.createResult(evaluationSpec);
+ok('evaluation results are deterministic', JSON.stringify(evaluationA) === JSON.stringify(evaluationB));
+ok('evaluation results contain versions', evaluationA.schemaVersion === 1 && evaluationA.engineVersion && evaluationA.activityVersion === 2);
+ok('evaluation results contain no identity or timestamps', !('studentId' in evaluationA) && !('timestamp' in evaluationA) && !('grade' in evaluationA));
 
 // ---------- report ----------
 

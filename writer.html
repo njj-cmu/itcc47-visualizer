@@ -13,10 +13,11 @@
     <span class="topbar-code">ITCC47</span> Algorithm Writer
   </div>
   <nav class="topbar-nav">
-    <a href="index.html">Sorting &amp; Searching</a>
-    <a href="writer.html" class="active">Algorithm Writer</a>
-    <a href="tracer.html">Pseudocode Tracer</a>
-    <a href="problems.html">Problem Sets</a>
+    <a href="index.html" data-icon="start">Start</a>
+    <a href="visualizer.html" data-icon="visualize">Visualize</a>
+    <a href="writer.html" data-icon="writer">Algorithm Writer</a>
+    <a href="tracer.html" data-icon="tracer">Pseudocode Tracer</a>
+    <a href="problems.html" data-icon="problems">Problem Sets</a>
   </nav>
 </header>
 
@@ -61,11 +62,17 @@
       <div class="card-header">
         <div>
           <h1 id="algo-name-display">Untitled algorithm</h1>
-          <p class="muted">Write one action per step. Press Tab to nest a step under the one above it.</p>
+          <p class="muted">Write one action per step. Use the nesting controls or Tab to create sub-steps.</p>
         </div>
       </div>
 
       <input type="text" id="algo-name" class="text-input title-input" placeholder="Algorithm name">
+
+      <div class="nesting-toolbar" aria-label="Step nesting controls">
+        <button id="btn-outdent" class="btn btn-toolbar" type="button" data-icon="outdent">Outdent step</button>
+        <button id="btn-indent" class="btn btn-toolbar" type="button" data-icon="indent">Indent step</button>
+        <span class="muted">Select a step, then nest it. Its sub-steps move with it.</span>
+      </div>
 
       <div id="steps" class="steps"></div>
 

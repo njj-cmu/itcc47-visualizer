@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const AxeBuilder = require('@axe-core/playwright').default;
 
-for (const entry of ['index.html', 'writer.html', 'tracer.html', 'problems.html', 'practice.html?module=1']) {
+for (const entry of ['index.html', 'visualizer.html', 'writer.html', 'tracer.html', 'problems.html', 'problem-list.html?module=1', 'practice.html?module=1']) {
   test(`${entry} has no serious or critical Axe violations`, async ({ page }) => {
     await page.goto(`/${entry}`);
     const results = await new AxeBuilder({ page })

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITCC47 Choose a Problem</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="catalog-page">
+<header class="topbar">
+  <div class="topbar-title"><span class="topbar-code">ITCC47</span> Problem Sets</div>
+  <nav class="topbar-nav">
+    <a href="index.html" data-icon="start">Start</a>
+    <a href="visualizer.html" data-icon="visualize">Visualize</a>
+    <a href="writer.html" data-icon="writer">Algorithm Writer</a>
+    <a href="tracer.html" data-icon="tracer">Pseudocode Tracer</a>
+    <a href="problems.html" data-icon="problems">Problem Sets</a>
+  </nav>
+</header>
+<main class="catalog-main problem-catalog-main">
+  <nav class="catalog-breadcrumb" aria-label="Problem set breadcrumb">
+    <a class="btn btn-modules" href="problems.html" data-icon="modules">All Modules</a>
+    <span aria-hidden="true">/</span><span id="module-crumb">Module</span>
+    <span class="toolbar-spacer"></span>
+    <button id="btn-clear-progress" class="btn btn-small" type="button" data-icon="reset">Clear saved progress</button>
+  </nav>
+  <header class="catalog-intro problem-list-intro">
+    <h1 id="problem-list-heading">Select a problem</h1>
+    <p>Choose one focused exercise. You can return here without losing work saved in this browser.</p>
+  </header>
+  <div class="problem-cards" id="problem-cards" aria-labelledby="problem-list-heading"></div>
+  <aside class="practice-note" aria-label="Practice data notice" data-icon="info">
+    <p>This is public practice. A check result is feedback, not an authoritative grade.</p>
+  </aside>
+</main>
+<script src="nav.js"></script><script src="problems.data.js"></script><script src="problem-list.js"></script><script src="sw-register.js" defer></script>
+</body>
+</html>

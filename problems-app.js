@@ -14,6 +14,10 @@ const STEP_CAP = 20000;
 const mobileTabs = [...document.querySelectorAll('[data-mobile-panel]')];
 const problemPane = document.getElementById('problem-pane');
 const workPane = document.getElementById('work-pane');
+const requestedModule = new URLSearchParams(window.location.search).get('module');
+const moduleProblems = requestedModule
+  ? PROBLEMS.filter((problem) => problem.module === `Module ${requestedModule}`)
+  : PROBLEMS;
 
 const pstate = {
   problem: null,
@@ -292,8 +296,8 @@ function renderProblemMeta() {
 }
 
 function renderProgress() {
-  const solved = PROBLEMS.filter((p) => pstate.solved[p.id]).length;
-  pels.progressLine.textContent = `${solved} of ${PROBLEMS.length} solved`;
+  const solved = moduleProblems.filter((p) => pstate.solved[p.id]).length;
+  pels.progressLine.textContent = `${solved} of ${moduleProblems.length} solved`;
   buildProblemList();
 }
 
@@ -340,7 +344,7 @@ function selectProblem(problem) {
 
 function buildProblemList() {
   pels.problemList.innerHTML = '';
-  PROBLEMS.forEach((p) => {
+  moduleProblems.forEach((p) => {
     const btn = document.createElement('button');
     btn.className = 'algo-btn problem-btn';
     const selected = Boolean(pstate.problem && pstate.problem.id === p.id);
@@ -425,4 +429,8 @@ document.querySelectorAll('dialog.dlg').forEach((dlg) => {
 // ---------- init ----------
 
 loadProgress();
-selectProblem(PROBLEMS[0]);
+if (moduleProblems.length) {
+  selectProblem(moduleProblems[0]);
+} else {
+  window.location.replace('problems.html');
+}

@@ -9,7 +9,8 @@ account, nothing to submit.
 | [`index.html`](index.html) | Sorting and searching, stepped through one comparison at a time, with a trace table |
 | [`writer.html`](writer.html) | Write an algorithm in plain language; it is checked against the five characteristics from Topic 01 |
 | [`tracer.html`](tracer.html) | Run course pseudocode step by step — variable state, output, per-line operation counts, and a measured growth curve |
-| [`problems.html`](problems.html) | Practice problems, checked against visible examples and hidden cases |
+| [`problems.html`](problems.html) | Browse equal-height module cards and see which problem sets are available |
+| [`practice.html`](practice.html) | Solve a selected module's pseudocode problems against visible examples and hidden cases |
 
 The three pseudocode tools hand off to each other: the Writer exports a skeleton
 into the Tracer, and a problem draft can be opened in the Tracer to see where it

@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 
-const entries = ['index.html', 'writer.html', 'tracer.html', 'problems.html'];
+const entries = ['index.html', 'writer.html', 'tracer.html', 'problems.html', 'practice.html?module=1'];
 
 for (const entry of entries) {
   test(`${entry} has no horizontal overflow`, async ({ page }) => {
@@ -62,13 +62,26 @@ test('tracer runs and its result tabs work from the keyboard', async ({ page }) 
 
 test('problem work tabs reach code and results on a phone', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone');
-  await page.goto('/problems.html');
+  await page.goto('/practice.html?module=1');
   await page.getByRole('tab', { name: 'Code' }).click();
   await expect(page.locator('#code-box')).toBeVisible();
   await expect(page.locator('#problem-pane')).toBeHidden();
   await page.getByRole('button', { name: 'Check answer' }).click();
   await expect(page.getByRole('tab', { name: 'Results' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#results-body')).toBeVisible();
+});
+
+test('module catalog shows equal-height availability cards and opens Module 1', async ({ page }) => {
+  await page.goto('/problems.html');
+  await expect(page.getByRole('heading', { name: 'Choose a module' })).toBeVisible();
+  await expect(page.locator('.module-card')).toHaveCount(8);
+  await expect(page.getByText('Not implemented', { exact: true })).toHaveCount(12);
+  const heights = await page.locator('.module-card').evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height));
+  expect(new Set(heights.map((height) => Math.round(height))).size).toBe(1);
+  await page.getByRole('link', { name: /Open problem sets/ }).first().click();
+  await expect(page).toHaveURL(/practice\.html\?module=1$/);
+  await expect(page.locator('#p-module')).toHaveText('Module 1');
+  await expect(page.locator('#progress-line')).toContainText('of 11 solved');
 });
 
 test('all entry pages open from file URLs and permit an interaction', async ({ page }) => {
@@ -83,14 +96,15 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
   await expect(page.locator('#step-slider')).toHaveValue('1');
 });
 
-test('cached navigation remains available offline', async ({ page, context }) => {
+test('cached navigation remains available offline', async ({ page, context }, testInfo) => {
   await page.goto('/index.html');
   await page.evaluate(async () => {
     if ('serviceWorker' in navigator) await navigator.serviceWorker.ready;
   });
   await page.reload();
   await context.setOffline(true);
-  await page.goto('/tracer.html');
+  await page.goto('/practice.html?module=1');
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
   await expect(page.locator('#code-box')).toBeVisible();
 });
 

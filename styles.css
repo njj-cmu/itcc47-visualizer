@@ -1572,8 +1572,11 @@ html, body {
 }
 
 .diff-warmup { color: #86efac; border-color: #166534; background: #12291b; }
-.diff-core { color: #93c5fd; border-color: #1e40af; background: #16233f; }
-.diff-challenge { color: #fcd34d; border-color: #92400e; background: #2e2210; }
+.diff-core { color: #5eead4; border-color: #0f766e; background: #102b29; }
+.diff-medium { color: #fde047; border-color: #a16207; background: #31290f; }
+.diff-mediumhard { color: #fdba74; border-color: #c2410c; background: #3a2012; }
+.diff-challenge { color: #fda4af; border-color: #be123c; background: #3a151f; }
+.diff-hard { color: #f87171; border-color: #dc2626; background: #3a1414; }
 
 .chip-solved { color: #86efac; border-color: var(--sorted); background: #12291b; }
 
@@ -1798,6 +1801,15 @@ html, body {
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
 }
 .tool-section h2 { margin: 0 0 14px; font: 650 1rem ui-monospace, "SFMono-Regular", Consolas, monospace; }
+.tool-section { scroll-margin-top: 24px; }
+.tool-section.is-arriving h2 { color: #93c5fd; }
+.tool-section.is-arriving .tool-rail > a { animation: tool-arrive 520ms ease-out both; }
+.tool-section.is-arriving .tool-rail > a:nth-child(2) { animation-delay: 70ms; }
+.tool-section.is-arriving .tool-rail > a:nth-child(3) { animation-delay: 140ms; }
+@keyframes tool-arrive {
+  from { opacity: 0.35; transform: translateY(12px); border-color: #3b82f6; }
+  to { opacity: 1; transform: translateY(0); border-color: #484852; }
+}
 .tool-rail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
 .tool-rail > a {
   min-height: 94px;

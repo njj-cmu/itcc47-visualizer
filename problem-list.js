@@ -23,12 +23,13 @@
   problems.forEach((problem, index) => {
     const complete = Boolean(solved[problem.id]);
     const hasDraft = Object.prototype.hasOwnProperty.call(drafts, problem.id);
+    const difficultyClass = `diff-${problem.difficulty.toLowerCase().replace(/[^a-z]/g, '')}`;
     const article = document.createElement('article');
     article.className = 'problem-choice';
     article.innerHTML = `
       <div class="problem-choice-number" aria-hidden="true">${String(index + 1).padStart(2, '0')}</div>
       <div class="problem-choice-body">
-        <div class="problem-choice-heading"><h2>${esc(problem.title)}</h2><span class="chip chip-diff">${esc(problem.difficulty)}</span>${complete ? '<span class="chip chip-solved">Solved</span>' : ''}</div>
+        <div class="problem-choice-heading"><h2>${esc(problem.title)}</h2><span class="chip chip-diff ${difficultyClass}">${esc(problem.difficulty)}</span>${complete ? '<span class="chip chip-solved">Solved</span>' : ''}</div>
         <p>${esc(problem.statement)}</p>
         <small>${problem.visibleTests.length} visible example${problem.visibleTests.length === 1 ? '' : 's'} · ${hasDraft && !complete ? 'Draft saved' : complete ? 'Completed in this browser' : 'Not started'}</small>
       </div>

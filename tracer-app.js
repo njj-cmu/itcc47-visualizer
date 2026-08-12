@@ -5,6 +5,7 @@ const tstate = {
   stepIndex: 0,
   running: false,
   sourceLines: [],
+  operationsView: 'actual',
 };
 
 const tels = {
@@ -31,8 +32,17 @@ const tels = {
   opsEmpty: document.getElementById('ops-empty'),
   opsContent: document.getElementById('ops-content'),
   opsTotal: document.getElementById('ops-total-value'),
+  opsTotalLabel: document.getElementById('ops-total-label'),
+  opsViewActual: document.getElementById('ops-view-actual'),
+  opsViewSymbolic: document.getElementById('ops-view-symbolic'),
+  opsDominant: document.getElementById('ops-dominant'),
+  opsGrowth: document.getElementById('ops-growth'),
+  opsConfidence: document.getElementById('ops-confidence'),
+  opsSymbolicFacts: document.getElementById('ops-symbolic-facts'),
+  opsDiagnostics: document.getElementById('ops-diagnostics'),
+  opsRunsHeading: document.getElementById('ops-runs-heading'),
   opsBody: document.getElementById('ops-body'),
-  optControl: document.getElementById('opt-control'),
+  countModels: [...document.querySelectorAll('input[name="count-model"]')],
   loopNotes: document.getElementById('loop-notes'),
   sweepInput: document.getElementById('sweep-input'),
   sweepMax: document.getElementById('sweep-max'),
@@ -183,27 +193,87 @@ function renderOperations() {
   tels.opsEmpty.classList.add('hidden');
   tels.opsContent.classList.remove('hidden');
 
-  const includeControl = tels.optControl.checked;
-  const { rows, total } = summarizeCounts(tstate.steps, tstate.sourceLines, includeControl);
-
-  tels.opsTotal.textContent = total.toLocaleString();
-  tels.opsBody.innerHTML = rows
-    .map((r) => `<tr><td>${r.line}</td><td><code>${escapeHtml(r.code)}</code></td><td>${r.each % 1 === 0 ? r.each : r.each.toFixed(1)}</td><td>${r.times}</td><td><strong>${r.total}</strong></td></tr>`)
-    .join('');
-
-  const { notes } = loopDiagnostics(tstate.ast, tstate.steps, tstate.sourceLines);
-  tels.loopNotes.innerHTML = notes.length
-    ? notes.map((n) => `<div class="loop-note"><strong>Line ${n.line}:</strong> ${escapeHtml(n.message)}</div>`).join('')
-    : '';
-
-  // populate the "which input is n?" selector once per run
   const reads = findReadTargets(tstate.ast);
-  const prev = tels.sweepInput.value;
+  const previousInput = tels.sweepInput.value;
   tels.sweepInput.innerHTML = reads.length
-    ? reads.map((r, i) => `<option value="${i}">input ${i + 1} — ${escapeHtml(r.name)} (line ${r.line})</option>`).join('')
+    ? reads.map((read, index) => `<option value="${index}">${escapeHtml(read.name)} — input ${index + 1}, line ${read.line}</option>`).join('')
     : '<option value="-1">this algorithm reads no input</option>';
-  if (prev && Number(prev) < reads.length) tels.sweepInput.value = prev;
+  if (previousInput && Number(previousInput) < reads.length) tels.sweepInput.value = previousInput;
   tels.btnMeasure.disabled = reads.length === 0;
+
+  const model = (tels.countModels.find((radio) => radio.checked) || {}).value || 'lecture';
+  const selectedIndex = Number(tels.sweepInput.value);
+  const selectedRead = reads[selectedIndex] || reads[0];
+  const analysis = ITCC47Counting.analyse({
+    ast: tstate.ast,
+    steps: tstate.steps,
+    sourceLines: tstate.sourceLines,
+    inputs: tstate.inputs,
+    model,
+    inputName: selectedRead ? selectedRead.name : 'n',
+  });
+  tstate.countAnalysis = analysis;
+
+  const symbolic = tstate.operationsView === 'symbolic';
+  tels.opsViewActual.classList.toggle('active', !symbolic);
+  tels.opsViewSymbolic.classList.toggle('active', symbolic);
+  tels.opsViewActual.setAttribute('aria-pressed', String(!symbolic));
+  tels.opsViewSymbolic.setAttribute('aria-pressed', String(symbolic));
+  tels.opsSymbolicFacts.classList.toggle('hidden', !symbolic);
+  tels.opsRunsHeading.textContent = symbolic ? 'Symbolic runs' : 'Actual runs';
+  tels.opsTotalLabel.textContent = symbolic ? 'Exact formula' : `Actual operations${selectedRead ? ` for ${selectedRead.name} = ${tstate.inputs[selectedIndex]}` : ''}`;
+  tels.opsTotal.textContent = symbolic
+    ? (analysis.symbolicTotal ? `T(n) = ${analysis.symbolicTotal}` : 'Formula unavailable')
+    : analysis.actualTotal.toLocaleString();
+  tels.opsDominant.textContent = analysis.dominantTerm || '—';
+  tels.opsGrowth.textContent = analysis.growthClass || '—';
+  tels.opsConfidence.textContent = analysis.confidence === 'exact' ? 'Exact for supported FOR loops' : 'Cannot prove this control flow yet';
+  tels.opsConfidence.classList.toggle('unsupported', analysis.confidence !== 'exact');
+
+  const rows = symbolic ? analysis.rows : analysis.actualRows;
+  tels.opsBody.innerHTML = rows.length ? rows.map((row) => {
+    const runs = symbolic ? (row.symbolicRuns === null ? '—' : row.symbolicRuns) : row.actualRuns;
+    const contribution = symbolic ? (row.contribution === null ? '—' : row.contribution) : row.actualContribution;
+    return `<tr class="ops-row${row.confidence === 'unsupported' ? ' ops-row-unsupported' : ''}" tabindex="0" data-source-line="${row.line}" data-loop-lines="${row.enclosingLoops.map((loop) => `${loop.line}:${loop.endLine}`).join(',')}">
+      <td>${row.line}</td><td><code>${escapeHtml(row.statement)}</code>${row.kind === 'loop-control' ? '<span class="ops-row-kind">loop control</span>' : ''}</td>
+      <td>${row.unitCost}</td><td>${escapeHtml(runs)}</td><td><strong>${escapeHtml(contribution)}</strong></td></tr>`;
+  }).join('') : '<tr><td colspan="5" class="muted">No countable operations were recorded.</td></tr>';
+
+  tels.opsDiagnostics.innerHTML = analysis.diagnostics.map((item) =>
+    `<div class="ops-diagnostic"><strong>Line ${item.line}:</strong> ${escapeHtml(item.message)} <span>${escapeHtml(item.suggestion || '')}</span></div>`).join('');
+  tels.opsDiagnostics.classList.toggle('hidden', analysis.diagnostics.length === 0 || !symbolic);
+
+  tels.loopNotes.innerHTML = symbolic && analysis.loops.length ? analysis.loops.map((loop, index) => `<details class="loop-explanation"${index === 0 ? ' open' : ''}>
+    <summary>Why ${escapeHtml(loop.totalSymbolicIterations || 'an unknown number of')} executions? <span>Line ${loop.line}</span></summary>
+    <p>${escapeHtml(loop.explanation)}</p>
+    <dl><div><dt>Bounds</dt><dd><code>${escapeHtml(loop.boundExpression)}</code></dd></div><div><dt>Per entry</dt><dd>${escapeHtml(loop.symbolicIterations || 'unknown')}</dd></div><div><dt>Total</dt><dd>${escapeHtml(loop.totalSymbolicIterations || 'unknown')}</dd></div></dl>
+    <button class="btn btn-small loop-highlight" type="button" data-loop-line="${loop.line}" data-loop-end="${loop.endLine}">Highlight lines ${loop.line}–${loop.endLine} in Code</button>
+  </details>`).join('') : '';
+
+  tels.opsBody.querySelectorAll('.ops-row').forEach((row) => {
+    const select = () => highlightCountSource(Number(row.dataset.sourceLine), row.dataset.loopLines);
+    row.addEventListener('click', select);
+    row.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(); }
+    });
+  });
+  tels.loopNotes.querySelectorAll('.loop-highlight').forEach((button) => button.addEventListener('click', () =>
+    highlightCountSource(Number(button.dataset.loopLine), `${button.dataset.loopLine}:${button.dataset.loopEnd}`)));
+}
+
+function highlightCountSource(line, loopData) {
+  tels.codeView.querySelectorAll('.count-line, .count-loop-line').forEach((element) => element.classList.remove('count-line', 'count-loop-line'));
+  String(loopData || '').split(',').filter(Boolean).forEach((range) => {
+    const [start, end] = range.split(':').map(Number);
+    for (let current = start; current <= end; current++) tels.codeView.querySelector(`[data-line="${current}"]`)?.classList.add('count-loop-line');
+  });
+  const selected = tels.codeView.querySelector(`[data-line="${line}"]`);
+  if (selected) {
+    selected.classList.add('count-line');
+    const card = document.querySelector('.editor-card');
+    const toolbar = document.querySelector('.editor-toolbar');
+    keepInView(card, selected, toolbar ? toolbar.offsetHeight : 0);
+  }
 }
 
 function renderGrowth() {
@@ -214,8 +284,8 @@ function renderGrowth() {
   const sizes = [];
   for (let n = 1; n <= maxN; n++) sizes.push(n);
 
-  const includeControl = tels.optControl.checked;
-  const { points, error } = sweep(tstate.ast, tstate.inputs, idx, sizes, includeControl);
+  const includeControl = (tels.countModels.find((radio) => radio.checked) || {}).value === 'full';
+  const { points, error } = sweep(tstate.ast, tstate.inputs, idx, sizes, includeControl, tstate.sourceLines);
 
   if (error) {
     tels.growthResult.classList.remove('hidden');
@@ -370,10 +440,13 @@ tels.tabOps.addEventListener('click', () => selectTab('ops'));
   });
 });
 
-tels.optControl.addEventListener('change', () => {
+tels.opsViewActual.addEventListener('click', () => { tstate.operationsView = 'actual'; renderOperations(); });
+tels.opsViewSymbolic.addEventListener('click', () => { tstate.operationsView = 'symbolic'; renderOperations(); });
+tels.countModels.forEach((radio) => radio.addEventListener('change', () => {
   renderOperations();
   if (!tels.growthResult.classList.contains('hidden')) renderGrowth();
-});
+}));
+tels.sweepInput.addEventListener('change', renderOperations);
 
 tels.sweepMax.addEventListener('input', () => {
   tels.sweepMaxValue.textContent = tels.sweepMax.value;

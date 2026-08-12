@@ -154,7 +154,7 @@ function findReadTargets(ast) {
  * Later READs reuse the remaining original inputs, cycling if the program asks
  * for more than were supplied.
  */
-function sweep(ast, baseInputs, inputIndex, sizes, includeControl) {
+function sweep(ast, baseInputs, inputIndex, sizes, includeControl, sourceLines) {
   const points = [];
   const filler = baseInputs.filter((_, i) => i !== inputIndex);
 
@@ -170,7 +170,16 @@ function sweep(ast, baseInputs, inputIndex, sizes, includeControl) {
 
     const { steps, truncated, error } = collectSteps(ast, inputs, 60000);
     if (error) return { points, error: error.message || String(error) };
-    const total = steps.reduce((s, st) => s + st.metrics.cost + (includeControl ? st.metrics.controlCost : 0), 0);
+    const total = includeControl && typeof ITCC47Counting !== 'undefined'
+      ? ITCC47Counting.analyse({
+        ast,
+        steps,
+        sourceLines: sourceLines || [],
+        inputs,
+        model: 'full',
+        inputName: (findReadTargets(ast)[inputIndex] || {}).name,
+      }).actualTotal
+      : steps.reduce((s, st) => s + st.metrics.cost, 0);
     points.push({ n, total, truncated });
     if (truncated) break;
   }

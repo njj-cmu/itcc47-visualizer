@@ -45,6 +45,7 @@ const PRECACHE = [
   'start-page.js',
   'styles.css',
   'sw-register.js',
+  'symbolic-counting.js',
   'tooltip.js',
   'tracer-app.js',
   'tracer.html',

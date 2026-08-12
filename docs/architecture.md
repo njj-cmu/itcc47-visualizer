@@ -50,6 +50,24 @@ Content keeps stable activity/problem IDs and an explicit `contentVersion`.
 Changing the meaning of an activity or its test contract requires incrementing
 that version.
 
+## Symbolic operation counting
+
+`symbolic-counting.js` is another framework-neutral engine. It consumes the
+interpreter AST plus an optional completed timeline and returns deterministic
+actual totals, an exact symbolic formula when one can be proved, per-line
+derivation rows, loop explanations, and diagnostics.
+
+Phase 1 proves only straight-line statements, constant-bound `FOR` loops,
+simple affine bounds such as `1 TO n` and `0 TO n - 1`, and independent nested
+loops. Branches, `WHILE`, `FOR EACH`, early exits, dependent bounds, and
+flooring division in bounds return an unsupported diagnostic instead of an
+estimated formula.
+
+The Lecture model charges no operations to a `FOR` header. Full Control adds
+separate setup, condition-check, and increment rows; it never averages unequal
+control events into a misleading unit cost. The measured-growth sweep remains
+separate evidence and is not combined with the symbolic proof.
+
 ## Incremental React migration
 
 React should first replace one page shell while importing these unchanged

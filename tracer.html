@@ -99,51 +99,77 @@
       <div id="ops-empty" class="muted field-note">Run the pseudocode to count operations.</div>
 
       <div id="ops-content" class="hidden">
-        <div class="ops-total">
-          <span class="ops-total-label">T(n) for this input</span>
-          <strong id="ops-total-value">0</strong>
+        <div class="ops-toolbar">
+          <fieldset class="ops-fieldset">
+            <legend>View</legend>
+            <div class="segmented" role="group" aria-label="Operation count view">
+              <button id="ops-view-actual" class="segment active" type="button" aria-pressed="true">Actual</button>
+              <button id="ops-view-symbolic" class="segment" type="button" aria-pressed="false">Symbolic</button>
+            </div>
+          </fieldset>
+          <fieldset class="ops-fieldset">
+            <legend>Counting model</legend>
+            <div class="segmented">
+              <label class="segment"><input type="radio" name="count-model" value="lecture" checked><span>Lecture</span></label>
+              <label class="segment"><input type="radio" name="count-model" value="full"><span>Full Control</span></label>
+            </div>
+          </fieldset>
         </div>
 
-        <label class="checkline">
-          <input type="checkbox" id="opt-control">
-          <span>Count loop control (FOR headers)</span>
-        </label>
-        <p class="muted field-note" id="control-note">Off matches the lecture, where T(n) = 7n + 6 charges nothing for the FOR header.</p>
+        <div class="ops-input-row">
+          <label for="sweep-input">Treat <code>n</code> as</label>
+          <select id="sweep-input" class="text-input"></select>
+        </div>
 
-        <div class="trace-table-wrap ops-table-wrap" tabindex="0" aria-label="Operation counts table">
+        <section id="ops-summary" class="ops-summary" aria-live="polite">
+          <div class="ops-formula">
+            <span id="ops-total-label">Actual operations</span>
+            <strong id="ops-total-value">0</strong>
+          </div>
+          <div id="ops-symbolic-facts" class="ops-symbolic-facts hidden">
+            <span>Dominant <strong id="ops-dominant">—</strong></span>
+            <span>Growth <strong id="ops-growth">—</strong></span>
+            <span id="ops-confidence" class="ops-confidence">—</span>
+          </div>
+        </section>
+
+        <div id="ops-diagnostics" class="ops-diagnostics hidden" role="status" aria-live="polite"></div>
+
+        <div class="trace-table-wrap ops-table-wrap ops-derivation-wrap" tabindex="0" aria-label="Operation counts table">
           <table class="trace-table">
-            <thead><tr><th>Line</th><th>Statement</th><th>Each</th><th>Runs</th><th>Total</th></tr></thead>
+            <thead><tr><th>Line</th><th>Statement</th><th>Unit cost</th><th id="ops-runs-heading">Actual runs</th><th>Contribution</th></tr></thead>
             <tbody id="ops-body"></tbody>
           </table>
         </div>
 
-        <div id="loop-notes"></div>
+        <div id="loop-notes" class="loop-explanations"></div>
 
-        <h3 class="panel-title ops-section">Growth</h3>
-        <p class="muted field-note">Re-runs the algorithm at increasing input sizes and measures the real count.</p>
+        <details class="growth-disclosure">
+          <summary>Measured growth <span>(experimental)</span></summary>
+          <div class="growth-content">
+            <p class="muted field-note">Re-runs the algorithm at increasing input sizes. This evidence is separate from the exact symbolic formula.</p>
 
-        <label class="field-label" for="sweep-input">Which input is n?</label>
-        <select id="sweep-input" class="text-input"></select>
+            <label class="field-label" for="sweep-max">Test n up to <span id="sweep-max-value">12</span></label>
+            <input type="range" id="sweep-max" min="4" max="30" value="12" class="slider">
 
-        <label class="field-label" for="sweep-max">Test n up to <span id="sweep-max-value">12</span></label>
-        <input type="range" id="sweep-max" min="4" max="30" value="12" class="slider">
+            <button id="btn-measure" class="btn btn-primary btn-wide">Measure growth</button>
 
-        <button id="btn-measure" class="btn btn-primary btn-wide">Measure growth</button>
-
-        <div id="growth-result" class="hidden">
-          <div class="growth-verdict">
-            <span class="growth-label" id="growth-label">—</span>
-            <span class="growth-detail muted" id="growth-detail"></span>
+            <div id="growth-result" class="hidden">
+              <div class="growth-verdict">
+                <span class="growth-label" id="growth-label">—</span>
+                <span class="growth-detail muted" id="growth-detail"></span>
+              </div>
+              <div id="growth-chart" class="growth-chart"></div>
+              <div class="trace-table-wrap ops-table-wrap" tabindex="0" aria-label="Growth measurements table">
+                <table class="trace-table">
+                  <thead><tr><th>n</th><th>Operations</th><th>Ratio</th></tr></thead>
+                  <tbody id="growth-body"></tbody>
+                </table>
+              </div>
+              <p class="muted field-note">Measured over the range tested, not a proof. Growth beyond it may differ.</p>
+            </div>
           </div>
-          <div id="growth-chart" class="growth-chart"></div>
-          <div class="trace-table-wrap ops-table-wrap" tabindex="0" aria-label="Growth measurements table">
-            <table class="trace-table">
-              <thead><tr><th>n</th><th>Operations</th><th>Ratio</th></tr></thead>
-              <tbody id="growth-body"></tbody>
-            </table>
-          </div>
-          <p class="muted field-note">Measured over the range tested, not a proof. Growth beyond it may differ.</p>
-        </div>
+        </details>
       </div>
     </div>
   </aside>
@@ -251,8 +277,9 @@ STOP      end the algorithm</pre>
 <script src="nav.js"></script>
 <script src="editor-tools.js"></script>
 <script src="interpreter.js"></script>
-<script src="complexity.js"></script>
 <script src="playback.js"></script>
+<script src="complexity.js"></script>
+<script src="symbolic-counting.js"></script>
 <script src="presets.js"></script>
 <script src="tracer-app.js"></script>
 <script src="sw-register.js" defer></script>

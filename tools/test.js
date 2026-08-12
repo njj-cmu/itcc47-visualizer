@@ -49,6 +49,18 @@ const parse = engine.get('parsePseudocode');
 const runProgram = engine.get('runProgram');
 const fmtValue = engine.get('fmtValue');
 
+const countingEngine = load(['interpreter.js', 'playback.js', 'complexity.js', 'symbolic-counting.js']);
+const Counting = countingEngine.get('ITCC47Counting');
+const parseForCounting = countingEngine.get('parsePseudocode');
+const collectForCounting = countingEngine.get('collectSteps');
+
+function analyseCount(src, inputs, model = 'lecture', inputName = 'n') {
+  const ast = parseForCounting(src);
+  const sourceLines = src.split('\n');
+  const run = collectForCounting(ast, inputs);
+  return Counting.analyse({ ast, steps: run.steps, sourceLines, inputs, model, inputName });
+}
+
 function outputs(src, inputs) {
   const gen = runProgram(parse(src), [...inputs]);
   const out = [];
@@ -141,6 +153,55 @@ ok('division by zero is rejected on the correct line', zeroDivision && zeroDivis
 let threw = false;
 try { outputs('WRITE mystery', []); } catch (e) { threw = true; }
 ok('unassigned variable is an error', threw);
+
+// ---------- exact symbolic operation counting ----------
+
+section('symbolic operation counting');
+
+const SUM_N = 'READ n\ntotal <- 0\nFOR i <- 1 TO n DO\n total <- total + i\nENDFOR\nWRITE total';
+const sumLecture = analyseCount(SUM_N, [4]);
+ok('lecture model derives an exact linear formula', sumLecture.symbolicTotal === '4n + 6' && sumLecture.growthClass === 'O(n)');
+ok('lecture symbolic total matches the observed run', Counting.expression.evaluate([6, 4], 4) === sumLecture.actualTotal);
+ok('linear formula matches actual executions for several n', [1, 4, 9].every((n) => {
+  const analysis = analyseCount(SUM_N, [n]);
+  return Counting.expression.evaluate([6, 4], n) === analysis.actualTotal;
+}));
+ok('lecture FOR header is explicitly free', sumLecture.rows.some((row) => row.kind === 'loop-header' && row.unitCost === 0));
+ok('loop body explains n executions', sumLecture.rows.some((row) => row.line === 4 && row.symbolicRuns === 'n' && row.contribution === '4n'));
+
+const sumFull = analyseCount(SUM_N, [4], 'full');
+ok('full-control model has setup, condition, and increment rows', ['setup', 'condition', 'increment'].every((part) => sumFull.rows.some((row) => row.id.endsWith(part))));
+ok('full-control formula is exact', sumFull.symbolicTotal === '11n + 12' && sumFull.actualTotal === 56);
+
+const AFFINE = 'READ n\nc <- 0\nFOR i <- 0 TO n - 1 DO\n c <- c + 1\nENDFOR\nWRITE c';
+const affine = analyseCount(AFFINE, [7]);
+ok('affine 0 TO n - 1 bound simplifies to n', affine.loops[0].symbolicIterations === 'n' && affine.symbolicTotal === '4n + 6');
+
+const CONSTANT_LOOP = 'x <- 0\nFOR i <- 1 TO 4 DO\n x <- x + 1\nENDFOR\nWRITE x';
+const fixed = analyseCount(CONSTANT_LOOP, []);
+ok('constant-bound FOR loop produces a constant formula', fixed.symbolicTotal === '20' && fixed.growthClass === 'O(1)');
+
+const EMPTY_LOOP = 'x <- 0\nFOR i <- 5 TO 1 DO\n x <- x + 1\nENDFOR\nWRITE x';
+const emptyLoop = analyseCount(EMPTY_LOOP, []);
+ok('constant empty FOR loop clamps to zero iterations', emptyLoop.symbolicTotal === '4' && emptyLoop.actualTotal === 4);
+
+const NESTED_LOOPS = 'READ n\nc <- 0\nFOR i <- 1 TO n DO\n FOR j <- 1 TO n DO\n  c <- c + 1\n ENDFOR\nENDFOR\nWRITE c';
+const nested = analyseCount(NESTED_LOOPS, [3]);
+ok('independent nested FOR loops produce n squared', nested.symbolicTotal === '4n² + 6' && nested.growthClass === 'O(n²)');
+ok('nested formula matches observed executions', nested.actualTotal === 42);
+
+const conditional = analyseCount('READ n\nIF n > 0 THEN\n WRITE n\nENDIF', [3]);
+ok('data-dependent branch refuses to invent a formula', conditional.symbolicTotal === null && conditional.diagnostics.some((d) => d.code === 'W_SYMBOLIC_BRANCH'));
+
+const dependentLoop = analyseCount('READ n\nFOR i <- 1 TO n DO\n FOR j <- 1 TO i DO\n  WRITE j\n ENDFOR\nENDFOR', [3]);
+ok('dependent nested bound is diagnosed as unsupported', dependentLoop.symbolicTotal === null && dependentLoop.diagnostics.some((d) => d.code === 'W_SYMBOLIC_LOOP_BOUND' && d.line === 3));
+
+const wrongInput = analyseCount(SUM_N, [4], 'lecture', 'missing');
+ok('unknown input mapping is not treated as n', wrongInput.symbolicTotal === null && wrongInput.diagnostics.some((d) => d.code === 'W_SYMBOLIC_LOOP_BOUND'));
+
+const FRACTIONAL_BOUND = 'READ n\nFOR i <- 1 TO n / 2 DO\n WRITE i\nENDFOR';
+const fractional = analyseCount(FRACTIONAL_BOUND, [8]);
+ok('flooring division in a loop bound is not falsely treated as affine', fractional.symbolicTotal === null && fractional.diagnostics.some((d) => d.code === 'W_SYMBOLIC_LOOP_BOUND'));
 
 // ---------- shared playback contract ----------
 

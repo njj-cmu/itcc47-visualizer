@@ -76,6 +76,43 @@ test('tracer runs and its result tabs work from the keyboard', async ({ page }) 
   await expect(page.getByRole('tab', { name: /operations/i })).toHaveAttribute('aria-selected', 'true');
 });
 
+test('tracer explains exact symbolic FOR-loop counts and explicit control costs', async ({ page }) => {
+  await page.goto('/tracer.html');
+  await page.getByRole('button', { name: 'Load Example' }).click();
+  await page.getByRole('button', { name: /Counting: sum of n values/ }).click();
+  await page.getByRole('button', { name: /run/i }).click();
+  await page.getByRole('tab', { name: /operations/i }).click();
+
+  await expect(page.locator('#ops-total-value')).toHaveText('30');
+  await page.getByRole('button', { name: 'Symbolic' }).click();
+  await expect(page.locator('#ops-total-value')).toHaveText('T(n) = 4n + 6');
+  await expect(page.locator('#ops-growth')).toHaveText('O(n)');
+  await expect(page.locator('.loop-explanation').first()).toContainText('= n iterations');
+
+  const bodyRow = page.locator('.ops-row').filter({ hasText: 'total <- total + i' });
+  await bodyRow.click();
+  await expect(page.locator('.code-line.count-line')).toHaveAttribute('data-line', '4');
+  await expect(page.locator('.code-line.count-loop-line')).toHaveCount(3);
+
+  await page.getByText('Full Control', { exact: true }).click();
+  await expect(page.locator('#ops-total-value')).toHaveText('T(n) = 11n + 12');
+  await expect(page.locator('.ops-row-kind')).toHaveCount(3);
+  await expect(page.locator('.ops-row').filter({ hasText: 'condition' })).toContainText('n + 1');
+});
+
+test('symbolic operation counting is touch-readable without horizontal page overflow', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone');
+  await page.goto('/tracer.html');
+  await page.getByRole('button', { name: 'Load Example' }).click();
+  await page.getByRole('button', { name: /Counting: nested loops/ }).click();
+  await page.getByRole('button', { name: /run/i }).click();
+  await page.getByRole('tab', { name: /operations/i }).click();
+  await page.getByRole('button', { name: 'Symbolic' }).click();
+  await expect(page.locator('#ops-total-value')).toHaveText('T(n) = 4n² + 6');
+  await expect(page.locator('.loop-explanation').first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
+
 test('problem work tabs reach code and results on a phone', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone');
   await page.goto('/practice.html?module=1');
@@ -144,6 +181,14 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
   await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}`);
   await page.getByRole('button', { name: 'Step' }).click();
   await expect(page.locator('#step-slider')).toHaveValue('1');
+
+  await page.goto(`file:///${path.resolve(__dirname, '..', 'tracer.html').replace(/\\/g, '/')}`);
+  await page.getByRole('button', { name: 'Load Example' }).click();
+  await page.getByRole('button', { name: /Counting: sum of n values/ }).click();
+  await page.getByRole('button', { name: /run/i }).click();
+  await page.getByRole('tab', { name: /operations/i }).click();
+  await page.getByRole('button', { name: 'Symbolic' }).click();
+  await expect(page.locator('#ops-total-value')).toHaveText('T(n) = 4n + 6');
 });
 
 test('cached navigation remains available offline', async ({ page, context }, testInfo) => {

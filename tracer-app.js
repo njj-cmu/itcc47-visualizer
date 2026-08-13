@@ -294,15 +294,15 @@ function renderRecurrence() {
   const combinePrompt = !branchRequirement && !tstate.recurrenceCombine;
   tels.recurrenceAssumptions.innerHTML = branchRequirement
     ? `<fieldset class="assumption-fieldset"><legend>Which recursive branch is the worst case?</legend>${branchRequirement.candidates.map((item) => `<label><input type="radio" name="recurrence-branch" value="${escapeHtml(item.value)}"><span>${escapeHtml(item.label)}</span></label>`).join('')}<p>This session-only choice resets when the code changes.</p></fieldset>`
-    : combinePrompt ? `<fieldset class="assumption-fieldset"><legend>Bound the non-recursive work in one call</legend>
-      <label><input type="radio" name="recurrence-combine" value="constant"><span>Constant, c</span></label>
-      <label><input type="radio" name="recurrence-combine" value="linear"><span>Linear in the confirmed size, cn</span></label>
-      <p>Choose only what the work outside recursive calls justifies.</p></fieldset>` : '';
+    : `<fieldset class="assumption-fieldset"><legend>Bound the non-recursive work in one call</legend>
+      <label><input type="radio" name="recurrence-combine" value="constant"${tstate.recurrenceCombine === 'constant' ? ' checked' : ''}><span>Constant, c</span></label>
+      <label><input type="radio" name="recurrence-combine" value="linear"${tstate.recurrenceCombine === 'linear' ? ' checked' : ''}><span>Linear in the confirmed size, cn</span></label>
+      <p>Choose only what the work outside recursive calls justifies.</p></fieldset>`;
   tels.recurrenceAssumptions.classList.toggle('hidden', !tels.recurrenceAssumptions.innerHTML);
   tels.recurrenceAssumptions.querySelectorAll('input').forEach((input) => input.addEventListener('change', () => {
     if (input.name === 'recurrence-branch') tstate.recurrenceBranch = input.value;
     else tstate.recurrenceCombine = input.value;
-    renderRecurrence();
+    requestAnimationFrame(renderRecurrence);
   }));
 
   const solved = Boolean(analysis.recurrence) && !combinePrompt;

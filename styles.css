@@ -1551,11 +1551,12 @@ html, body {
 .recurrence-empty strong { color: var(--text); display: block; margin-bottom: 7px; }
 .recurrence-empty p { margin: 0 auto; max-width: 48ch; }
 .recurrence-setup { display: grid; grid-template-columns: minmax(220px, 1.4fr) minmax(160px, .8fr) minmax(200px, 1fr); gap: 12px; align-items: end; border: 1px solid var(--border); border-radius: 12px; padding: 15px; background: var(--surface-2); }
+.recurrence-setup > * { min-width: 0; }
 .recurrence-setup > div:first-child { grid-row: span 2; align-self: start; }
 .recurrence-setup h2 { font-size: 1.15rem; margin: 3px 0 5px; }
 .recurrence-setup p { color: var(--muted); font-size: .82rem; margin: 0; }
 .recurrence-setup .field-label { margin: 0; }
-.recurrence-setup .text-input { width: 100%; margin-top: 5px; }
+.recurrence-setup .text-input { width: 100%; max-width: 100%; min-width: 0; margin-top: 5px; text-overflow: ellipsis; }
 .recurrence-formula-card { margin-top: 14px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: 12px; padding: 16px; background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
 .recurrence-formula-card > span { color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
 .recurrence-formula-card strong { display: block; margin: 8px 0; font: 700 clamp(1.1rem, 2.2vw, 1.6rem)/1.35 var(--font-mono); color: var(--text); overflow-wrap: anywhere; }

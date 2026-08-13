@@ -132,6 +132,24 @@ test('tracer explains exact symbolic FOR-loop counts and explicit control costs'
   await expect(page.locator('.ops-row').filter({ hasText: 'condition' })).toContainText('n + 1');
 });
 
+test('recursive functions expose call frames and guided recurrence assumptions', async ({ page }, testInfo) => {
+  await page.goto('/tracer.html');
+  await page.getByRole('button', { name: 'Load Example' }).click();
+  await page.getByRole('button', { name: /Recursive Factorial/ }).click();
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code & Run' }).click();
+  await page.locator('#step-slider').fill('8');
+  await expect(page.locator('#call-stack-box')).toContainText('Factorial');
+  await expect(page.locator('#call-stack-box')).toContainText('depth 3');
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Results' }).click();
+  await page.getByRole('tab', { name: 'Recurrence' }).click();
+  await page.getByRole('button', { name: 'Confirm size measure' }).click();
+  await expect(page.locator('#recurrence-assumptions')).toContainText('non-recursive work');
+  await page.locator('input[name="recurrence-combine"][value="constant"]').click();
+  await expect(page.locator('#recurrence-formula')).toContainText('T(n)');
+  await expect(page.locator('#recurrence-big-o')).toHaveText('O(n)');
+});
+
 test('symbolic operation counting is touch-readable without horizontal page overflow', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone');
   await page.goto('/tracer.html');

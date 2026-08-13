@@ -170,14 +170,26 @@ const ALGORITHMS = {
         const pass = i;
         const key = arr[i];
         let j = i - 1;
-        steps.push(makeStep(arr, { active: [i], sorted: [...sorted] }, `Pass ${pass}: pick up ${key} (index ${i}) to insert.`, { pass, comparisons, moves }));
+        let hole = i;
+        const held = () => ({ value: key, from: i, hole });
+        steps.push(makeStep(arr, { active: [i], held: held(), sorted: [...sorted] }, `Pass ${pass}: pick up ${key} (index ${i}) to insert.`, { pass, comparisons, moves }));
         while (j >= 0) {
           comparisons++;
-          steps.push(makeStep(arr, { compare: [j, j + 1], sorted: [...sorted] }, `Compare ${key} with ${arr[j]}`, { pass, comparisons, moves }));
+          steps.push(makeStep(arr, { compare: [j, hole], held: held(), sorted: [...sorted] }, `Compare ${key} with ${arr[j]}`, { pass, comparisons, moves }));
           if (arr[j] > key) {
-            arr[j + 1] = arr[j];
+            const from = j;
+            const to = hole;
+            const movedValue = arr[from];
+            const displacedValue = arr[to];
+            arr[to] = movedValue;
+            hole = from;
             moves++;
-            steps.push(makeStep(arr, { move: [j, j + 1], sorted: [...sorted] }, `${arr[j + 1]} > ${key} → shift right`, { pass, comparisons, moves }));
+            steps.push(makeStep(arr, {
+              move: [from, to],
+              held: held(),
+              transition: { kind: 'shift', from, to, value: movedValue, displacedValue },
+              sorted: [...sorted],
+            }, `${movedValue} > ${key} → shift right`, { pass, comparisons, moves }));
             j--;
           } else {
             break;

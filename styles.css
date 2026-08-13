@@ -275,11 +275,13 @@ body[data-course="itcc45"] {
 .oop-topics-intro { max-width: 720px; margin-bottom: 42px; }
 .oop-topics-intro h1 { margin: 0; font-size: clamp(2.2rem, 4.8vw, 4rem); line-height: 1.05; letter-spacing: -.045em; }
 .oop-topics-intro p { margin: 18px 0 0; color: var(--muted); font-size: 1.05rem; line-height: 1.55; }
-.oop-topic-path { padding: 0; list-style: none; counter-reset: topic; }
+.oop-topic-path { --topic-dot-y: 110px; padding: 0; list-style: none; counter-reset: topic; }
 .oop-topic-path > li { position: relative; min-height: 190px; display: grid; grid-template-columns: 70px minmax(260px, .95fr) minmax(240px, .8fr) 190px; gap: 26px; align-items: center; padding: 18px 22px 18px 0; border-top: 1px solid #41414a; }
 .oop-topic-path > li:last-child { border-bottom: 1px solid #41414a; }
-.oop-topic-path > li::before { content: ''; position: absolute; left: 29px; top: 66px; bottom: -66px; width: 1px; background: #6d4bb0; }
-.oop-topic-path > li:last-child::before { display: none; }
+.oop-topic-path > li::before, .oop-topic-path > li::after { content: ''; position: absolute; left: 29px; width: 1px; background: #6d4bb0; }
+.oop-topic-path > li::before { top: 18px; height: calc(var(--topic-dot-y) - 18px); }
+.oop-topic-path > li::after { top: var(--topic-dot-y); bottom: 18px; }
+.oop-topic-path > li:first-child::before, .oop-topic-path > li:last-child::after { display: none; }
 .topic-number { align-self: start; padding-top: 28px; color: #a78bfa; font: 760 2.15rem/1 ui-monospace, "SFMono-Regular", Consolas, monospace; }
 .topic-number::after { content: ''; display: block; width: 14px; height: 14px; margin: 22px 0 0 22px; border-radius: 50%; background: #a78bfa; box-shadow: 0 0 0 5px #241c35; }
 .topic-visual { min-height: 128px; display: flex; gap: 14px; align-items: center; justify-content: center; color: #b9a5eb; }
@@ -316,7 +318,7 @@ body[data-course="itcc45"] {
   .subject-main { padding: 42px 18px; }.subject-hero h1 { font-size: clamp(2rem, 11vw, 3.2rem); }.subject-hero p { margin: 18px 0 30px; font-size: .95rem; }
   .subject-choice { min-height: 390px; padding: 22px; }.subject-choice header > span { font-size: 2.25rem; }.subject-choice h2 { font-size: 1.08rem; }.oop-preview { grid-template-columns: 1fr; gap: 10px; }.preview-link { flex-direction: row; align-items: center; justify-content: center; }.subject-footer { min-height: 72px; }
   .oop-home-main { padding: 42px 18px; }.oop-home-hero { gap: 44px; }.oop-home-hero h1 { font-size: clamp(2.2rem, 11vw, 3.3rem); }.oop-hero-model { padding: 20px 14px; }.model-instances { gap: 10px; }.oop-path { grid-template-columns: 1fr; }.oop-path li + li { border-top: 1px solid #3d3d46; }
-  .oop-topics-main { padding: 38px 16px 58px; }.oop-topics-intro h1 { font-size: 2.45rem; }.oop-topic-path > li { grid-template-columns: 52px minmax(0, 1fr); gap: 12px; padding-right: 0; }.topic-number { grid-row: 1 / 3; }.topic-number::after { margin-left: 14px; }.oop-topic-path > li::before { left: 21px; }.topic-visual { min-width: 0; min-height: 110px; flex-wrap: wrap; }.topic-visual code { max-width: 100%; overflow-wrap: anywhere; }.topic-copy, .topic-actions { min-width: 0; }.topic-copy { grid-column: 2; }.topic-actions { grid-column: 2; grid-template-columns: minmax(0, 1fr); }
+  .oop-topics-main { padding: 38px 16px 58px; }.oop-topics-intro h1 { font-size: 2.45rem; }.oop-topic-path > li { grid-template-columns: 52px minmax(0, 1fr); gap: 12px; padding-right: 0; }.topic-number { grid-row: 1 / 3; }.topic-number::after { margin-left: 14px; }.oop-topic-path > li::before, .oop-topic-path > li::after { left: 21px; }.topic-visual { min-width: 0; min-height: 110px; flex-wrap: wrap; }.topic-visual code { max-width: 100%; overflow-wrap: anywhere; }.topic-copy, .topic-actions { min-width: 0; }.topic-copy { grid-column: 2; }.topic-actions { grid-column: 2; grid-template-columns: minmax(0, 1fr); }
   .oop-practice-layout > * { min-width: 0; }#practice-topic-nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }#practice-topic-nav a { min-width: 0; grid-template-columns: 26px minmax(0, 1fr) auto; padding-inline: 8px; }#practice-topic-nav strong { min-width: 0; overflow-wrap: anywhere; }.oop-practice-main { padding: 34px 16px 56px; }.practice-question, #challenge-form { padding: 20px; }.challenge-feedback { margin: 0 20px 20px; }.practice-heading > span { display: block; margin: 7px 0 0; }.practice-controls { flex-direction: column; }
 }
 

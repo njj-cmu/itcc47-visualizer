@@ -52,6 +52,9 @@ test('ITCC45 exposes six ordered topics with lab and practice routes', async ({ 
   await expect(page.getByRole('heading', { name: 'Build object-oriented thinking step by step.' })).toBeVisible();
   await expect(page.locator('.oop-topic-path > li')).toHaveCount(6);
   await expect(page.locator('.oop-topic-path h2')).toHaveText(['Classes', 'Objects', 'Encapsulation', 'Inheritance', 'Class Abstraction', 'Polymorphism']);
+  expect(await page.locator('.oop-topic-path > li').first().evaluate((item) => getComputedStyle(item, '::before').display)).toBe('none');
+  expect(await page.locator('.oop-topic-path > li').nth(1).evaluate((item) => getComputedStyle(item, '::before').top)).toBe('18px');
+  expect(await page.locator('.oop-topic-path > li').nth(1).evaluate((item) => getComputedStyle(item, '::after').bottom)).toBe('18px');
   await page.getByRole('link', { name: 'Open lab' }).first().click();
   await expect(page).toHaveURL(/visualizer\.html\?course=itcc45&activity=itcc45-classes-blueprint$/);
 });
@@ -60,11 +63,20 @@ test('Python Object Lab synchronizes source, object state, lookup, output, and e
   await page.goto('/visualizer.html?course=itcc45&activity=itcc45-classes-blueprint');
   await expect(page.getByRole('heading', { name: /Classes: turn a blueprint/ })).toBeVisible();
   await expect(page.getByLabel('Python source')).toContainText('class Student');
+  await page.getByRole('button', { name: 'Edit scenario' }).click();
+  await expect(page.getByRole('dialog', { name: 'Edit scenario' })).toBeVisible();
   await page.getByLabel('Student name').fill('Lia');
+  await page.getByRole('button', { name: 'Apply scenario' }).click();
+  await expect(page.getByRole('dialog', { name: 'Edit scenario' })).toBeHidden();
   const slider = page.locator('#step-slider');
   await slider.fill(await slider.getAttribute('max'));
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Visualize' }).click();
   await expect(page.locator('.object-instance-card')).toContainText('Lia');
+  await expect(page.locator('.visual-canvas .object-canvas')).toHaveCSS('overflow-y', 'auto');
+  await page.getByRole('button', { name: 'Expand model' }).click();
+  await expect(page.getByRole('dialog', { name: /Classes: turn a blueprint/ })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: /Classes: turn a blueprint/ }).getByLabel('Class blueprints')).toContainText('Student');
+  await page.getByRole('button', { name: 'Close full model view' }).click();
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'More' }).click();
   await page.getByRole('tab', { name: 'Call path' }).click();
   await expect(page.locator('.evidence-drawer:visible')).toContainText('Student.describe');
@@ -115,6 +127,8 @@ test('binary search explains its sorted copy before searching', async ({ page })
 
 test('custom signed data is rendered and oversized data is rejected inline', async ({ page }) => {
   await page.goto('/visualizer.html');
+  const controls = page.getByText('Data and inputs', { exact: true });
+  if (!(await page.locator('.data-controls').evaluate((element) => element.open))) await controls.click();
   const input = page.getByLabel('Custom values (comma-separated)');
   await input.fill('-8, -2, 0, 5');
   await page.getByRole('button', { name: 'Apply' }).click();
@@ -150,7 +164,8 @@ test('insertion shifts stage one held entity and one explicit hole without visua
   await page.goto('/visualizer.html?activity=insertion-sort');
   const slider = page.locator('#step-slider');
   await slider.fill('3');
-  await expect(page.locator('.array-held-value')).toContainText('held17');
+  await expect(page.locator('.array-held-value')).toHaveText('17');
+  await expect(page.locator('.array-held-value')).toHaveAttribute('aria-label', 'Held insertion value 17');
   await expect(page.locator('[data-entity-id="item:0"]')).toContainText('42');
   await expect(page.locator('.array-cell-slot.is-empty')).toHaveCount(1);
   const geometry = await page.evaluate(() => {
@@ -160,7 +175,7 @@ test('insertion shifts stage one held entity and one explicit hole without visua
   });
   expect(geometry.connectorTop).toBeGreaterThan(geometry.lowestIndex + 8);
   for (let step = 0; step < 5; step += 1) await page.getByRole('button', { name: 'Step', exact: true }).click();
-  await expect(page.locator('.array-held-value')).toContainText('held8');
+  await expect(page.locator('.array-held-value')).toHaveText('8');
   await expect(page.locator('.array-cell-slot.is-empty')).toHaveCount(1);
 });
 
@@ -177,6 +192,22 @@ test('Motion swaps stable entities and gates rapid structural steps', async ({ p
   expect(during.x).toBeGreaterThan(before.x);
   await expect(page.getByRole('button', { name: 'Step', exact: true })).toBeEnabled({ timeout: 1200 });
   await expect(slider).toHaveValue('2');
+});
+
+test('array-list shifts identify the moving value and its exact destination', async ({ page }) => {
+  await page.goto('/visualizer.html?activity=array-list-insert');
+  await page.getByLabel('Motion preference').selectOption('on');
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('.array-connector span')).toHaveText('shift 12: [3] → [4]');
+  await expect(page.locator('[data-motion-role="moving"]')).toHaveAttribute('data-entity-id', 'item:3');
+  await expect(page.locator('.array-held-value')).toHaveText('24');
+
+  await page.goto('/visualizer.html?activity=array-list-remove');
+  await page.getByLabel('Motion preference').selectOption('on');
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('.array-connector span')).toHaveText('shift 31: [2] → [1]');
+  await expect(page.locator('[data-motion-role="moving"]')).toHaveAttribute('data-entity-id', 'item:2');
+  await expect(page.locator('.array-connector')).toHaveClass(/moves-left/);
 });
 
 test('Motion duration follows speed while direct seeking stays immediate', async ({ page }) => {
@@ -227,6 +258,16 @@ test('linked-list head insertion synchronizes references, links, source, and met
   await page.getByRole('tab', { name: 'Operations' }).click();
   await expect(page.locator('.evidence-drawer:visible .metric-summary')).toContainText('Pointer writes');
   await expect(page.locator('.evidence-drawer:visible .metric-summary')).toContainText('2');
+});
+
+test('linked-list structure, head, and current pointer have distinct visual roles', async ({ page }) => {
+  await page.goto('/visualizer.html?activity=linked-list-traversal');
+  await page.locator('#step-slider').fill('9');
+  await expect(page.locator('.linked-node-wrap.has-head')).toHaveCount(1);
+  await expect(page.locator('.linked-node-wrap.is-current')).toHaveCount(1);
+  await expect(page.locator('.pointer-head')).toHaveText('head');
+  await expect(page.locator('.pointer-current')).toHaveText('current');
+  await expect(page.locator('.linked-node-wrap.is-current .linked-node')).toHaveAttribute('aria-label', /current node/);
 });
 
 test('curated linked-list pseudocode opens in the lab and retains trace, output, and diagnostics', async ({ page }, testInfo) => {

@@ -86,8 +86,9 @@ visualizer assets are committed so previewing does not require a build.
 Aligned to the ITCC47 syllabus and its eight-module sequence. The pages
 currently cover Module 1 (algorithmic thinking, pseudocode, exact I/O,
 complexity basics), Module 2 searching and sorting foundations, and introductory
-array-list insertion and removal. Linked lists, stacks and queues, recursion,
-trees, and graphs remain later visualizer adapters.
+array-list and singly linked-list activities. The interpreter supports recursive
+functions, call frames, and singly linked node references. Stacks, queues,
+trees, AVLs, and graphs remain later visualizer adapters.
 
 The pseudocode grammar, the primitive-operation cost model, and the worked
 examples follow the lecture material rather than any general convention — `/` is

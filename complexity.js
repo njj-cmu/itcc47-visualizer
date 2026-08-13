@@ -35,8 +35,11 @@ function collectSteps(ast, inputs, maxSteps = MAX_STEPS) {
     type: step.kind || 'exec',
     message: step.description,
     frame: Object.freeze({
+      kind: 'pseudocode',
       vars: step.vars,
       globals: step.globals,
+      heap: step.heap,
+      pointers: step.pointers,
       outputValue: step.outputValue,
       loopLine: step.loopLine,
       loopIterations: step.loopIterations,

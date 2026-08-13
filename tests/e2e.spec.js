@@ -84,6 +84,52 @@ test('array-list activity synchronizes source, structure, trace, and metrics', a
   await expect(visibleEvidence.getByText('These algorithm metrics are never added to it.')).toBeVisible();
 });
 
+test('linked-list head insertion synchronizes references, links, source, and metrics', async ({ page }, testInfo) => {
+  await page.goto('/visualizer.html?activity=linked-list-insert-head');
+  await expect(page.getByRole('heading', { name: 'Insert at the head' })).toBeVisible();
+  const slider = page.locator('#step-slider');
+  await slider.fill(await slider.getAttribute('max'));
+  await expect(page.locator('.linked-node')).toHaveCount(3);
+  await expect(page.locator('.linked-node').first()).toContainText('24');
+  await expect(page.locator('.pointer-labels').first()).toContainText('head');
+  await expect(page.locator('.linked-arrow')).toHaveCount(2);
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'More' }).click();
+  await page.getByRole('tab', { name: 'Operations' }).click();
+  await expect(page.locator('.evidence-drawer:visible .metric-summary')).toContainText('Pointer writes');
+  await expect(page.locator('.evidence-drawer:visible .metric-summary')).toContainText('2');
+});
+
+test('curated linked-list pseudocode opens in the lab and retains trace, output, and diagnostics', async ({ page }, testInfo) => {
+  await page.goto('/visualizer.html?activity=linked-list-traversal');
+  await page.getByRole('link', { name: /Edit pseudocode/ }).click();
+  await expect(page).toHaveURL(/tracer\.html\?activity=linked-list-traversal/);
+  await expect(page.getByLabel('Pseudocode editor')).toHaveValue(/head <- NEW NODE\(18\)/);
+  await expect(page.locator('#status-line')).toContainText('loaded from the Visualizer');
+  await page.getByRole('button', { name: /run/i }).click();
+  await expect(page.locator('#status-line')).toContainText('step(s) recorded');
+  await expect(page.locator('#trace-body tr')).not.toHaveCount(0);
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code & Run' }).click();
+  const slider = page.locator('#step-slider');
+  await slider.fill(await slider.getAttribute('max'));
+  await expect(page.locator('#output-box')).toContainText('31');
+});
+
+test('pseudocode lab shows node references in scoped runtime state', async ({ page }, testInfo) => {
+  await page.goto('/tracer.html');
+  await page.getByLabel('Pseudocode editor').fill(`FUNCTION Echo(node)
+ RETURN node
+ENDFUNCTION
+head <- NEW NODE(4)
+CALL Echo(head) INTO alias
+WRITE alias = head`);
+  await page.getByRole('button', { name: /run/i }).click();
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code & Run' }).click();
+  const slider = page.locator('#step-slider');
+  await slider.fill(await slider.getAttribute('max'));
+  await expect(page.locator('#vars-box')).toContainText('&node:1');
+  await expect(page.locator('#output-box')).toContainText('true');
+});
+
 test('mobile visualizer tabs replace the central surface without resetting playback', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone');
   await page.goto('/visualizer.html');

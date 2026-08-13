@@ -21,6 +21,7 @@ const KEYWORDS = new Set([
   'WHILE', 'ENDWHILE', 'CASE', 'OF', 'DEFAULT', 'ENDCASE',
   'BREAK', 'RETURN', 'STOP', 'AND', 'OR', 'NOT', 'TRUE', 'FALSE',
   'FUNCTION', 'ENDFUNCTION', 'CALL', 'INTO', 'GLOBAL', 'LENGTH', 'DIV',
+  'NULL', 'NEW',
 ]);
 
 function normalizeSource(src) {
@@ -90,7 +91,7 @@ function tokenize(src) {
       if (ch === '<' && line[i + 1] === '>') { push('op', '<>', i); i += 2; continue; }
       if (ch === '!' && line[i + 1] === '=') { push('op', '<>', i); i += 2; continue; }
       if (ch === '=' && line[i + 1] === '=') { push('op', '=', i); i += 2; continue; }
-      if ('+-*/%=<>,:[]()'.includes(ch)) {
+      if ('+-*/%=<>,:[]().'.includes(ch)) {
         push('op', ch, i);
         i++;
         continue;
@@ -278,13 +279,19 @@ class Parser {
     const line = this.peek().line;
     const name = this.next().value;
     let index = null;
+    const fields = [];
     if (this.at('op', '[')) {
       this.next();
       index = this.parseExpr();
       this.expectOp(']');
     }
-    const text = index ? `${name}[${exprToText(index)}]` : name;
-    return { name, index, line, text };
+    while (this.at('op', '.')) {
+      this.next();
+      if (!this.at('ident')) this.err('Expected a node field after the dot', 'E_EXPECTED_FIELD', 'Use .value or .next.');
+      fields.push(this.next().value);
+    }
+    const text = `${index ? `${name}[${exprToText(index)}]` : name}${fields.map((field) => `.${field}`).join('')}`;
+    return { name, index, fields, line, text };
   }
 
   parseRead() {
@@ -468,11 +475,17 @@ class Parser {
   }
   parsePostfix() {
     let expr = this.parsePrimary();
-    while (this.at('op', '[')) {
-      this.next();
-      const index = this.parseExpr();
-      this.expectOp(']');
-      expr = { type: 'Index', target: expr, index, line: expr.line || this.peek().line };
+    while (this.at('op', '[') || this.at('op', '.')) {
+      if (this.at('op', '[')) {
+        this.next();
+        const index = this.parseExpr();
+        this.expectOp(']');
+        expr = { type: 'Index', target: expr, index, line: expr.line || this.peek().line };
+      } else {
+        this.next();
+        if (!this.at('ident')) this.err('Expected a node field after the dot', 'E_EXPECTED_FIELD', 'Use .value or .next.');
+        expr = { type: 'Field', target: expr, field: this.next().value, line: expr.line || this.peek().line };
+      }
     }
     return expr;
   }
@@ -482,6 +495,16 @@ class Parser {
     if (t.type === 'string') { this.next(); return { type: 'String', value: t.value, line: t.line }; }
     if (this.atKeyword('TRUE')) { this.next(); return { type: 'Bool', value: true, line: t.line }; }
     if (this.atKeyword('FALSE')) { this.next(); return { type: 'Bool', value: false, line: t.line }; }
+    if (this.atKeyword('NULL')) { this.next(); return { type: 'Null', value: null, line: t.line }; }
+    if (this.atKeyword('NEW')) {
+      this.next();
+      if (!this.at('ident') || this.peek().value.toUpperCase() !== 'NODE') this.err("Expected 'NODE' after NEW", 'E_EXPECTED_NODE', 'Use NEW NODE(value).');
+      this.next();
+      this.expectOp('(');
+      const value = this.parseExpr();
+      this.expectOp(')');
+      return { type: 'NewNode', value, line: t.line };
+    }
     if (this.at('op', '(')) {
       this.next();
       const e = this.parseExpr();
@@ -593,8 +616,11 @@ function exprToText(node) {
     case 'Number': return String(node.value);
     case 'String': return `"${node.value}"`;
     case 'Bool': return node.value ? 'TRUE' : 'FALSE';
+    case 'Null': return 'NULL';
+    case 'NewNode': return `NEW NODE(${exprToText(node.value)})`;
     case 'Ident': return node.name;
     case 'Index': return `${exprToText(node.target)}[${exprToText(node.index)}]`;
+    case 'Field': return `${exprToText(node.target)}.${node.field}`;
     case 'ArrayLit': return `[${node.items.map(exprToText).join(', ')}]`;
     case 'Unary': return `${node.op}${node.op === 'NOT' ? ' ' : ''}${exprToText(node.expr)}`;
     case 'Binary': return `${exprToText(node.left)} ${node.op} ${exprToText(node.right)}`;
@@ -616,9 +642,47 @@ class BreakSignal {}
 class ReturnSignal { constructor(value) { this.value = value; } }
 class StopSignal {}
 
+const NODE_REFERENCE = Symbol('ITCC47NodeReference');
+const RUNTIME_CONTEXT = Symbol('ITCC47RuntimeContext');
+const NODE_FIELDS = new Set(['value', 'next']);
+
+function nodeReference(id) { return Object.freeze({ [NODE_REFERENCE]: true, id }); }
+function isNodeReference(value) { return !!(value && value[NODE_REFERENCE] === true && typeof value.id === 'string'); }
+function runtimeContext(env) {
+  const globals = isScope(env) ? env.globals : env;
+  return globals && globals[RUNTIME_CONTEXT];
+}
+function requireNodeReference(value, line, operation) {
+  if (value === null) throw new TracerError(`Cannot ${operation} through NULL`, line, null,
+    'E_NULL_REFERENCE', 'Check the reference against NULL before accessing a node field.');
+  if (!isNodeReference(value)) throw new TracerError(`Cannot ${operation} because the value is not a node reference`, line, null,
+    'E_NOT_NODE_REFERENCE', 'Assign NEW NODE(value) or another node reference first.');
+  return value;
+}
+function readNodeField(reference, field, env, line) {
+  if (!NODE_FIELDS.has(field)) throw new TracerError(`Node field '${field}' does not exist`, line, null,
+    'E_INVALID_NODE_FIELD', 'Singly linked nodes support only value and next.');
+  const ref = requireNodeReference(reference, line, `read .${field}`);
+  const node = runtimeContext(env).heap.get(ref.id);
+  if (!node) throw new TracerError(`Node ${ref.id} is no longer available`, line, null, 'E_DANGLING_REFERENCE');
+  return node[field];
+}
+function writeNodeField(reference, field, value, env, line) {
+  if (!NODE_FIELDS.has(field)) throw new TracerError(`Node field '${field}' does not exist`, line, null,
+    'E_INVALID_NODE_FIELD', 'Singly linked nodes support only value and next.');
+  const ref = requireNodeReference(reference, line, `write .${field}`);
+  if (field === 'next' && value !== null && !isNodeReference(value)) throw new TracerError('Node next must be NULL or another node reference', line, null,
+    'E_INVALID_NODE_LINK', 'Assign NULL or a value created by NEW NODE(...).');
+  const ctx = runtimeContext(env);
+  const node = ctx.heap.get(ref.id);
+  if (!node) throw new TracerError(`Node ${ref.id} is no longer available`, line, null, 'E_DANGLING_REFERENCE');
+  node[field] = value;
+}
+
 function fmtValue(v) {
   if (v === undefined) return '—';
-  if (v === null) return 'null';
+  if (v === null) return 'NULL';
+  if (isNodeReference(v)) return `&${v.id}`;
   if (Array.isArray(v)) return `[${v.map(fmtValue).join(', ')}]`;
   if (typeof v === 'boolean') return v ? 'true' : 'false';
   return String(v);
@@ -667,6 +731,14 @@ function evalExpr(node, env) {
     case 'Number': return node.value;
     case 'String': return node.value;
     case 'Bool': return node.value;
+    case 'Null': return null;
+    case 'NewNode': {
+      const ctx = runtimeContext(env);
+      const id = `node:${++ctx.nodeCounter}`;
+      const ref = nodeReference(id);
+      ctx.heap.set(id, { id, value: evalExpr(node.value, env), next: null, allocatedAt: node.line });
+      return ref;
+    }
     case 'Ident':
       return readName(env, node.name, node.line);
     case 'ArrayLit': return node.items.map((it) => evalExpr(it, env));
@@ -680,6 +752,7 @@ function evalExpr(node, env) {
         'E_INDEX_OUT_OF_BOUNDS', 'Check the loop boundary or list position.');
       return base[idx];
     }
+    case 'Field': return readNodeField(evalExpr(node.target, env), node.field, env, node.line);
     case 'Unary': {
       const v = evalExpr(node.expr, env);
       if (node.op === 'NOT') return !truthy(v);
@@ -730,19 +803,25 @@ function evalExpr(node, env) {
 function truthy(v) { return v === true || (typeof v === 'number' && v !== 0); }
 
 function assignLValue(target, value, env) {
-  if (target.index === null) {
+  if (target.index === null && (!target.fields || target.fields.length === 0)) {
     writeName(env, target.name, value);
     return;
   }
-  const list = readName(env, target.name, target.line);
-  if (!Array.isArray(list)) throw new TracerError(`${target.name} is not a list`, target.line);
-  const idx = evalExpr(target.index, env);
-  if (!Number.isInteger(idx)) throw new TracerError('List position must be a whole number', target.line, null, 'E_INVALID_INDEX');
-  const canAppend = idx === list.length || (list.length === 0 && idx === 1);
-  if (idx < 0 || (idx >= list.length && !canAppend)) throw new TracerError(
-    `List position ${idx} skips beyond the next available position`, target.line, null,
-    'E_INDEX_OUT_OF_BOUNDS', 'Use the next 0-based or 1-based position without skipping an item.');
-  list[idx] = value;
+  let base = readName(env, target.name, target.line);
+  if (target.index !== null) {
+    if (!Array.isArray(base)) throw new TracerError(`${target.name} is not a list`, target.line);
+    const idx = evalExpr(target.index, env);
+    if (!Number.isInteger(idx)) throw new TracerError('List position must be a whole number', target.line, null, 'E_INVALID_INDEX');
+    const canAppend = idx === base.length || (base.length === 0 && idx === 1);
+    if (idx < 0 || (idx >= base.length && !canAppend)) throw new TracerError(
+      `List position ${idx} skips beyond the next available position`, target.line, null,
+      'E_INDEX_OUT_OF_BOUNDS', 'Use the next 0-based or 1-based position without skipping an item.');
+    if (!target.fields || target.fields.length === 0) { base[idx] = value; return; }
+    base = base[idx];
+  }
+  const fields = target.fields || [];
+  for (let i = 0; i < fields.length - 1; i++) base = readNodeField(base, fields[i], env, target.line);
+  writeNodeField(base, fields.at(-1), value, env, target.line);
 }
 
 /*
@@ -755,8 +834,10 @@ function assignLValue(target, value, env) {
 function costExpr(node) {
   if (!node) return 0;
   switch (node.type) {
-    case 'Number': case 'String': case 'Bool': case 'Ident':
+    case 'Number': case 'String': case 'Bool': case 'Null': case 'Ident':
       return 1;
+    case 'NewNode': return costExpr(node.value) + 1;
+    case 'Field': return costExpr(node.target) + 1;
     case 'Index':
       if (node.index.type === 'Number') return 1;
       return costExpr(node.target) + costExpr(node.index) + 2;
@@ -774,6 +855,7 @@ function costExpr(node) {
 
 /** Cost of storing into an assignment target. */
 function costTarget(target) {
+  if (target.fields && target.fields.length) return 1 + target.fields.length;
   if (!target.index) return 1;
   if (target.index.type === 'Number') return 1;
   return costExpr(target.index) + 2;
@@ -785,6 +867,20 @@ function callStackSnapshot(ctx) {
     arguments: Object.freeze({ ...frame.arguments }), locals: Object.freeze(snapshotLocals(frame.scope)),
     returnTarget: frame.returnTarget || null,
   })));
+}
+function heapSnapshot(ctx) {
+  return Object.freeze([...ctx.heap.values()].map((node) => Object.freeze({
+    id: node.id, value: fmtValue(node.value),
+    next: node.next === null ? null : node.next.id, allocatedAt: node.allocatedAt,
+  })));
+}
+function pointerSnapshot(env) {
+  const pointers = {};
+  for (const name of visibleNames(env)) {
+    const value = rawName(env, name);
+    if (value === null || isNodeReference(value)) pointers[name] = value === null ? null : value.id;
+  }
+  return Object.freeze(pointers);
 }
 function snapshotLocals(scope) {
   const out = {};
@@ -802,6 +898,8 @@ function mkStep(line, code, description, env, kind, extra, ctx) {
     cost: 0,
     controlCost: 0,
     callStack: callStackSnapshot(ctx || { callStack: [] }),
+    heap: ctx ? heapSnapshot(ctx) : Object.freeze([]),
+    pointers: pointerSnapshot(env),
     activeFrameId: ctx && ctx.callStack.length ? ctx.callStack[ctx.callStack.length - 1].id : null,
     globals: isScope(env) ? snapshotEnv({ __scope: true, globals: env.globals, locals: {}, localNames: new Set(), globalNames: new Set(Object.keys(env.globals)) }) : snapshotEnv(env),
     ...extra,
@@ -1038,8 +1136,9 @@ function* runProgram(ast, inputValues) {
   const ctx = {
     inputs: [...inputValues], output: [], warnings: [], globals: env,
     functions: new Map((program.functions || []).map((fn) => [fn.name, fn])),
-    callStack: [], frameCounter: 0, maxCallDepth: 128,
+    callStack: [], frameCounter: 0, maxCallDepth: 128, heap: new Map(), nodeCounter: 0,
   };
+  Object.defineProperty(env, RUNTIME_CONTEXT, { value: ctx, enumerable: false });
   try {
     yield* execBlock(program.body, env, ctx);
   } catch (e) {
@@ -1049,7 +1148,7 @@ function* runProgram(ast, inputValues) {
       throw e;
     }
   }
-  return { env, output: ctx.output, warnings: ctx.warnings };
+  return { env, output: ctx.output, warnings: ctx.warnings, heap: heapSnapshot(ctx) };
 }
 
 function parseInputList(text) {

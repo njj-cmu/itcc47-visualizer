@@ -99,6 +99,72 @@ const ITCC47Activities = (() => {
     },
   });
 
+  function linkedFrame(event, highlightedEdge = null) {
+    const heap = event.frame.heap || [];
+    const byNodeId = new Map(heap.map((node) => [node.id, node]));
+    const ordered = [];
+    const seen = new Set();
+    let currentId = event.frame.pointers?.head || null;
+    while (currentId && byNodeId.has(currentId) && !seen.has(currentId)) {
+      seen.add(currentId); ordered.push(byNodeId.get(currentId)); currentId = byNodeId.get(currentId).next;
+    }
+    heap.forEach((node) => { if (!seen.has(node.id)) ordered.push(node); });
+    const nodes = ordered.map((node) => Object.freeze({
+      id: node.id, value: node.value, next: node.next, allocatedAt: node.allocatedAt,
+    }));
+    return {
+      kind: 'linked-list', nodes, links: nodes.filter((node) => node.next).map((node) => Object.freeze({ from: node.id, to: node.next })),
+      pointers: Object.freeze({ ...(event.frame.pointers || {}) }),
+      detached: Object.freeze(heap.filter((node) => !seen.has(node.id)).map((node) => node.id)),
+      highlightedEdges: Object.freeze(highlightedEdge ? [highlightedEdge] : []),
+      vars: event.frame.vars, globals: event.frame.globals, outputValue: event.frame.outputValue,
+      callStack: event.frame.callStack, activeFrameId: event.frame.activeFrameId,
+    };
+  }
+
+  function linkedActivity(spec) {
+    return Object.freeze({
+      ...spec, contentVersion: CONTENT_VERSION, module: 3, topic: 'Linked Lists', family: 'Linked Lists',
+      engine: 'pseudocode-runtime', renderer: 'linked-list', views: ['visualize', 'code', 'trace', 'variables', 'operations', 'output'],
+      input: Object.freeze({ kind: 'linked-list', editable: false, defaultValues: spec.defaultValues }),
+      metrics: Object.freeze([{ key: 'nodeVisits', short: 'Visit', label: 'Node visits' }, { key: 'pointerWrites', short: 'Ptr', label: 'Pointer writes' }]),
+      complexity: Object.freeze(spec.complexity),
+      run() {
+        const collected = collectSteps(parsePseudocode(spec.source.join('\n')), []);
+        let nodeVisits = 0; let pointerWrites = 0;
+        const events = collected.events.map((event, index) => {
+          const code = event.source.code || '';
+          if (/WRITE\s+\w+\.value/i.test(code)) nodeVisits += 1;
+          if (/(?:\.next|^\s*head)\s*<-/i.test(code) && !/NEW NODE/i.test(code)) pointerWrites += 1;
+          const edgeMatch = code.match(/^(\w+)\.next\s*<-\s*(\w+)/i);
+          const pointers = event.frame.pointers || {};
+          const edge = edgeMatch && pointers[edgeMatch[1]] && pointers[edgeMatch[2]]
+            ? { from: pointers[edgeMatch[1]], to: pointers[edgeMatch[2]] } : null;
+          return ITCC47Playback.timelineEvent({
+            id: `${spec.id}:${index}`, domain: 'linked-list', type: event.type, message: event.message,
+            frame: linkedFrame(event, edge), metrics: { nodeVisits, pointerWrites }, source: event.source,
+            boundary: event.boundary, terminal: index === collected.events.length - 1,
+          });
+        });
+        return ITCC47Playback.runResult({ events, diagnostics: collected.diagnostics, outcome: collected.outcome, result: collected.result });
+      },
+    });
+  }
+
+  const linkedTraversal = linkedActivity({
+    id: 'linked-list-traversal', title: 'Traverse a singly linked list', subtitle: 'Follow next references until the current pointer reaches NULL.',
+    defaultValues: [18, 7, 31], complexity: { best: 'O(n)', avg: 'O(n)', worst: 'O(n)', space: 'O(1)' },
+    blurb: 'Traversal visits each reachable node once and stops at the NULL link.',
+    source: ['head <- NEW NODE(18)', 'head.next <- NEW NODE(7)', 'head.next.next <- NEW NODE(31)', 'current <- head', 'WHILE current <> NULL DO', '  WRITE current.value', '  current <- current.next', 'ENDWHILE'],
+  });
+
+  const linkedInsertHead = linkedActivity({
+    id: 'linked-list-insert-head', title: 'Insert at the head', subtitle: 'Allocate one node, connect it to the old head, then move head.',
+    defaultValues: [18, 7], complexity: { best: 'O(1)', avg: 'O(1)', worst: 'O(1)', space: 'O(1)' },
+    blurb: 'Head insertion changes two references regardless of list length.',
+    source: ['head <- NEW NODE(18)', 'head.next <- NEW NODE(7)', 'newNode <- NEW NODE(24)', 'newNode.next <- head', 'head <- newNode'],
+  });
+
   const activities = Object.freeze([
     algorithmActivity('bubble-sort', 'bubble', 'Bubble Sort', 'Sorting', 'Compare adjacent values one step at a time.'),
     algorithmActivity('selection-sort', 'selection', 'Selection Sort', 'Sorting', 'Find the next minimum and place it.'),
@@ -107,6 +173,8 @@ const ITCC47Activities = (() => {
     algorithmActivity('binary-search', 'binary', 'Binary Search', 'Searching', 'Repeatedly discard half of a sorted range.'),
     arrayListInsert,
     arrayListRemove,
+    linkedTraversal,
+    linkedInsertHead,
   ]);
   const byId = new Map(activities.map((activity) => [activity.id, activity]));
 

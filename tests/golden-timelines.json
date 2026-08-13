@@ -5,5 +5,12 @@
   "linear-search": { "types": ["state", "state", "state", "complete"], "final": [3, 1, 2], "metrics": { "comparisons": 3 } },
   "binary-search": { "types": ["preprocess", "preprocess", "range", "complete"], "final": [1, 2, 3], "metrics": { "comparisons": 1 } },
   "array-list-insert": { "types": ["state", "move", "move", "insert"], "final": [3, 9, 1, 2], "metrics": { "moves": 2, "writes": 3 } },
-  "array-list-remove": { "types": ["remove", "move", "complete"], "final": [3, 2], "metrics": { "moves": 1, "writes": 1 } }
+  "array-list-remove": { "types": ["remove", "move", "complete"], "final": [3, 2], "metrics": { "moves": 1, "writes": 1 } },
+  "transitions": {
+    "bubble-sort": ["swap", "swap"],
+    "selection-sort": ["swap", "swap"],
+    "insertion-sort": ["shift", "shift", "insert", "shift", "shift", "insert"],
+    "array-list-insert": ["shift", "shift", "insert"],
+    "array-list-remove": ["remove", "shift"]
+  }
 }

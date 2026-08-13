@@ -98,6 +98,7 @@ test('mismatched ITCC45 activity falls back and normalizes the URL', async ({ pa
 
 test('sorting can step, play, pause, and scrub backward', async ({ page }) => {
   await page.goto('/visualizer.html');
+  await page.getByLabel('Motion preference').selectOption('off');
   await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(page.locator('#step-slider')).toHaveValue('1');
   await page.getByRole('button', { name: 'Play' }).click();
@@ -127,13 +128,15 @@ test('custom signed data is rendered and oversized data is rejected inline', asy
 
 test('array-list activity synchronizes source, structure, trace, and metrics', async ({ page }, testInfo) => {
   await page.goto('/visualizer.html?activity=array-list-insert');
+  await page.getByLabel('Motion preference').selectOption('off');
   await expect(page.getByRole('heading', { name: 'Insert at an index' })).toBeVisible();
   await expect(page.locator('.source-line code').nth(0)).toContainText('index <- 2');
   await expect(page.locator('.source-line code').nth(1)).toContainText('value <- 24');
   await page.getByRole('button', { name: 'Step' }).click();
   await expect(page.locator('#step-slider')).toHaveValue('1');
   await expect(page.locator('.source-line.is-current')).toContainText('values[i + 1] <- values[i]');
-  await expect(page.locator('.array-cell.bar-move')).toHaveCount(2);
+  await expect(page.locator('.array-cell.bar-move')).toHaveCount(1);
+  await expect(page.locator('.array-cell-slot.is-empty')).toHaveCount(1);
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'More' }).click();
   await page.getByRole('tab', { name: 'Operations' }).click();
   const visibleEvidence = page.locator('.evidence-drawer:visible');
@@ -143,14 +146,13 @@ test('array-list activity synchronizes source, structure, trace, and metrics', a
   await expect(visibleEvidence.getByText('These algorithm metrics are never added to it.')).toBeVisible();
 });
 
-test('insertion shifts stage the held value and moving block without visual overwrite', async ({ page }) => {
+test('insertion shifts stage one held entity and one explicit hole without visual overwrite', async ({ page }) => {
   await page.goto('/visualizer.html?activity=insertion-sort');
   const slider = page.locator('#step-slider');
   await slider.fill('3');
   await expect(page.locator('.array-held-value')).toContainText('held17');
-  await expect(page.locator('.array-moving-value')).toContainText('42');
-  await expect(page.locator('.array-cell.is-empty')).toHaveCount(1);
-  await expect(page.locator('.array-cell.is-receiving')).toHaveCount(1);
+  await expect(page.locator('[data-entity-id="item:0"]')).toContainText('42');
+  await expect(page.locator('.array-cell-slot.is-empty')).toHaveCount(1);
   const geometry = await page.evaluate(() => {
     const indices = [...document.querySelectorAll('.array-index')].map((node) => node.getBoundingClientRect().bottom);
     const connector = document.querySelector('.array-connector').getBoundingClientRect();
@@ -159,8 +161,57 @@ test('insertion shifts stage the held value and moving block without visual over
   expect(geometry.connectorTop).toBeGreaterThan(geometry.lowestIndex + 8);
   for (let step = 0; step < 5; step += 1) await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(page.locator('.array-held-value')).toContainText('held8');
-  await expect(page.locator('.array-cell.is-empty')).toHaveCount(1);
-  await expect(page.locator('.array-moving-value')).toHaveCount(0);
+  await expect(page.locator('.array-cell-slot.is-empty')).toHaveCount(1);
+});
+
+test('Motion swaps stable entities and gates rapid structural steps', async ({ page }) => {
+  await page.goto('/visualizer.html?activity=bubble-sort');
+  await page.getByLabel('Motion preference').selectOption('on');
+  const slider = page.locator('#step-slider');
+  await slider.fill('1');
+  const before = await page.locator('[data-entity-id="item:0"]').boundingBox();
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Step', exact: true })).toBeDisabled();
+  await expect(slider).toHaveValue('2');
+  const during = await page.locator('[data-entity-id="item:0"]').boundingBox();
+  expect(during.x).toBeGreaterThan(before.x);
+  await expect(page.getByRole('button', { name: 'Step', exact: true })).toBeEnabled({ timeout: 1200 });
+  await expect(slider).toHaveValue('2');
+});
+
+test('Motion duration follows speed while direct seeking stays immediate', async ({ page }) => {
+  await page.goto('/visualizer.html?activity=bubble-sort');
+  await page.getByLabel('Motion preference').selectOption('on');
+  await page.getByLabel('Speed').selectOption('3');
+  await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-motion-duration', '0.8');
+  await page.getByLabel('Speed').selectOption('6');
+  await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-motion-duration', '0.52');
+  await page.getByLabel('Speed').selectOption('9');
+  await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-motion-duration', '0.3');
+  await page.locator('#step-slider').fill('2');
+  await expect(page.getByRole('button', { name: 'Step', exact: true })).toBeEnabled();
+});
+
+test('motion preferences persist, reduce, turn off, and reset to the device', async ({ page }) => {
+  await page.goto('/visualizer.html');
+  const control = page.getByLabel('Motion preference');
+  await control.selectOption('reduced');
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-reduced/);
+  await page.reload();
+  await expect(control).toHaveValue('reduced');
+  await control.selectOption('off');
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-off/);
+  await control.selectOption('device');
+  await expect(control).toHaveValue('device');
+});
+
+test('OS reduced motion becomes the default when no override is saved', async ({ browser }) => {
+  const context = await browser.newContext({ reducedMotion: 'reduce' });
+  const page = await context.newPage();
+  await page.goto('/visualizer.html');
+  await expect(page.getByLabel('Motion preference')).toHaveValue('device');
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-reduced/);
+  await context.close();
 });
 
 test('linked-list head insertion synchronizes references, links, source, and metrics', async ({ page }, testInfo) => {
@@ -365,6 +416,7 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
     await expect(page.locator('body')).toBeVisible();
   }
   await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}`);
+  await page.getByLabel('Motion preference').selectOption('off');
   await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(page.locator('#step-slider')).toHaveValue('1');
 

@@ -28,18 +28,19 @@ const ITCC47Activities = (() => {
     });
   }
 
-  function arrayFrame(values, highlight = {}, markers = {}) {
+  function arrayFrame(values, highlight = {}, markers = {}, presentation = null) {
     return {
       kind: 'array', array: [...values],
       items: values.map((value, index) => Object.freeze({ id: `slot:${index}`, value, index })),
-      highlight, markers: Object.freeze({ ...markers }),
+      presentation, highlight, markers: Object.freeze({ ...markers }),
     };
   }
 
   function arrayListEvent(activityId, index, type, message, values, metrics, source, options = {}) {
     return ITCC47Playback.timelineEvent({
       id: `${activityId}:${index}`, domain: 'array-list', type, message,
-      frame: arrayFrame(values, options.highlight, options.markers), metrics,
+      frame: arrayFrame(values, options.highlight, options.markers, options.presentation), metrics,
+      transition: options.transition || null,
       source, boundary: !!options.boundary, terminal: !!options.terminal,
     });
   }
@@ -59,16 +60,24 @@ const ITCC47Activities = (() => {
       const value = Number.isFinite(options.value) ? options.value : this.input.value;
       const events = [];
       let moves = 0;
-      events.push(arrayListEvent(this.id, events.length, 'state', `Insert ${value} at index ${index}.`, values, { moves, writes: 0 }, { line: 1, code: this.source[0] }, { markers: { index } }));
+      const entities = values.map((itemValue, itemIndex) => ({ id: `item:${itemIndex}`, value: itemValue }));
+      const inserted = { id: 'item:insert', value };
+      const slots = entities.map((entity) => entity.id);
+      const presentation = () => ({ entities: [...entities, inserted], slots: [...slots], held: { entityId: inserted.id, location: 'held', from: index }, holes: slots.flatMap((id, slotIndex) => id == null ? [`slot:${slotIndex}`] : []) });
+      events.push(arrayListEvent(this.id, events.length, 'state', `Insert ${value} at index ${index}.`, values, { moves, writes: 0 }, { line: 1, code: this.source[0] }, { markers: { index }, presentation: presentation() }));
       values.push(null);
+      slots.push(null);
       for (let i = values.length - 2; i >= index; i--) {
         const displacedValue = values[i + 1];
         values[i + 1] = values[i];
+        const movingId = slots[i]; slots[i + 1] = movingId; slots[i] = null;
         moves += 1;
-        events.push(arrayListEvent(this.id, events.length, 'move', `Shift ${values[i]} from index ${i} to ${i + 1}.`, values, { moves, writes: moves }, { line: 4, code: this.source[3] }, { highlight: { move: [i, i + 1], held: { value, from: index, hole: i }, transition: { kind: 'shift', from: i, to: i + 1, value: values[i], displacedValue } }, markers: { index } }));
+        events.push(arrayListEvent(this.id, events.length, 'move', `Shift ${values[i]} from index ${i} to ${i + 1}.`, values, { moves, writes: moves }, { line: 4, code: this.source[3] }, { highlight: { move: [i, i + 1], held: { value, from: index, hole: i }, transition: { kind: 'shift', from: i, to: i + 1, value: values[i], displacedValue } }, markers: { index }, presentation: presentation(), transition: { kind: 'shift', moves: [{ entityId: movingId, from: `slot:${i}`, to: `slot:${i + 1}` }], enter: [], exit: [], wait: true } }));
       }
       values[index] = value;
-      events.push(arrayListEvent(this.id, events.length, 'insert', `Store ${value} at index ${index}.`, values, { moves, writes: moves + 1 }, { line: 5, code: this.source[4] }, { highlight: { found: index }, markers: { index }, terminal: true }));
+      slots[index] = inserted.id;
+      const finalPresentation = presentation(); finalPresentation.held = null;
+      events.push(arrayListEvent(this.id, events.length, 'insert', `Store ${value} at index ${index}.`, values, { moves, writes: moves + 1 }, { line: 5, code: this.source[4] }, { highlight: { found: index }, markers: { index }, presentation: finalPresentation, transition: { kind: 'insert', moves: [{ entityId: inserted.id, from: 'held', to: `slot:${index}` }], enter: [inserted.id], exit: [], wait: true }, terminal: true }));
       return ITCC47Playback.runResult({ events });
     },
   });
@@ -88,15 +97,22 @@ const ITCC47Activities = (() => {
       const removed = values[index];
       const events = [];
       let moves = 0;
-      events.push(arrayListEvent(this.id, events.length, 'remove', `Mark ${removed} at index ${index} for removal.`, values, { moves, writes: 0 }, { line: 2, code: this.source[1] }, { highlight: { compare: [index] }, markers: { index } }));
+      const entities = values.map((itemValue, itemIndex) => ({ id: `item:${itemIndex}`, value: itemValue }));
+      const slots = entities.map((entity) => entity.id);
+      const removedId = slots[index];
+      const presentation = () => ({ entities, slots: [...slots], held: null, holes: slots.flatMap((id, slotIndex) => id == null ? [`slot:${slotIndex}`] : []) });
+      events.push(arrayListEvent(this.id, events.length, 'remove', `Mark ${removed} at index ${index} for removal.`, values, { moves, writes: 0 }, { line: 2, code: this.source[1] }, { highlight: { compare: [index] }, markers: { index }, presentation: presentation(), transition: { kind: 'remove', moves: [{ entityId: removedId, from: `slot:${index}`, to: 'null' }], enter: [], exit: [removedId], wait: true } }));
+      slots[index] = null;
       for (let i = index; i < values.length - 1; i++) {
         const displacedValue = values[i];
         values[i] = values[i + 1];
+        const movingId = slots[i + 1]; slots[i] = movingId; slots[i + 1] = null;
         moves += 1;
-        events.push(arrayListEvent(this.id, events.length, 'move', `Shift ${values[i]} from index ${i + 1} to ${i}.`, values, { moves, writes: moves }, { line: 4, code: this.source[3] }, { highlight: { move: [i, i + 1], transition: { kind: 'shift', from: i + 1, to: i, value: values[i], displacedValue } }, markers: { index } }));
+        events.push(arrayListEvent(this.id, events.length, 'move', `Shift ${values[i]} from index ${i + 1} to ${i}.`, values, { moves, writes: moves }, { line: 4, code: this.source[3] }, { highlight: { move: [i, i + 1], transition: { kind: 'shift', from: i + 1, to: i, value: values[i], displacedValue } }, markers: { index }, presentation: presentation(), transition: { kind: 'shift', moves: [{ entityId: movingId, from: `slot:${i + 1}`, to: `slot:${i}` }], enter: [], exit: moves === 1 ? [removedId] : [], wait: true } }));
       }
       values.pop();
-      events.push(arrayListEvent(this.id, events.length, 'complete', `Removed ${removed}; logical size is now ${values.length}.`, values, { moves, writes: moves }, { line: 5, code: this.source[4] }, { highlight: { sorted: values.map((_, i) => i) }, terminal: true }));
+      slots.pop();
+      events.push(arrayListEvent(this.id, events.length, 'complete', `Removed ${removed}; logical size is now ${values.length}.`, values, { moves, writes: moves }, { line: 5, code: this.source[4] }, { highlight: { sorted: values.map((_, i) => i) }, presentation: presentation(), terminal: true }));
       return ITCC47Playback.runResult({ events, result: { removed } });
     },
   });
@@ -115,7 +131,7 @@ const ITCC47Activities = (() => {
       id: node.id, value: node.value, next: node.next, allocatedAt: node.allocatedAt,
     }));
     return {
-      kind: 'linked-list', nodes, links: nodes.filter((node) => node.next).map((node) => Object.freeze({ from: node.id, to: node.next })),
+      kind: 'linked-list', nodes, links: nodes.filter((node) => node.next).map((node) => Object.freeze({ id: `edge:${node.id}->${node.next}`, from: node.id, to: node.next })),
       pointers: Object.freeze({ ...(event.frame.pointers || {}) }),
       detached: Object.freeze(heap.filter((node) => !seen.has(node.id)).map((node) => node.id)),
       highlightedEdges: Object.freeze(highlightedEdge ? [highlightedEdge] : []),
@@ -134,6 +150,7 @@ const ITCC47Activities = (() => {
       run() {
         const collected = collectSteps(parsePseudocode(spec.source.join('\n')), []);
         let nodeVisits = 0; let pointerWrites = 0;
+        let previousFrame = null;
         const events = collected.events.map((event, index) => {
           const code = event.source.code || '';
           if (/WRITE\s+\w+\.value/i.test(code)) nodeVisits += 1;
@@ -142,9 +159,29 @@ const ITCC47Activities = (() => {
           const pointers = event.frame.pointers || {};
           const edge = edgeMatch && pointers[edgeMatch[1]] && pointers[edgeMatch[2]]
             ? { from: pointers[edgeMatch[1]], to: pointers[edgeMatch[2]] } : null;
+          const frame = linkedFrame(event, edge);
+          const previousNodes = new Set((previousFrame?.nodes || []).map((node) => node.id));
+          const nextNodes = new Set(frame.nodes.map((node) => node.id));
+          const enteredNodes = frame.nodes.filter((node) => !previousNodes.has(node.id)).map((node) => node.id);
+          const exitedNodes = (previousFrame?.nodes || []).filter((node) => !nextNodes.has(node.id)).map((node) => node.id);
+          const pointerMoves = Object.keys({ ...(previousFrame?.pointers || {}), ...frame.pointers }).flatMap((name) => {
+            const from = previousFrame?.pointers?.[name] || null;
+            const to = frame.pointers[name] || null;
+            return from === to ? [] : [{ entityId: `pointer:${name}`, from: from ? `node:${from}` : 'null', to: to ? `node:${to}` : 'null' }];
+          });
+          const previousEdges = new Set((previousFrame?.links || []).map((link) => link.id));
+          const nextEdges = new Set(frame.links.map((link) => link.id));
+          const enteredEdges = frame.links.filter((link) => !previousEdges.has(link.id)).map((link) => link.id);
+          const exitedEdges = (previousFrame?.links || []).filter((link) => !nextEdges.has(link.id)).map((link) => link.id);
+          let transition = null;
+          if (enteredNodes.length || exitedNodes.length) transition = { kind: enteredNodes.length ? 'insert' : 'remove', moves: [], enter: enteredNodes, exit: exitedNodes, wait: true };
+          else if (pointerMoves.length) transition = { kind: 'pointer', moves: pointerMoves, enter: [], exit: [], wait: true };
+          else if (enteredEdges.length || exitedEdges.length) transition = { kind: 'edge', moves: [], enter: enteredEdges, exit: exitedEdges, wait: true };
+          else if (/WRITE\s+\w+\.value/i.test(code)) transition = { kind: 'emphasis', moves: [], enter: [], exit: [], wait: false };
+          previousFrame = frame;
           return ITCC47Playback.timelineEvent({
             id: `${spec.id}:${index}`, domain: 'linked-list', type: event.type, message: event.message,
-            frame: linkedFrame(event, edge), metrics: { nodeVisits, pointerWrites }, source: event.source,
+            frame, transition, metrics: { nodeVisits, pointerWrites }, source: event.source,
             boundary: event.boundary, terminal: index === collected.events.length - 1,
           });
         });

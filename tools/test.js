@@ -447,6 +447,8 @@ const timeline = [0, 1, 2, 3].map((i) => Playback.timelineEvent({
 }));
 ok('timeline events use the version 2 schema', timeline.every((event) => event.schemaVersion === 2));
 ok('timeline frames are deeply immutable', Object.isFrozen(timeline[0].frame) && Object.isFrozen(timeline[0].frame.nested) && Object.isFrozen(timeline[0].frame.nested.values));
+const transitionEvent = Playback.timelineEvent({ id: 'transition:1', domain: 'array', type: 'swap', frame: { kind: 'array' }, transition: { kind: 'swap', moves: [{ entityId: 'item:0', from: 'slot:0', to: 'slot:1' }], enter: [], exit: [], wait: true } });
+ok('transition metadata is deeply immutable', Object.isFrozen(transitionEvent.transition) && Object.isFrozen(transitionEvent.transition.moves) && Object.isFrozen(transitionEvent.transition.moves[0]));
 const seen = [];
 const controller = Playback.createController({ onChange: (s) => seen.push(`${s.status}:${s.index}`) });
 let subscriptionCalls = 0;
@@ -474,6 +476,27 @@ ok('terminal seek marks playback complete', controller.getState().status === 'co
 controller.dispose();
 ok('disposed playback has no events', controller.getState().total === 0);
 
+const gated = Playback.createController();
+gated.load([timeline[0], transitionEvent, timeline[2]]);
+gated.step();
+const activeToken = gated.getState().transitionToken;
+ok('structural steps expose a transition token and navigation direction', gated.getState().transitioning && activeToken && gated.getState().direction === 1 && gated.getState().navigationSource === 'step');
+gated.step();
+ok('rapid structural steps cannot skip an active transition', gated.getState().index === 1);
+gated.completeTransition('stale-token');
+ok('stale transition completion is idempotently ignored', gated.getState().transitioning);
+gated.completeTransition(activeToken);
+gated.completeTransition(activeToken);
+ok('valid transition completion is idempotent', !gated.getState().transitioning && gated.getState().index === 1);
+gated.step(-1); gated.seek(2);
+ok('direct seeking cancels transitions and records seek navigation', !gated.getState().transitioning && gated.getState().navigationSource === 'seek');
+const queuedPlay = Playback.createController();
+queuedPlay.load([timeline[0], transitionEvent, timeline[2]]); queuedPlay.step(); queuedPlay.play();
+const queuedToken = queuedPlay.getState().transitionToken;
+ok('play can queue behind an active structural step', queuedPlay.getState().status === 'playing' && queuedPlay.getState().index === 1);
+queuedPlay.completeTransition(queuedToken);
+ok('queued play resumes only after transition completion', queuedPlay.getState().status === 'playing' && queuedPlay.getState().index === 1);
+
 const compatibleResult = Playback.runResult({ events: timeline, result: { value: 3 } });
 ok('run results expose events and legacy steps together', compatibleResult.schemaVersion === 2 && compatibleResult.events === compatibleResult.steps);
 ok('run result capabilities are detected from events', compatibleResult.capabilities.visualize && compatibleResult.capabilities.trace && compatibleResult.capabilities.operations);
@@ -491,7 +514,12 @@ ok('insertion sort declares moves instead of swaps', ALGORITHMS.insertion.metric
 ok('insertion move events use the declared move metric', ALGORITHMS.insertion.run([3, -1, 2]).some((event) => event.metrics.moves > 0 && event.frame.highlight.move));
 const insertionShift = ALGORITHMS.insertion.run([3, -1, 2]).find((event) => event.type === 'move');
 ok('insertion shift events preserve held and displaced values for presentation', insertionShift.frame.highlight.transition.value === 3 && insertionShift.frame.highlight.held.value === -1 && insertionShift.frame.highlight.transition.displacedValue === -1);
-ok('array timelines retain stable slot identities', ALGORITHMS.bubble.run([3, 1, 2]).every((event) => event.frame.items.every((item, index) => item.id === `slot:${index}`)));
+ok('legacy array timeline items retain stable slot identities', ALGORITHMS.bubble.run([3, 1, 2]).every((event) => event.frame.items.every((item, index) => item.id === `slot:${index}`)));
+const duplicateSwap = ALGORITHMS.bubble.run([2, 2, 1]).find((event) => event.type === 'swap');
+ok('presentation identities remain deterministic with duplicate values', duplicateSwap.frame.presentation.entities.map((entity) => entity.id).join(',') === 'item:0,item:1,item:2' && new Set(duplicateSwap.frame.presentation.slots.filter(Boolean)).size === 3);
+ok('swap metadata moves stable entities between slots', duplicateSwap.transition.kind === 'swap' && duplicateSwap.transition.moves.length === 2 && duplicateSwap.transition.wait);
+const insertionEvents = ALGORITHMS.insertion.run([3, -1, 2]);
+ok('insertion presentation keeps a single held entity and explicit hole', insertionEvents.some((event) => event.frame.presentation.held && event.frame.presentation.holes.length === 1) && insertionEvents.every((event) => new Set([...event.frame.presentation.slots.filter(Boolean), event.frame.presentation.held?.entityId].filter(Boolean)).size === 3));
 const appSource = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
 ok('visual input uses one 18-value limit', appSource.includes('const MAX_VISUAL_VALUES = 18') && /parsed\.length > MAX_VISUAL_VALUES/.test(appSource));
 
@@ -506,8 +534,10 @@ const insertResultB = Activities.get('array-list-insert').run({ values: [18, 7, 
 ok('array-list insertion timeline is deterministic', JSON.stringify(insertResultA) === JSON.stringify(insertResultB));
 ok('array-list insertion shifts before storing', insertResultA.events.map((event) => event.type).join(',') === 'state,move,move,insert' && insertResultA.events.at(-1).frame.array.join(',') === '18,7,24,31,12');
 ok('array-list insertion move preserves its held value', insertResultA.events.find((event) => event.type === 'move').frame.highlight.held.value === 24);
+ok('array-list insertion transitions shift then enter the stable new entity', insertResultA.events.filter((event) => event.transition).map((event) => event.transition.kind).join(',') === 'shift,shift,insert' && insertResultA.events.at(-1).transition.enter[0] === 'item:insert');
 const removeResult = Activities.get('array-list-remove').run({ values: [18, 7, 31, 12], index: 1 });
 ok('array-list removal closes the gap', removeResult.events.map((event) => event.type).join(',') === 'remove,move,move,complete' && removeResult.events.at(-1).frame.array.join(',') === '18,31,12');
+ok('array-list removal begins with the exiting entity still in its slot', removeResult.events[0].frame.presentation.slots[1] === removeResult.events[0].transition.exit[0]);
 ok('visualizer capabilities include all synchronized evidence', insertResultA.capabilities.visualize && insertResultA.capabilities.trace && insertResultA.capabilities.operations);
 const linkedTraversalA = Activities.get('linked-list-traversal').run();
 const linkedTraversalB = Activities.get('linked-list-traversal').run();
@@ -515,9 +545,11 @@ ok('linked-list traversal timeline is deterministic', JSON.stringify(linkedTrave
 ok('linked-list traversal follows every node to NULL', linkedTraversalA.outcome === 'complete' && linkedTraversalA.events.at(-1).frame.nodes.map((node) => node.value).join(',') === '18,7,31' && linkedTraversalA.events.at(-1).metrics.nodeVisits === 3);
 const linkedInsert = Activities.get('linked-list-insert-head').run();
 ok('head insertion preserves the old chain after the new node', linkedInsert.events.at(-1).frame.nodes.map((node) => node.value).join(',') === '24,18,7' && linkedInsert.events.at(-1).metrics.pointerWrites === 2);
+ok('linked transitions preserve pointer and edge identities', linkedInsert.events.some((event) => event.transition?.moves?.some((move) => move.entityId === 'pointer:head')) && linkedInsert.events.some((event) => event.frame.links.every((link) => link.id === `edge:${link.from}->${link.to}`)));
 ok('linked-list events use immutable V2 frames', Object.isFrozen(linkedInsert.events[0]) && Object.isFrozen(linkedInsert.events[0].frame) && linkedInsert.events.every((event, index) => event.id === `linked-list-insert-head:${index}`));
 const goldenTimelines = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests', 'golden-timelines.json'), 'utf8'));
-Object.entries(goldenTimelines).forEach(([id, golden]) => {
+const transitionGoldens = goldenTimelines.transitions;
+Object.entries(goldenTimelines).filter(([id]) => id !== 'transitions').forEach(([id, golden]) => {
   const options = id === 'array-list-insert' ? { values: [3, 1, 2], index: 1, value: 9 }
     : id === 'array-list-remove' ? { values: [3, 1, 2], index: 1 }
       : { values: [3, 1, 2], target: 2 };
@@ -528,6 +560,13 @@ Object.entries(goldenTimelines).forEach(([id, golden]) => {
     metrics: result.events.at(-1).metrics,
   };
   ok(`${id} matches its golden timeline`, JSON.stringify(signature) === JSON.stringify(golden));
+});
+Object.entries(transitionGoldens).forEach(([id, expected]) => {
+  const options = id === 'array-list-insert' ? { values: [3, 1, 2], index: 1, value: 9 }
+    : id === 'array-list-remove' ? { values: [3, 1, 2], index: 1 }
+      : { values: [3, 1, 2], target: 2 };
+  const actual = Activities.get(id).run(options).events.filter((event) => event.transition?.wait).map((event) => event.transition.kind);
+  ok(`${id} matches its golden transitions`, JSON.stringify(actual) === JSON.stringify(expected));
 });
 const extensionActivity = { id: 'test-extension', input: {}, run() { return Playback.runResult(); } };
 ok('activity catalog accepts later adapters', Activities.register(extensionActivity) && Activities.list().some((activity) => activity.id === extensionActivity.id));

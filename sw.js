@@ -42,6 +42,7 @@ const PRECACHE = [
   'problems-catalog.js',
   'problems.data.js',
   'problems.html',
+  'recurrence.js',
   'sha256.js',
   'start-page.js',
   'styles.css',

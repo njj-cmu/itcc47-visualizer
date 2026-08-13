@@ -9,7 +9,7 @@ account, nothing to submit.
 | [`index.html`](index.html) | Student start page with the recommended practice path and links to every tool |
 | [`visualizer.html`](visualizer.html) | Course-first React workspace with synchronized visualization, code, trace, variables, operations, and output |
 | [`writer.html`](writer.html) | Write an algorithm in plain language; it is checked against the five characteristics from Topic 01 |
-| [`tracer.html`](tracer.html) | Run course pseudocode step by step — variable state, output, per-line operation counts, and a measured growth curve |
+| [`tracer.html`](tracer.html) | Run course pseudocode step by step — variables and call frames, exact operation formulas, recursive functions, guided recurrences, and measured growth |
 | [`problems.html`](problems.html) | Browse equal-height module cards and see which problem sets are available |
 | [`practice.html`](practice.html) | Solve a selected module's pseudocode problems against visible examples and hidden cases |
 

@@ -83,3 +83,29 @@ engines. Algorithm generation, parsing, evaluation, and playback remain outside
 components. Once the contract works for that feature, other shells can migrate
 without rewriting course behavior. Authentication belongs only in the hosted
 portal, not in the static practice build.
+
+## Functions, calls, and recurrences
+
+The parser root is `Program { functions, body }`. Top-level function definitions
+are hoisted, while `CALL` remains a statement so user-defined functions cannot
+be hidden inside expressions. The runtime keeps explicit logical call frames
+with stable IDs, arguments, locals, call sites, depths, and return destinations.
+Timeline frames receive immutable call-stack snapshots and an active-frame ID,
+allowing the current vanilla shell and a future React shell to render the same
+trace without consulting interpreter internals.
+
+Function scope follows the course's Python-oriented model: scalar arguments are
+values, arrays retain their reference, assigned names are statically local, and
+global mutation must be declared before first use. `STOP` terminates the whole
+program; `RETURN` exits only the active frame. Runtime depth is capped at 128,
+and exceeding it reports a probable missing or ineffective base case.
+
+`recurrence.js` exposes the versioned, framework-neutral `ITCC47Recurrence`
+contract. Analysis is deliberately guided: a student confirms the problem-size
+measure, chooses a visible worst-case recursive branch when necessary, and
+bounds unproved combine work. It reports the recurrence before the solution,
+then Big-O, tight Theta only when justified, recursion depth, and call-stack
+space. Actual calls from the current run remain separate evidence. Mutual
+recursion can execute but is explicitly unsupported by the symbolic solver.
+General graph symbols and assumptions remain reserved for later modules; no
+graph-specific representation is inferred here.

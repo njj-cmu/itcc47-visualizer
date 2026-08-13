@@ -76,6 +76,10 @@
           <h2 class="panel-title">Variables</h2>
           <div id="vars-box" class="vars-box muted">Run the pseudocode to see variable state.</div>
         </div>
+        <div class="state-panel call-stack-panel">
+          <h2 class="panel-title">Call Stack</h2>
+          <div id="call-stack-box" class="call-stack-box muted">No function is active.</div>
+        </div>
         <div class="state-panel">
           <h2 class="panel-title">Output</h2>
           <div id="output-box" class="vars-box muted">(no output yet)</div>
@@ -89,6 +93,7 @@
     <div class="tabs" role="tablist" aria-label="Tracer details">
       <button id="tab-trace" class="tab active" role="tab" aria-selected="true" aria-controls="panel-trace">Trace Table</button>
       <button id="tab-ops" class="tab" role="tab" aria-selected="false" aria-controls="panel-ops" tabindex="-1">Operations</button>
+      <button id="tab-recurrence" class="tab" role="tab" aria-selected="false" aria-controls="panel-recurrence" tabindex="-1">Recurrence</button>
     </div>
 
     <div id="panel-trace" role="tabpanel" aria-labelledby="tab-trace">
@@ -200,6 +205,50 @@
         </details>
       </div>
     </div>
+
+    <div id="panel-recurrence" class="hidden recurrence-panel" role="tabpanel" aria-labelledby="tab-recurrence">
+      <div id="recurrence-empty" class="recurrence-empty">
+        <strong>Trace a recursive function first.</strong>
+        <p>Load a recursive example or write a <code>FUNCTION</code> and <code>CALL</code> it. This guide keeps the current run separate from the worst-case recurrence.</p>
+      </div>
+      <div id="recurrence-content" class="hidden">
+        <section class="recurrence-setup" aria-labelledby="recurrence-setup-title">
+          <div>
+            <span class="eyebrow">Guided worst-case analysis</span>
+            <h2 id="recurrence-setup-title">Describe what shrinks</h2>
+            <p>The analyzer suggests a size measure, but you confirm the meaning used in your lesson.</p>
+          </div>
+          <label class="field-label" for="recurrence-function">Function
+            <select id="recurrence-function" class="text-input"></select>
+          </label>
+          <label class="field-label" for="recurrence-measure">Problem-size measure
+            <select id="recurrence-measure" class="text-input"></select>
+          </label>
+          <button id="btn-confirm-recurrence" class="btn btn-primary" type="button">Confirm size measure</button>
+          <span id="recurrence-confirm-status" class="ops-symbol-status" role="status">Not confirmed</span>
+        </section>
+
+        <div id="recurrence-assumptions" class="ops-assumptions hidden" aria-live="polite"></div>
+
+        <section id="recurrence-result" class="recurrence-result hidden" aria-live="polite">
+          <div class="recurrence-formula-card">
+            <span>Worst-case recurrence</span>
+            <strong id="recurrence-formula">—</strong>
+            <p id="recurrence-confidence"></p>
+          </div>
+          <div class="recurrence-facts">
+            <div><span>Actual calls</span><strong id="recurrence-actual-calls">0</strong></div>
+            <div><span>Current depth</span><strong id="recurrence-actual-depth">0</strong></div>
+            <div><span>Big-O</span><strong id="recurrence-big-o">—</strong></div>
+            <div><span>Tight bound</span><strong id="recurrence-theta">—</strong></div>
+            <div><span>Stack space</span><strong id="recurrence-space">—</strong></div>
+          </div>
+          <div id="recurrence-derivation" class="ops-derivation"></div>
+          <p class="recurrence-storage-note">This stack-space result covers call frames only. Non-stack storage such as merge buffers is not inferred unless an explicit bound supports it.</p>
+        </section>
+        <div id="recurrence-diagnostics" class="ops-diagnostics hidden" role="status" aria-live="polite"></div>
+      </div>
+    </div>
   </aside>
 
 </div>
@@ -290,9 +339,20 @@ AND   OR   NOT
 
     <section class="grammar-card">
       <h3>Stopping early</h3>
-      <pre>BREAK     leave the loop
-RETURN    leave with a value
-STOP      end the algorithm</pre>
+      <pre>BREAK         leave the loop
+RETURN value  leave a function
+STOP          end the program</pre>
+    </section>
+
+    <section class="grammar-card">
+      <h3>Functions and recursion</h3>
+      <pre>FUNCTION LowerBound(values, target, low, high)
+    RETURN low
+ENDFUNCTION
+
+CALL LowerBound(values, target, 0, LENGTH(values)) INTO answer
+GLOBAL comparisons</pre>
+      <p>Scalars are passed by value and arrays by reference. Assigned names are local unless declared <code>GLOBAL</code>.</p>
     </section>
   </div>
 
@@ -313,6 +373,7 @@ STOP      end the algorithm</pre>
 <script src="playback.js"></script>
 <script src="complexity.js"></script>
 <script src="symbolic-counting.js"></script>
+<script src="recurrence.js"></script>
 <script src="presets.js"></script>
 <script src="tracer-app.js"></script>
 <script src="sw-register.js" defer></script>

@@ -1531,6 +1531,62 @@ html, body {
   color: #fff;
 }
 
+/* ---- Recursive function frames and guided recurrences ---- */
+.state-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr); }
+.call-stack-box { max-height: 154px; overflow: auto; }
+.call-frame { border: 1px solid var(--border); border-radius: 8px; background: color-mix(in srgb, var(--surface-2) 88%, transparent); margin-bottom: 6px; }
+.call-frame.active { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.call-frame summary { cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 8px; }
+.call-frame summary > span { display: flex; align-items: baseline; gap: 7px; }
+.call-frame summary small { color: var(--muted); font-size: .68rem; }
+.call-frame summary code { color: var(--muted); font-size: .7rem; }
+.call-frame-body { border-top: 1px solid var(--border); padding: 7px 8px; }
+.call-frame-body p { margin: 0 0 7px; color: var(--muted); font-size: .75rem; overflow-wrap: anywhere; }
+.frame-scope-label { margin: 0 0 7px; color: var(--accent); font-size: .72rem; font-weight: 700; }
+.global-scope { margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px; }
+.global-scope summary { cursor: pointer; color: var(--muted); font-size: .72rem; }
+
+.recurrence-panel { padding: 18px; overflow: auto; }
+.recurrence-empty { border: 1px dashed var(--border); border-radius: 12px; padding: 24px; text-align: center; color: var(--muted); }
+.recurrence-empty strong { color: var(--text); display: block; margin-bottom: 7px; }
+.recurrence-empty p { margin: 0 auto; max-width: 48ch; }
+.recurrence-setup { display: grid; grid-template-columns: minmax(220px, 1.4fr) minmax(160px, .8fr) minmax(200px, 1fr); gap: 12px; align-items: end; border: 1px solid var(--border); border-radius: 12px; padding: 15px; background: var(--surface-2); }
+.recurrence-setup > * { min-width: 0; }
+.recurrence-setup > div:first-child { grid-row: span 2; align-self: start; }
+.recurrence-setup h2 { font-size: 1.15rem; margin: 3px 0 5px; }
+.recurrence-setup p { color: var(--muted); font-size: .82rem; margin: 0; }
+.recurrence-setup .field-label { margin: 0; }
+.recurrence-setup .text-input { width: 100%; max-width: 100%; min-width: 0; margin-top: 5px; text-overflow: ellipsis; }
+.recurrence-formula-card { margin-top: 14px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border)); border-radius: 12px; padding: 16px; background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.recurrence-formula-card > span { color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
+.recurrence-formula-card strong { display: block; margin: 8px 0; font: 700 clamp(1.1rem, 2.2vw, 1.6rem)/1.35 var(--font-mono); color: var(--text); overflow-wrap: anywhere; }
+.recurrence-formula-card p { margin: 0; color: var(--muted); font-size: .78rem; }
+.recurrence-facts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.recurrence-facts > div { border: 1px solid var(--border); border-radius: 9px; padding: 10px; background: var(--surface-2); }
+.recurrence-facts span { display: block; color: var(--muted); font-size: .68rem; margin-bottom: 4px; }
+.recurrence-facts strong { font-size: .92rem; }
+.recurrence-storage-note { border-left: 3px solid var(--warning); padding: 8px 10px; color: var(--muted); font-size: .78rem; }
+.trace-row-call td:last-child { color: var(--accent); }
+.trace-row-return td:last-child { color: var(--success); }
+
+@media (max-width: 1100px) {
+  .state-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .call-stack-panel { grid-column: 1 / -1; }
+  .recurrence-setup { grid-template-columns: 1fr 1fr; }
+  .recurrence-setup > div:first-child { grid-column: 1 / -1; grid-row: auto; }
+  .recurrence-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .state-grid { grid-template-columns: 1fr; }
+  .call-stack-panel { grid-column: auto; }
+  .recurrence-panel { padding: 12px; }
+  .recurrence-setup { grid-template-columns: 1fr; }
+  .recurrence-setup > div:first-child { grid-column: auto; }
+  .recurrence-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .recurrence-facts > div:last-child { grid-column: 1 / -1; }
+}
+
 /* the right-hand tables have more room now, so let them breathe */
 .trace-panel .trace-table { font-size: 0.85rem; }
 .trace-panel .trace-table th { padding: 10px 10px; }

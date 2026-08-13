@@ -1,9 +1,57 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
+import { AnimatePresence, LayoutGroup, LazyMotion, MotionConfig, domMax, m } from 'motion/react';
 import './workspace.css';
 
 const MAX_VISUAL_VALUES = 18;
 const DEFAULT_SPEED = 6;
+const MOTION_STORAGE_KEY = 'itcc47:visualizer-motion:v1';
+const MOTION_DURATIONS = Object.freeze({ 3: 0.8, 6: 0.52, 9: 0.3 });
+
+function motionDuration(speed) { return MOTION_DURATIONS[speed] || 0.52; }
+
+function useMotionPreference() {
+  const [override, setOverride] = useState(() => {
+    try { return localStorage.getItem(MOTION_STORAGE_KEY); } catch { return null; }
+  });
+  const [deviceReduced, setDeviceReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const updateDevice = () => setDeviceReduced(media.matches);
+    media.addEventListener?.('change', updateDevice);
+    return () => media.removeEventListener?.('change', updateDevice);
+  }, []);
+  const mode = override || (deviceReduced ? 'reduced' : 'on');
+  const update = useCallback((next) => {
+    const value = next === 'device' ? null : next;
+    try { if (value) localStorage.setItem(MOTION_STORAGE_KEY, value); else localStorage.removeItem(MOTION_STORAGE_KEY); } catch { /* session state still applies */ }
+    setOverride(value);
+  }, []);
+  return { mode, override, update };
+}
+
+function useTransitionBoundary({ state, event, controller, mode }) {
+  const completed = useRef(new Set());
+  const expected = useMemo(() => new Set([
+    ...(event?.transition?.moves || []).map((move) => move.entityId),
+    ...(event?.transition?.enter || []), ...(event?.transition?.exit || []),
+  ]), [event]);
+  useEffect(() => {
+    completed.current = new Set();
+    if (!state.transitioning || !state.transitionToken) return undefined;
+    if (mode !== 'on' || expected.size === 0) {
+      controller.completeTransition(state.transitionToken);
+      return undefined;
+    }
+    const timeout = setTimeout(() => controller.completeTransition(state.transitionToken), motionDuration(state.speed) * 1000 + 100);
+    return () => clearTimeout(timeout);
+  }, [controller, event?.id, expected, mode, state.speed, state.transitionToken, state.transitioning]);
+  return useCallback((entityId) => {
+    if (!state.transitioning || !state.transitionToken || !expected.has(entityId)) return;
+    completed.current.add(entityId);
+    if ([...expected].every((id) => completed.current.has(id))) controller.completeTransition(state.transitionToken);
+  }, [controller, expected, state.transitionToken, state.transitioning]);
+}
 
 function Icon({ name, size = 20 }) {
   const paths = {
@@ -41,71 +89,75 @@ function classifyIndex(index, highlight = {}) {
   return 'default';
 }
 
-const ArrayRenderer = memo(function ArrayRenderer({ frame, event }) {
+const ArrayRenderer = memo(function ArrayRenderer({ frame, event, motionMode, duration, onEntityComplete }) {
   const values = frame?.array || [];
+  const fallbackEntities = (frame?.items || []).map((item, index) => ({ id: item.id, value: values[index] }));
+  const presentation = frame?.presentation || { entities: fallbackEntities, slots: fallbackEntities.map((entity) => entity.id), held: null };
+  const entities = new Map(presentation.entities.map((entity) => [entity.id, entity]));
+  const slots = presentation.slots || [];
   const action = frame?.highlight?.swap || frame?.highlight?.move || null;
-  const transition = frame?.highlight?.transition || null;
-  const held = frame?.highlight?.held || null;
-  const actionStart = action ? ((Math.min(...action) + 0.5) / values.length) * 100 : 0;
-  const actionEnd = action ? ((Math.max(...action) + 0.5) / values.length) * 100 : 0;
-  return <div className="array-canvas" aria-label="Array visualization">
-    <div className="array-stage" style={{ '--array-count': values.length }}>
-    <div className="array-cells" style={{ '--array-count': values.length }}>
-      {values.map((value, index) => {
+  const heldEntity = presentation.held ? entities.get(presentation.held.entityId) : null;
+  const actionStart = action ? ((Math.min(...action) + 0.5) / slots.length) * 100 : 0;
+  const actionEnd = action ? ((Math.max(...action) + 0.5) / slots.length) * 100 : 0;
+  return <div className="array-canvas" aria-label="Array visualization"><LayoutGroup id="array-layout">
+    <div className="array-stage" style={{ '--array-count': slots.length }}>
+    <div className="array-cells" style={{ '--array-count': slots.length }}>
+      {slots.map((entityId, index) => {
         const state = classifyIndex(index, frame.highlight);
         const marker = frame?.markers?.index === index;
-        const isTransitionSource = transition?.from === index || held?.hole === index;
-        const isTransitionDestination = transition?.to === index;
-        const displayValue = isTransitionSource ? null : value;
-        return <div className={`array-item ${marker ? 'has-marker' : ''}`} key={frame.items?.[index]?.id || index}>
+        const entity = entities.get(entityId);
+        return <div className={`array-item ${marker ? 'has-marker' : ''}`} data-slot={`slot:${index}`} key={`slot:${index}`}>
           {marker ? <span className="array-marker">index</span> : null}
-          <div className={`array-cell bar-${state} ${displayValue == null ? 'is-empty' : ''} ${isTransitionDestination ? 'is-receiving' : ''}`}
-            aria-label={`Index ${index}, ${displayValue == null ? 'temporarily empty' : `value ${displayValue}`}, ${state}`}>
-            <span className="array-value">{displayValue == null ? '—' : displayValue}</span>
+          <div className={`array-cell-slot ${entity ? '' : 'is-empty'}`} aria-label={`Index ${index}, ${entity ? `value ${entity.value}` : 'temporarily empty'}, ${state}`}>
+            <AnimatePresence initial={false}>{entity ? <m.div layout layoutId={entity.id} data-entity-id={entity.id} className={`array-cell bar-${state}`}
+              initial={event?.transition?.enter?.includes(entity.id) ? { opacity: 0, scale: .72 } : false} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .72 }}
+              transition={{ layout: { duration, ease: [0.22, 0.75, 0.28, 1] }, opacity: { duration: Math.min(duration, .18) } }}
+              onLayoutAnimationComplete={() => onEntityComplete(entity.id)} onAnimationComplete={() => onEntityComplete(entity.id)}>
+              <span className="array-value">{entity.value}</span>
+            </m.div> : <span className="array-hole" aria-hidden="true">&mdash;</span>}</AnimatePresence>
           </div>
           <span className="array-index" aria-hidden="true">{index}</span>
         </div>;
       })}
     </div>
-    {held ? <div className="array-held-value" style={{ '--held-column': held.from + 1 }} aria-label={`Held insertion value ${held.value}`}><span>held</span><strong>{held.value}</strong></div> : null}
-    {transition ? <>
-      <div className="array-moving-value" key={event?.id || `${transition.from}:${transition.to}`} style={{ '--move-from': transition.from, '--move-distance': transition.to - transition.from }} aria-hidden="true"><span>{transition.value}</span></div>
-    </> : null}
+    <AnimatePresence initial={false}>{heldEntity ? <m.div layout layoutId={heldEntity.id} data-entity-id={heldEntity.id} className="array-held-value" style={{ '--held-column': (presentation.held.from ?? 0) + 1 }}
+      transition={{ layout: { duration, ease: [0.22, 0.75, 0.28, 1] } }} onLayoutAnimationComplete={() => onEntityComplete(heldEntity.id)} onAnimationComplete={() => onEntityComplete(heldEntity.id)} aria-label={`Held insertion value ${heldEntity.value}`}>
+      <span>held</span><strong>{heldEntity.value}</strong></m.div> : null}</AnimatePresence>
     {action ? <div className={`array-connector ${frame?.highlight?.swap ? 'is-swap' : 'is-move'}`} aria-hidden="true">
-      <svg viewBox="0 0 100 24" preserveAspectRatio="none"><path d={`M ${actionStart} 3 C ${actionStart} 22, ${actionEnd} 22, ${actionEnd} 3`} /><path d={`M ${actionEnd - 1.4} 5 L ${actionEnd} 2 L ${actionEnd + 1.4} 5`} /></svg>
+      <m.svg viewBox="0 0 100 24" preserveAspectRatio="none" initial={motionMode === 'on' ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: Math.min(duration, .2) }}><m.path d={`M ${actionStart} 3 C ${actionStart} 22, ${actionEnd} 22, ${actionEnd} 3`} initial={motionMode === 'on' ? { pathLength: 0 } : false} animate={{ pathLength: 1 }} transition={{ duration }}/><path d={`M ${actionEnd - 1.4} 5 L ${actionEnd} 2 L ${actionEnd + 1.4} 5`} /></m.svg>
       <span style={{ left: `${(actionStart + actionEnd) / 2}%` }}>{frame?.highlight?.swap ? 'swap' : 'move'}</span>
     </div> : null}
     </div>
     <div className="array-legend" aria-label="Visualization legend"><span><i className="legend-current"/>Active</span><span><i className="legend-sorted"/>Complete</span><span>Position is shown by index, not height.</span></div>
-  </div>;
+  </LayoutGroup></div>;
 });
 
 ITCC47VisualizerRegistry.registerRenderer('array', ArrayRenderer);
 
-const LinkedListRenderer = memo(function LinkedListRenderer({ frame }) {
+const LinkedListRenderer = memo(function LinkedListRenderer({ frame, event, duration, onEntityComplete }) {
   const nodes = frame?.nodes || [];
   const pointersByNode = Object.entries(frame?.pointers || {}).reduce((grouped, [name, id]) => {
     const key = id || 'NULL';
     grouped[key] = [...(grouped[key] || []), name];
     return grouped;
   }, {});
-  return <div className="linked-canvas" aria-label="Singly linked list visualization">
+  return <div className="linked-canvas" aria-label="Singly linked list visualization"><LayoutGroup id="linked-layout">
     <div className="linked-chain">
       {nodes.map((node, index) => <React.Fragment key={node.id}>
-        <div className="linked-node-wrap">
-          <div className="pointer-labels">{(pointersByNode[node.id] || []).map((name) => <span key={name}>{name}</span>)}</div>
+        <m.div layout layoutId={`node:${node.id}`} data-node-id={node.id} className="linked-node-wrap" initial={event?.transition?.enter?.includes(node.id) ? { opacity: 0, scale: .72 } : false} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .72 }} transition={{ layout: { duration }, opacity: { duration: Math.min(duration, .18) } }} onLayoutAnimationComplete={() => onEntityComplete(node.id)} onAnimationComplete={() => onEntityComplete(node.id)}>
+          <div className="pointer-labels">{(pointersByNode[node.id] || []).map((name) => <m.span layout layoutId={`pointer:${name}`} data-pointer-name={name} transition={{ layout: { duration } }} onLayoutAnimationComplete={() => onEntityComplete(`pointer:${name}`)} key={name}>{name}</m.span>)}</div>
           <div className="linked-node" aria-label={`${node.id}, value ${node.value}`}>
             <strong>{node.value}</strong><span className={frame.highlightedEdges?.some((edge) => edge.from === node.id) ? 'is-highlighted' : ''}>●</span>
           </div>
           <small>{node.id}</small>
-        </div>
+        </m.div>
         {index < nodes.length - 1 && node.next === nodes[index + 1].id
-          ? <div className={`linked-arrow ${frame.highlightedEdges?.some((edge) => edge.from === node.id && edge.to === nodes[index + 1].id) ? 'is-highlighted' : ''}`} aria-hidden="true">→</div>
+          ? <m.div layout data-edge-id={`edge:${node.id}->${nodes[index + 1].id}`} initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }} transition={{ duration }} onAnimationComplete={() => onEntityComplete(`edge:${node.id}->${nodes[index + 1].id}`)} className={`linked-arrow ${frame.highlightedEdges?.some((edge) => edge.from === node.id && edge.to === nodes[index + 1].id) ? 'is-highlighted' : ''}`} aria-hidden="true">→</m.div>
           : index < nodes.length - 1 ? <div className="linked-chain-gap" aria-hidden="true"/> : null}
       </React.Fragment>)}
-      <div className="linked-null"><span>NULL</span>{(pointersByNode.NULL || []).map((name) => <small key={name}>{name}</small>)}</div>
+      <div className="linked-null"><span>NULL</span>{(pointersByNode.NULL || []).map((name) => <m.small layout layoutId={`pointer:${name}`} data-pointer-name={name} transition={{ layout: { duration } }} onLayoutAnimationComplete={() => onEntityComplete(`pointer:${name}`)} key={name}>{name}</m.small>)}</div>
     </div>
-  </div>;
+  </LayoutGroup></div>;
 });
 
 ITCC47VisualizerRegistry.registerRenderer('linked-list', LinkedListRenderer);
@@ -231,16 +283,17 @@ function DataControls({ activity, inputs, setInputs, onShuffle }) {
   </details>;
 }
 
-function PlaybackDock({ state, controller, activity, event }) {
+function PlaybackDock({ state, controller, activity, event, motionPreference }) {
   const visibleMetrics = activity.metrics.slice(0, 2);
   return <footer className="playback-dock">
     <div className="transport">
-      <button type="button" aria-label="Previous" onClick={() => controller.step(-1)} disabled={state.index === 0}><Icon name="previous"/></button>
+      <button type="button" aria-label="Previous" onClick={() => controller.step(-1)} disabled={state.index === 0 || state.transitioning}><Icon name="previous"/></button>
       <button type="button" className="primary" aria-label={state.status === 'playing' ? 'Pause' : 'Play'} onClick={controller.toggle} disabled={state.atEnd}><Icon name={state.status === 'playing' ? 'pause' : 'play'}/><span>{state.status === 'playing' ? 'Pause' : 'Play'}</span></button>
-      <button id="btn-step" type="button" aria-label="Step" onClick={() => controller.step(1)} disabled={state.atEnd}><Icon name="next"/><span>Step</span></button>
+      <button id="btn-step" type="button" aria-label="Step" onClick={() => controller.step(1)} disabled={state.atEnd || state.transitioning}><Icon name="next"/><span>Step</span></button>
     </div>
     <div className="timeline-control"><input id="step-slider" type="range" min="0" max={Math.max(state.total - 1, 0)} value={state.index} onChange={(e) => controller.seek(Number(e.target.value))} aria-label="Timeline step"/><strong>{state.total ? state.index + 1 : 0} / {state.total}</strong></div>
     <label className="speed-control">Speed<select value={state.speed} onChange={(e) => controller.setSpeed(e.target.value)}><option value="3">0.5×</option><option value="6">1×</option><option value="9">2×</option></select></label>
+    <label className="motion-control">Motion<select aria-label="Motion preference" value={motionPreference.override || 'device'} onChange={(e) => motionPreference.update(e.target.value)}><option value="device">Use device setting</option><option value="on">On</option><option value="reduced">Reduced</option><option value="off">Off</option></select></label>
     <div className="dock-metrics">{visibleMetrics.map((metric) => <span key={metric.key}>{metric.label}<strong>{event?.metrics?.[metric.key] ?? 0}</strong></span>)}</div>
   </footer>;
 }
@@ -266,8 +319,12 @@ function App() {
   const [mobileTab, setMobileTab] = useState('visualize');
   const controller = useMemo(() => ITCC47Playback.createController({ speed: DEFAULT_SPEED, delayForSpeed: (speed) => 1250 - speed * 110 }), []);
   const playback = usePlayback(controller);
+  const motionPreference = useMotionPreference();
   const result = useMemo(() => activity.run(inputs), [activity, inputs]);
   const event = result.events[playback.index] || result.events[0] || null;
+  const onEntityComplete = useTransitionBoundary({ state: playback, event, controller, mode: motionPreference.mode });
+  const duration = motionPreference.mode === 'on' ? motionDuration(playback.speed) : (motionPreference.mode === 'reduced' ? 0.16 : 0);
+  const visualDuration = playback.navigationSource === 'seek' || playback.navigationSource === 'load' ? 0 : duration;
   const [Renderer, setRenderer] = useState(() => ArrayRenderer);
 
   useEffect(() => { controller.load(result.events); }, [controller, result]);
@@ -286,14 +343,14 @@ function App() {
   const mobileTabs = [
     ['visualize', 'grid', 'Visualize'], ['code', 'code', 'Code'], ['trace', 'list', 'Trace'], ['more', 'more', 'More'],
   ];
-  return <div className="visualizer-workspace">
+  return <LazyMotion features={domMax} strict><MotionConfig reducedMotion={motionPreference.mode === 'on' ? 'never' : 'always'} transition={{ duration }}><div className={`visualizer-workspace motion-${motionPreference.mode} navigation-${playback.navigationSource}`} data-motion-duration={duration}>
     <main className="workspace-main">
       <div className="activity-heading"><div><p><a href="problems.html?view=visualizations"><Icon name="back" size={14}/> All visualizations</a><span>Module {activity.module} / {activity.topic}</span></p><h1>{activity.title}</h1><span>{activity.subtitle}</span></div><a className="edit-code" href={`tracer.html?activity=${encodeURIComponent(activity.id)}`}><Icon name="code" size={17}/> Edit pseudocode</a></div>
       <DataControls activity={activity} inputs={inputs} setInputs={setInputs} onShuffle={shuffle}/>
       <div className="mobile-surface-tabs" role="tablist" aria-label="Workspace view">{mobileTabs.map(([id, icon, label]) => <button type="button" role="tab" aria-selected={mobileTab === id} className={mobileTab === id ? 'active' : ''} onClick={() => setMobileTab(id)} key={id}><Icon name={icon}/>{label}</button>)}</div>
       <div className={`desktop-source mobile-surface ${mobileTab === 'code' ? 'mobile-active' : ''}`}><SourcePanel activity={activity} event={event}/></div>
       <section className={`visual-canvas mobile-surface ${mobileTab === 'visualize' ? 'mobile-active' : ''}`} tabIndex="0" aria-label={`${activity.title} visualization canvas`}>
-        <Renderer frame={event?.frame} event={event} activity={activity}/>
+        <Renderer frame={event?.frame} event={event} activity={activity} motionMode={motionPreference.mode} duration={visualDuration} onEntityComplete={onEntityComplete}/>
       </section>
       <p id="result-caption" className="current-step" aria-live="polite"><span>{playback.index + 1}</span>{event?.message || 'Preparing activity…'}</p>
       <div className={`mobile-evidence mobile-surface ${mobileTab === 'trace' || mobileTab === 'more' ? 'mobile-active' : ''}`}>
@@ -301,8 +358,8 @@ function App() {
       </div>
     </main>
     <div className="desktop-evidence"><EvidenceDrawer tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs}/></div>
-    <PlaybackDock state={playback} controller={controller} activity={activity} event={event}/>
-  </div>;
+    <PlaybackDock state={playback} controller={controller} activity={activity} event={event} motionPreference={motionPreference}/>
+  </div></MotionConfig></LazyMotion>;
 }
 
 const root = document.getElementById('visualizer-root');

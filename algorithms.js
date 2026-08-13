@@ -31,23 +31,76 @@ function eventType(step) {
 }
 
 function finalizeTimeline(key, steps) {
-  return steps.map((step, index) => ITCC47Playback.timelineEvent({
-    id: `${key}:${index}`,
-    domain: 'array',
-    type: eventType(step),
-    message: step.description,
-    frame: {
-      kind: 'array',
-      array: step.array,
-      items: step.array.map((value, itemIndex) => Object.freeze({ id: `slot:${itemIndex}`, value, index: itemIndex })),
-      highlight: step.highlight,
-      markers: Object.freeze({}),
-    },
-    metrics: step.stats,
-    segment: step.stats.pass == null ? null : `pass:${step.stats.pass}`,
-    boundary: step.passEnd,
-    terminal: step.final,
-  }));
+  const entities = steps[0].array.map((value, index) => Object.freeze({ id: `item:${index}`, value }));
+  let slots = entities.map((entity) => entity.id);
+  let heldId = null;
+  let previousHeld = null;
+
+  return steps.map((step, index) => {
+    const highlight = step.highlight || {};
+    let transition = null;
+
+    if (highlight.swap) {
+      const [from, to] = highlight.swap;
+      const fromId = slots[from]; const toId = slots[to];
+      slots = [...slots];
+      [slots[from], slots[to]] = [toId, fromId];
+      transition = { kind: 'swap', moves: [
+        { entityId: fromId, from: `slot:${from}`, to: `slot:${to}` },
+        { entityId: toId, from: `slot:${to}`, to: `slot:${from}` },
+      ], enter: [], exit: [], wait: true };
+    } else if (highlight.held && !heldId) {
+      const from = highlight.held.from;
+      heldId = slots[from];
+      slots = [...slots]; slots[from] = null;
+      transition = { kind: 'shift', moves: [{ entityId: heldId, from: `slot:${from}`, to: 'held' }], enter: [], exit: [], wait: true };
+    } else if (highlight.transition?.kind === 'shift') {
+      const { from, to } = highlight.transition;
+      const movingId = slots[from];
+      slots = [...slots]; slots[to] = movingId; slots[from] = null;
+      transition = { kind: 'shift', moves: [{ entityId: movingId, from: `slot:${from}`, to: `slot:${to}` }], enter: [], exit: [], wait: true };
+    } else if (!highlight.held && heldId && previousHeld) {
+      const to = previousHeld.hole;
+      slots = [...slots]; slots[to] = heldId;
+      transition = { kind: 'insert', moves: [{ entityId: heldId, from: 'held', to: `slot:${to}` }], enter: [], exit: [], wait: true };
+      heldId = null;
+    } else if (index > 0 && step.array.some((value, slotIndex) => {
+      const entity = entities.find((candidate) => candidate.id === slots[slotIndex]);
+      return entity && entity.value !== value;
+    })) {
+      const available = new Map();
+      entities.forEach((entity) => available.set(entity.value, [...(available.get(entity.value) || []), entity.id]));
+      slots = step.array.map((value) => available.get(value).shift());
+    }
+
+    if (!transition && (highlight.compare || highlight.mid !== undefined || highlight.found !== undefined || highlight.range)) {
+      transition = { kind: 'emphasis', moves: [], enter: [], exit: [], wait: false };
+    }
+
+    const presentation = {
+      entities,
+      slots: [...slots],
+      held: heldId ? { entityId: heldId, location: 'held', from: highlight.held?.from ?? previousHeld?.from } : null,
+      holes: slots.flatMap((entityId, slotIndex) => entityId == null ? [`slot:${slotIndex}`] : []),
+    };
+    previousHeld = highlight.held || null;
+    return ITCC47Playback.timelineEvent({
+      id: `${key}:${index}`,
+      domain: 'array',
+      type: eventType(step),
+      message: step.description,
+      frame: {
+        kind: 'array', array: step.array,
+        items: step.array.map((value, itemIndex) => Object.freeze({ id: `slot:${itemIndex}`, value, index: itemIndex })),
+        presentation, highlight, markers: Object.freeze({}),
+      },
+      transition,
+      metrics: step.stats,
+      segment: step.stats.pass == null ? null : `pass:${step.stats.pass}`,
+      boundary: step.passEnd,
+      terminal: step.final,
+    });
+  });
 }
 
 function allIndices(n) {

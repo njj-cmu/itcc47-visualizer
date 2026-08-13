@@ -109,3 +109,24 @@ space. Actual calls from the current run remain separate evidence. Mutual
 recursion can execute but is explicitly unsupported by the symbolic solver.
 General graph symbols and assumptions remain reserved for later modules; no
 graph-specific representation is inferred here.
+
+## Singly linked node references
+
+The runtime value model includes `NULL` and opaque references created by
+`NEW NODE(value)`. A node has exactly `value` and `next` fields in this release;
+field access, field assignment, aliasing, and identity comparison work in
+globals, arrays, parameters, nested calls, and recursive calls. Invalid fields,
+scalar links, and dereferencing `NULL` produce explicit diagnostics.
+
+Heap ownership is deliberately separate from lexical call frames. The heap
+assigns deterministic identities such as `node:1`, while each timeline frame
+captures both the visible references in the active scopes and an immutable heap
+snapshot. This allows recursive functions to share node identity without
+moving heap objects into local environments.
+
+The activity catalog adapts those pseudocode frames into the shared
+`linked-list` renderer contract (`nodes`, `links`, named pointers, detached
+nodes, and highlighted edges). The Pseudocode Lab consumes the same curated
+source through an activity query parameter. Symbolic counting reports node
+allocation or field operations as unsupported and leaves the richer algebra
+engine intact; linked-list teaching metrics remain separate evidence.

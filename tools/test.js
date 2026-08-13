@@ -224,6 +224,60 @@ ok('timeline frames contain immutable-style call-stack snapshots', functionRun.s
 ok('INTO storage is exposed separately for Full Control', functionRun.steps.some((step) => step.type === 'call-store' && step.metrics.cost === 0 && step.metrics.controlCost > 0));
 ok('Lecture charges one operation for CALL', functionRun.steps.filter((step) => step.type === 'call').every((step) => step.metrics.cost === 1));
 
+// ---------- node references and heap frames ----------
+
+section('node references and heap frames');
+
+const NODE_CHAIN = `head <- NEW NODE(18)
+head.next <- NEW NODE(7)
+head.next.next <- NEW NODE(31)
+current <- head
+WHILE current <> NULL DO
+ WRITE current.value
+ current <- current.next
+ENDWHILE`;
+ok('NULL, NEW NODE, and chained fields parse and traverse', eq(tryOutputs(NODE_CHAIN, []), [18, 7, 31]));
+ok('reference assignment preserves node identity', eq(tryOutputs('head <- NEW NODE(4)\nalias <- head\nWRITE alias = head', []), [true]));
+ok('distinct node allocations have distinct identities', eq(tryOutputs('a <- NEW NODE(4)\nb <- NEW NODE(4)\nWRITE a = b', []), [false]));
+ok('node references compose inside arrays', eq(tryOutputs('nodes <- [NEW NODE(9)]\nWRITE nodes[0].value', []), [9]));
+
+const NESTED_NODE_CALL = `FUNCTION Pass(node)
+ RETURN node
+ENDFUNCTION
+FUNCTION Wrap(node)
+ CALL Pass(node) INTO result
+ RETURN result
+ENDFUNCTION
+head <- NEW NODE(9)
+CALL Wrap(head) INTO alias
+WRITE alias = head`;
+ok('node references survive parameters and nested calls', eq(tryOutputs(NESTED_NODE_CALL, []), [true]));
+
+const RECURSIVE_NODE_CALL = `FUNCTION Last(node)
+ IF node.next = NULL THEN
+  RETURN node
+ ENDIF
+ CALL Last(node.next) INTO result
+ RETURN result
+ENDFUNCTION
+head <- NEW NODE(4)
+head.next <- NEW NODE(8)
+head.next.next <- NEW NODE(15)
+CALL Last(head) INTO tail
+WRITE tail.value`;
+ok('recursive call frames carry node references without owning heap identity', eq(tryOutputs(RECURSIVE_NODE_CALL, []), [15]));
+
+function runtimeDiagnostic(source) {
+  const run = collectForCounting(parseForCounting(source), []);
+  return run.diagnostics[0] || null;
+}
+ok('NULL field access has a friendly diagnostic', runtimeDiagnostic('head <- NULL\nWRITE head.value')?.code === 'E_NULL_REFERENCE');
+ok('invalid node fields have a friendly diagnostic', runtimeDiagnostic('head <- NEW NODE(1)\nWRITE head.left')?.code === 'E_INVALID_NODE_FIELD');
+ok('next rejects scalar links explicitly', runtimeDiagnostic('head <- NEW NODE(1)\nhead.next <- 7')?.code === 'E_INVALID_NODE_LINK');
+const nodeTimeline = collectForCounting(parseForCounting(NODE_CHAIN), []);
+ok('node timeline snapshots expose deterministic heap identities', nodeTimeline.events.at(-1).frame.heap.map((node) => node.id).join(',') === 'node:1,node:2,node:3');
+ok('node references remain visible in call-stack frames', collectForCounting(parseForCounting(NESTED_NODE_CALL), []).events.some((event) => event.frame.callStack.some((frame) => Object.values(frame.locals || {}).some((value) => value === '&node:1'))));
+
 // ---------- guided recurrence analysis ----------
 
 section('guided recurrence analysis');
@@ -368,6 +422,8 @@ const branchPending = analyseCount('READ n\nIF n > 0 THEN\n WRITE n\nELSE\n WRIT
 ok('ambiguous branches expose candidate paths', branchPending.requiredAssumptions.length === 1 && branchPending.symbolicTotal === null);
 const branchChosen = analyseCount('READ n\nIF n > 0 THEN\n WRITE n\nELSE\n WRITE 0\nENDIF', [3], 'lecture', 'n', { branchSelections: { 2: 0 } });
 ok('confirmed worst-case paths are recorded as session assumptions', branchChosen.assumptions.length === 1 && branchChosen.confidence === 'assumption-based');
+const nodeCount = analyseCount('head <- NEW NODE(1)\nWRITE head.value', []);
+ok('symbolic counting reports node expressions as explicitly unsupported', nodeCount.symbolicTotal === null && nodeCount.confidence === 'unsupported' && nodeCount.diagnostics.some((item) => item.code === 'W_SYMBOLIC_NODE_EXPRESSION'));
 
 const rationalHalf = Counting.Rational.create(2, 4);
 ok('rational values reduce exactly', rationalHalf.numerator === 1 && rationalHalf.denominator === 2);
@@ -437,11 +493,11 @@ ok('array timelines retain stable slot identities', ALGORITHMS.bubble.run([3, 1,
 const appSource = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
 ok('visual input uses one 18-value limit', appSource.includes('const MAX_VISUAL_VALUES = 18') && /parsed\.length > MAX_VISUAL_VALUES/.test(appSource));
 
-const workspaceEngine = load(['playback.js', 'algorithms.js', 'activity-catalog.js', 'visualizer-registry.js'], { setTimeout, clearTimeout });
+const workspaceEngine = load(['interpreter.js', 'playback.js', 'complexity.js', 'algorithms.js', 'activity-catalog.js', 'visualizer-registry.js'], { setTimeout, clearTimeout });
 const Activities = workspaceEngine.get('ITCC47Activities');
 const Registry = workspaceEngine.get('ITCC47VisualizerRegistry');
 ok('activity catalog is versioned', Activities.SCHEMA_VERSION === 1 && /^\d{4}\.\d{2}$/.test(Activities.CONTENT_VERSION));
-['bubble-sort', 'selection-sort', 'insertion-sort', 'linear-search', 'binary-search', 'array-list-insert', 'array-list-remove']
+['bubble-sort', 'selection-sort', 'insertion-sort', 'linear-search', 'binary-search', 'array-list-insert', 'array-list-remove', 'linked-list-traversal', 'linked-list-insert-head']
   .forEach((id) => ok(`activity catalog contains ${id}`, Activities.list().some((activity) => activity.id === id)));
 const insertResultA = Activities.get('array-list-insert').run({ values: [18, 7, 31, 12], index: 2, value: 24 });
 const insertResultB = Activities.get('array-list-insert').run({ values: [18, 7, 31, 12], index: 2, value: 24 });
@@ -450,6 +506,13 @@ ok('array-list insertion shifts before storing', insertResultA.events.map((event
 const removeResult = Activities.get('array-list-remove').run({ values: [18, 7, 31, 12], index: 1 });
 ok('array-list removal closes the gap', removeResult.events.map((event) => event.type).join(',') === 'remove,move,move,complete' && removeResult.events.at(-1).frame.array.join(',') === '18,31,12');
 ok('visualizer capabilities include all synchronized evidence', insertResultA.capabilities.visualize && insertResultA.capabilities.trace && insertResultA.capabilities.operations);
+const linkedTraversalA = Activities.get('linked-list-traversal').run();
+const linkedTraversalB = Activities.get('linked-list-traversal').run();
+ok('linked-list traversal timeline is deterministic', JSON.stringify(linkedTraversalA) === JSON.stringify(linkedTraversalB));
+ok('linked-list traversal follows every node to NULL', linkedTraversalA.outcome === 'complete' && linkedTraversalA.events.at(-1).frame.nodes.map((node) => node.value).join(',') === '18,7,31' && linkedTraversalA.events.at(-1).metrics.nodeVisits === 3);
+const linkedInsert = Activities.get('linked-list-insert-head').run();
+ok('head insertion preserves the old chain after the new node', linkedInsert.events.at(-1).frame.nodes.map((node) => node.value).join(',') === '24,18,7' && linkedInsert.events.at(-1).metrics.pointerWrites === 2);
+ok('linked-list events use immutable V2 frames', Object.isFrozen(linkedInsert.events[0]) && Object.isFrozen(linkedInsert.events[0].frame) && linkedInsert.events.every((event, index) => event.id === `linked-list-insert-head:${index}`));
 const goldenTimelines = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests', 'golden-timelines.json'), 'utf8'));
 Object.entries(goldenTimelines).forEach(([id, golden]) => {
   const options = id === 'array-list-insert' ? { values: [3, 1, 2], index: 1, value: 9 }

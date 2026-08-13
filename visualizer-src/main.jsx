@@ -69,6 +69,34 @@ const ArrayRenderer = memo(function ArrayRenderer({ frame }) {
 
 ITCC47VisualizerRegistry.registerRenderer('array', ArrayRenderer);
 
+const LinkedListRenderer = memo(function LinkedListRenderer({ frame }) {
+  const nodes = frame?.nodes || [];
+  const pointersByNode = Object.entries(frame?.pointers || {}).reduce((grouped, [name, id]) => {
+    const key = id || 'NULL';
+    grouped[key] = [...(grouped[key] || []), name];
+    return grouped;
+  }, {});
+  return <div className="linked-canvas" aria-label="Singly linked list visualization">
+    <div className="linked-chain">
+      {nodes.map((node, index) => <React.Fragment key={node.id}>
+        <div className="linked-node-wrap">
+          <div className="pointer-labels">{(pointersByNode[node.id] || []).map((name) => <span key={name}>{name}</span>)}</div>
+          <div className="linked-node" aria-label={`${node.id}, value ${node.value}`}>
+            <strong>{node.value}</strong><span className={frame.highlightedEdges?.some((edge) => edge.from === node.id) ? 'is-highlighted' : ''}>●</span>
+          </div>
+          <small>{node.id}</small>
+        </div>
+        {index < nodes.length - 1 && node.next === nodes[index + 1].id
+          ? <div className={`linked-arrow ${frame.highlightedEdges?.some((edge) => edge.from === node.id && edge.to === nodes[index + 1].id) ? 'is-highlighted' : ''}`} aria-hidden="true">→</div>
+          : index < nodes.length - 1 ? <div className="linked-chain-gap" aria-hidden="true"/> : null}
+      </React.Fragment>)}
+      <div className="linked-null"><span>NULL</span>{(pointersByNode.NULL || []).map((name) => <small key={name}>{name}</small>)}</div>
+    </div>
+  </div>;
+});
+
+ITCC47VisualizerRegistry.registerRenderer('linked-list', LinkedListRenderer);
+
 function SourcePanel({ activity, event }) {
   const activeLine = event?.source?.line || (event?.type === 'complete' ? activity.source.length : Math.min(2, activity.source.length));
   return <section className="source-panel" aria-label="Pseudocode">
@@ -95,6 +123,10 @@ function TraceView({ events, currentIndex, onSelect }) {
 }
 
 function VariablesView({ frame, inputs }) {
+  if (frame?.kind === 'linked-list') return <dl className="variable-list">
+    {Object.entries(frame.pointers || {}).map(([name, id]) => <div key={name}><dt>{name}</dt><dd><code>{id ? `&${id}` : 'NULL'}</code></dd></div>)}
+    <div><dt>Heap nodes</dt><dd>{frame.nodes?.length || 0}</dd></div>
+  </dl>;
   return <dl className="variable-list">
     <div><dt>Values</dt><dd><code>[{(frame?.array || []).map((value) => value == null ? '—' : value).join(', ')}]</code></dd></div>
     {inputs.target != null ? <div><dt>target</dt><dd>{inputs.target}</dd></div> : null}
@@ -173,6 +205,7 @@ function DataControls({ activity, inputs, setInputs, onShuffle }) {
     if (parts.length < activity.input.min) return setError(`Use at least ${activity.input.min} values for this activity.`);
     setError(''); setInputs((current) => ({ ...current, values: parts.map(Number) }));
   }
+  if (activity.input.editable === false) return <div className="data-controls curated-note"><strong>Curated pseudocode activity</strong><span>Open it in Pseudocode Lab to edit or experiment with compatible node programs.</span></div>;
   return <details className="data-controls" open>
     <summary>Data and inputs</summary>
     <div className="data-grid">

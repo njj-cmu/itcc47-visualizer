@@ -354,6 +354,18 @@ CALL LowerBound(values, target, 0, LENGTH(values)) INTO answer
 GLOBAL comparisons</pre>
       <p>Scalars are passed by value and arrays by reference. Assigned names are local unless declared <code>GLOBAL</code>.</p>
     </section>
+
+    <section class="grammar-card">
+      <h3>Singly linked nodes</h3>
+      <pre>head &lt;- NEW NODE(18)
+head.next &lt;- NEW NODE(7)
+current &lt;- head
+WHILE current &lt;&gt; NULL DO
+    WRITE current.value
+    current &lt;- current.next
+ENDWHILE</pre>
+      <p>Nodes expose <code>value</code> and <code>next</code>. References compare by identity; check against <code>NULL</code> before reading a field.</p>
+    </section>
   </div>
 
   <div class="grammar-notes">
@@ -372,6 +384,8 @@ GLOBAL comparisons</pre>
 <script src="interpreter.js"></script>
 <script src="playback.js"></script>
 <script src="complexity.js"></script>
+<script src="algorithms.js"></script>
+<script src="activity-catalog.js"></script>
 <script src="symbolic-counting.js"></script>
 <script src="recurrence.js"></script>
 <script src="presets.js"></script>

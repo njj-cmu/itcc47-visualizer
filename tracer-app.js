@@ -737,6 +737,15 @@ document.querySelectorAll('dialog.dlg').forEach((dlg) => {
 
 buildPresetList();
 
+// A curated visualizer activity can open directly in the lab without copying code.
+const activityHandoff = (() => {
+  const activityId = new URLSearchParams(window.location.search).get('activity');
+  if (!activityId || typeof ITCC47Activities === 'undefined') return null;
+  const activity = ITCC47Activities.get(activityId);
+  if (!activity || !Array.isArray(activity.source)) return null;
+  return activity;
+})();
+
 // A skeleton handed over from the Algorithm Writer takes priority over the default preset.
 const handoff = (() => {
   try {
@@ -746,7 +755,11 @@ const handoff = (() => {
   } catch (e) { return null; }
 })();
 
-if (handoff) {
+if (activityHandoff) {
+  tels.codeBox.value = activityHandoff.source.join('\n');
+  tels.inputsBox.value = '';
+  tels.statusLine.textContent = `${activityHandoff.title} loaded from the Visualizer — edit it or Run to inspect its trace, operations, and output.`;
+} else if (handoff) {
   tels.codeBox.value = handoff;
   tels.inputsBox.value = '';
   tels.statusLine.textContent = 'Skeleton loaded from the Algorithm Writer — fill in the conditions, then Run.';

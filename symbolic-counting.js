@@ -584,6 +584,14 @@
       for (const stmt of blockToWalk) {
         const executions = aggregateExecutions(enclosingLoops);
         if (['Read', 'Write', 'Assign', 'Return'].includes(stmt.type)) {
+          const hasNodeSyntax = (node) => !!node && (['Field', 'NewNode', 'Null'].includes(node.type) ||
+            ['left', 'right', 'expr', 'target', 'index', 'argument', 'value'].some((key) => hasNodeSyntax(node[key])) ||
+            (node.items || []).some(hasNodeSyntax));
+          if ((stmt.target && stmt.target.fields && stmt.target.fields.length) || hasNodeSyntax(stmt.expr)) {
+            diagnostic('W_SYMBOLIC_NODE_EXPRESSION', stmt.line,
+              'Primitive counting for node allocation and fields is not defined in this course model.',
+              'Use Actual trace metrics for node visits and pointer writes; symbolic algebra remains unchanged.');
+          }
           addRow(stmt, statementUnitCost(stmt), executions, enclosingLoops);
           if (stmt.type === 'Read' && stmt.target.index === null) localConstants.delete(stmt.target.name);
           if (stmt.type === 'Assign' && stmt.target.index === null && enclosingLoops.length === 0) {

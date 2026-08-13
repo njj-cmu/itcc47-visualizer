@@ -5,10 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ITCC47 Visualizer Workspace</title>
 <link rel="icon" href="data:,">
+<link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="visualizer-workspace.css">
 </head>
-<body>
+<body class="visualizer-page">
+<header class="topbar">
+  <div class="topbar-title">
+    <span class="topbar-code">ITCC47</span> Visualizer
+  </div>
+  <nav class="topbar-nav">
+    <a href="index.html" data-icon="start">Start</a>
+    <a href="visualizer.html" data-icon="visualize">Visualize</a>
+    <a href="writer.html" data-icon="writer">Algorithm Writer</a>
+    <a href="tracer.html" data-icon="tracer">Pseudocode Tracer</a>
+    <a href="problems.html" data-icon="problems">Modules</a>
+  </nav>
+</header>
 <div id="visualizer-root"><p style="padding:24px;color:#ececee;background:#17171a">Loading visualizer workspace…</p></div>
+<script src="nav.js"></script>
 <script src="playback.js"></script>
 <script src="algorithms.js"></script>
 <script src="interpreter.js"></script>

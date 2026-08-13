@@ -489,6 +489,8 @@ const alreadySortedEvents = ALGORITHMS.binary.run([-3, -3, 0, 8], -3);
 ok('binary search recognizes sorted input with duplicates', alreadySortedEvents[0].message.includes('already sorted') && alreadySortedEvents[0].frame.array.join(',') === '-3,-3,0,8');
 ok('insertion sort declares moves instead of swaps', ALGORITHMS.insertion.metrics.some((m) => m.key === 'moves') && !ALGORITHMS.insertion.metrics.some((m) => m.key === 'swaps'));
 ok('insertion move events use the declared move metric', ALGORITHMS.insertion.run([3, -1, 2]).some((event) => event.metrics.moves > 0 && event.frame.highlight.move));
+const insertionShift = ALGORITHMS.insertion.run([3, -1, 2]).find((event) => event.type === 'move');
+ok('insertion shift events preserve held and displaced values for presentation', insertionShift.frame.highlight.transition.value === 3 && insertionShift.frame.highlight.held.value === -1 && insertionShift.frame.highlight.transition.displacedValue === -1);
 ok('array timelines retain stable slot identities', ALGORITHMS.bubble.run([3, 1, 2]).every((event) => event.frame.items.every((item, index) => item.id === `slot:${index}`)));
 const appSource = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
 ok('visual input uses one 18-value limit', appSource.includes('const MAX_VISUAL_VALUES = 18') && /parsed\.length > MAX_VISUAL_VALUES/.test(appSource));
@@ -503,6 +505,7 @@ const insertResultA = Activities.get('array-list-insert').run({ values: [18, 7, 
 const insertResultB = Activities.get('array-list-insert').run({ values: [18, 7, 31, 12], index: 2, value: 24 });
 ok('array-list insertion timeline is deterministic', JSON.stringify(insertResultA) === JSON.stringify(insertResultB));
 ok('array-list insertion shifts before storing', insertResultA.events.map((event) => event.type).join(',') === 'state,move,move,insert' && insertResultA.events.at(-1).frame.array.join(',') === '18,7,24,31,12');
+ok('array-list insertion move preserves its held value', insertResultA.events.find((event) => event.type === 'move').frame.highlight.held.value === 24);
 const removeResult = Activities.get('array-list-remove').run({ values: [18, 7, 31, 12], index: 1 });
 ok('array-list removal closes the gap', removeResult.events.map((event) => event.type).join(',') === 'remove,move,move,complete' && removeResult.events.at(-1).frame.array.join(',') === '18,31,12');
 ok('visualizer capabilities include all synchronized evidence', insertResultA.capabilities.visualize && insertResultA.capabilities.trace && insertResultA.capabilities.operations);

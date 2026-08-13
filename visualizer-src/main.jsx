@@ -41,27 +41,36 @@ function classifyIndex(index, highlight = {}) {
   return 'default';
 }
 
-const ArrayRenderer = memo(function ArrayRenderer({ frame }) {
+const ArrayRenderer = memo(function ArrayRenderer({ frame, event }) {
   const values = frame?.array || [];
   const action = frame?.highlight?.swap || frame?.highlight?.move || null;
+  const transition = frame?.highlight?.transition || null;
+  const held = frame?.highlight?.held || null;
   const actionStart = action ? ((Math.min(...action) + 0.5) / values.length) * 100 : 0;
   const actionEnd = action ? ((Math.max(...action) + 0.5) / values.length) * 100 : 0;
   return <div className="array-canvas" aria-label="Array visualization">
-    <div className="array-stage">
+    <div className="array-stage" style={{ '--array-count': values.length }}>
     <div className="array-cells" style={{ '--array-count': values.length }}>
       {values.map((value, index) => {
         const state = classifyIndex(index, frame.highlight);
         const marker = frame?.markers?.index === index;
+        const isTransitionSource = transition?.from === index || held?.hole === index;
+        const isTransitionDestination = transition?.to === index;
+        const displayValue = isTransitionSource ? null : value;
         return <div className={`array-item ${marker ? 'has-marker' : ''}`} key={frame.items?.[index]?.id || index}>
           {marker ? <span className="array-marker">index</span> : null}
-          <div className={`array-cell bar-${state} ${value == null ? 'is-empty' : ''}`}
-            aria-label={`Index ${index}, value ${value == null ? 'empty' : value}, ${state}`}>
-            <span className="array-value">{value == null ? '—' : value}</span>
+          <div className={`array-cell bar-${state} ${displayValue == null ? 'is-empty' : ''} ${isTransitionDestination ? 'is-receiving' : ''}`}
+            aria-label={`Index ${index}, ${displayValue == null ? 'temporarily empty' : `value ${displayValue}`}, ${state}`}>
+            <span className="array-value">{displayValue == null ? '—' : displayValue}</span>
           </div>
           <span className="array-index" aria-hidden="true">{index}</span>
         </div>;
       })}
     </div>
+    {held ? <div className="array-held-value" style={{ '--held-column': held.from + 1 }} aria-label={`Held insertion value ${held.value}`}><span>held</span><strong>{held.value}</strong></div> : null}
+    {transition ? <>
+      <div className="array-moving-value" key={event?.id || `${transition.from}:${transition.to}`} style={{ '--move-from': transition.from, '--move-distance': transition.to - transition.from }} aria-hidden="true"><span>{transition.value}</span></div>
+    </> : null}
     {action ? <div className={`array-connector ${frame?.highlight?.swap ? 'is-swap' : 'is-move'}`} aria-hidden="true">
       <svg viewBox="0 0 100 24" preserveAspectRatio="none"><path d={`M ${actionStart} 3 C ${actionStart} 22, ${actionEnd} 22, ${actionEnd} 3`} /><path d={`M ${actionEnd - 1.4} 5 L ${actionEnd} 2 L ${actionEnd + 1.4} 5`} /></svg>
       <span style={{ left: `${(actionStart + actionEnd) / 2}%` }}>{frame?.highlight?.swap ? 'swap' : 'move'}</span>

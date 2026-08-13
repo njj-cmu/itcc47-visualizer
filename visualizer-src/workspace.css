@@ -259,7 +259,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .source-panel { margin-bottom: 12px; }
 .visual-canvas { height: clamp(230px, calc(100vh - 610px), 390px); min-height: 230px; }
 .array-canvas { min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 28px 30px 20px; }
-.array-stage { position: relative; width: min(100%, 980px); margin: auto; padding: 25px 0 66px; }
+.array-stage { position: relative; width: min(100%, 980px); margin: auto; padding: 36px 0 82px; }
 .array-cells { display: grid; grid-template-columns: repeat(var(--array-count), minmax(44px, 1fr)); gap: clamp(5px, 0.8vw, 11px); }
 .array-item { position: relative; min-width: 0; text-align: center; }
 .array-cell { aspect-ratio: 1; min-height: 44px; display: grid; place-items: center; border: 1px solid #66718a; border-radius: 9px; color: #f4f6fb; background: linear-gradient(145deg, #33405a, #29344b); box-shadow: inset 0 1px rgba(255,255,255,.05); font: 750 clamp(.78rem, 1.2vw, 1rem) ui-monospace, monospace; transition: transform 160ms ease, border-color 160ms ease, background 160ms ease; }
@@ -269,10 +269,17 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .array-cell.bar-sorted, .array-cell.bar-found { border-color: #73d56e; background: linear-gradient(145deg, #2d8541, #215f32); }
 .array-cell.bar-eliminated { border-color: #454751; color: #767985; background: #292a30; box-shadow: none; }
 .array-cell.is-empty { border-style: dashed; color: #8f929d; background: #25262c; }
+.array-cell.is-receiving { color: transparent; }
 .array-index { display: block; margin-top: 8px; color: #898c97; font: .67rem ui-monospace, monospace; }
 .array-index::before { content: '['; }.array-index::after { content: ']'; }
 .array-marker { position: absolute; right: 0; bottom: calc(100% + 7px); left: 0; color: #f6c45e; font: 650 .58rem ui-monospace, monospace; text-transform: uppercase; }
-.array-connector { position: absolute; right: 0; bottom: 12px; left: 0; height: 43px; color: var(--vw-amber); }
+.array-held-value { position: absolute; top: 0; left: calc((var(--held-column) - .5) * (100% / var(--array-count))); z-index: 3; display: flex; align-items: center; gap: 5px; transform: translate(-50%, -50%); padding: 4px 8px; border: 1px solid #6fa8ff; border-radius: 7px; color: #dbeafe; background: #183966; box-shadow: 0 5px 16px rgba(35, 95, 180, .28); font: .65rem ui-monospace, monospace; }
+.array-held-value span { color: #9dc3ff; text-transform: uppercase; }
+.array-held-value strong { font-size: .78rem; }
+.array-moving-value { position: absolute; top: 36px; left: 0; z-index: 4; width: calc((100% - (var(--array-count) - 1) * clamp(5px, .8vw, 11px)) / var(--array-count)); aspect-ratio: 1; transform: translateX(calc(var(--move-from) * (100% + clamp(5px, .8vw, 11px)))); animation: array-shift 520ms cubic-bezier(.22, .75, .28, 1) both; pointer-events: none; }
+.array-moving-value span { width: 100%; height: 100%; display: grid; place-items: center; border: 1px solid #ffd069; border-radius: 9px; color: #fff8e6; background: linear-gradient(145deg, #c4800f, #8c590a); box-shadow: 0 10px 24px rgba(245, 181, 46, .35); font: 750 clamp(.78rem, 1.2vw, 1rem) ui-monospace, monospace; }
+@keyframes array-shift { from { transform: translateX(calc(var(--move-from) * (100% + clamp(5px, .8vw, 11px)))); } to { transform: translateX(calc((var(--move-from) + var(--move-distance)) * (100% + clamp(5px, .8vw, 11px)))); } }
+.array-connector { position: absolute; right: 0; bottom: -8px; left: 0; height: 43px; color: var(--vw-amber); }
 .array-connector svg { width: 100%; height: 100%; overflow: visible; }
 .array-connector path { fill: none; stroke: currentColor; stroke-width: .45; vector-effect: non-scaling-stroke; }
 .array-connector span { position: absolute; bottom: -1px; transform: translateX(-50%); padding: 2px 6px; border-radius: 999px; color: #f8d78e; background: #3b2c12; font: 650 .58rem ui-monospace, monospace; text-transform: uppercase; }
@@ -298,4 +305,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .activity-heading p span { padding-left: 0; border-left: 0; }
   .visual-canvas { height: 310px; min-height: 310px; }
   .array-legend { justify-content: flex-start; flex-wrap: wrap; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .array-moving-value { animation: none; transform: translateX(calc((var(--move-from) + var(--move-distance)) * (100% + clamp(5px, .8vw, 11px)))); }
 }

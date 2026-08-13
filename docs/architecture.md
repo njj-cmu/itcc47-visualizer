@@ -23,11 +23,24 @@ They have no DOM, storage, network, authentication, or framework dependency.
 `ITCC47Playback.timelineEvent(spec)` creates an immutable event with stable
 identity, domain, semantic type, student-facing message, immutable render frame,
 named metrics, and optional source, segment, boundary, and terminal information.
+Structural events may also carry an immutable `transition` with a semantic kind,
+stable entity moves, enter/exit identities, and a wait flag. Existing event
+fields and ordering remain authoritative for older consumers.
+
+Array frames retain their compatibility `array`, `items`, and highlight fields
+and may add a renderer-oriented `presentation`: immutable logical entities are
+separate from slot IDs, with explicit holes and an optional held entity. Linked
+frames use heap node IDs, pointer names, and deterministic edge IDs. Renderers
+can therefore animate identity without inferring it from duplicate values or
+from local call frames.
 
 `ITCC47Playback.createController(options)` owns deterministic playback state:
 `idle`, `paused`, `playing`, or `complete`, plus the current index, total event
 count, and speed. Its public operations are `load`, `play`, `pause`, `toggle`,
 `step`, `seek`, `finishSegment`, `setSpeed`, and `dispose`.
+Snapshots also expose transition state, token, direction, and navigation source.
+`completeTransition(token)` is idempotent; `seek` and `load` cancel active
+transitions, while structural Step/Play waits for the renderer boundary.
 
 Timelines are precomputed and cached. This keeps backward scrubbing instant and
 makes classroom behavior reproducible. Streaming should be considered only if
@@ -83,6 +96,13 @@ engines. Algorithm generation, parsing, evaluation, and playback remain outside
 components. Once the contract works for that feature, other shells can migrate
 without rewriting course behavior. Authentication belongs only in the hosted
 portal, not in the static practice build.
+
+The visualizer React bundle uses Motion through a static `LazyMotion`/`domMax`
+boundary and still publishes one `visualizer-app.js` plus one stylesheet for
+offline and `file://` use. Full motion follows playback speed; reduced motion
+uses instant relocation with brief emphasis; Off is immediate. The saved
+On/Reduced/Off override is optional, so the default continues to follow the
+operating-system preference.
 
 ## Functions, calls, and recurrences
 

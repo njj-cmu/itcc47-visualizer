@@ -216,15 +216,23 @@ const playbackEngine = load(['playback.js'], {
 const Playback = playbackEngine.get('ITCC47Playback');
 const timeline = [0, 1, 2, 3].map((i) => Playback.timelineEvent({
   id: `test:${i}`, domain: 'test', type: i === 3 ? 'complete' : 'state', message: String(i),
-  frame: { value: i }, metrics: {}, boundary: i === 2, terminal: i === 3,
+  frame: { kind: 'test', value: i, nested: { values: [i] } }, metrics: { visits: i }, boundary: i === 2, terminal: i === 3,
 }));
+ok('timeline events use the version 2 schema', timeline.every((event) => event.schemaVersion === 2));
+ok('timeline frames are deeply immutable', Object.isFrozen(timeline[0].frame) && Object.isFrozen(timeline[0].frame.nested) && Object.isFrozen(timeline[0].frame.nested.values));
 const seen = [];
 const controller = Playback.createController({ onChange: (s) => seen.push(`${s.status}:${s.index}`) });
+let subscriptionCalls = 0;
+const unsubscribe = controller.subscribe(() => { subscriptionCalls += 1; });
 controller.load(timeline);
 ok('playback loads at the first event', controller.getState().index === 0 && controller.getState().status === 'paused');
+ok('playback snapshots are stable between changes', controller.getSnapshot() === controller.getSnapshot());
 controller.step();
 ok('playback steps forward', controller.getState().index === 1);
+unsubscribe();
+const callsAfterUnsubscribe = subscriptionCalls;
 controller.seek(0);
+ok('playback subscriptions can be removed', subscriptionCalls === callsAfterUnsubscribe);
 ok('playback seeks backward', controller.getState().index === 0);
 controller.finishSegment();
 ok('playback finishes at the next boundary', controller.getState().index === 2);
@@ -239,6 +247,10 @@ ok('terminal seek marks playback complete', controller.getState().status === 'co
 controller.dispose();
 ok('disposed playback has no events', controller.getState().total === 0);
 
+const compatibleResult = Playback.runResult({ events: timeline, result: { value: 3 } });
+ok('run results expose events and legacy steps together', compatibleResult.schemaVersion === 2 && compatibleResult.events === compatibleResult.steps);
+ok('run result capabilities are detected from events', compatibleResult.capabilities.visualize && compatibleResult.capabilities.trace && compatibleResult.capabilities.operations);
+
 const algorithmEngine = load(['playback.js', 'algorithms.js'], { setTimeout, clearTimeout });
 const ALGORITHMS = algorithmEngine.get('ALGORITHMS');
 const binaryEvents = ALGORITHMS.binary.run([4, -2, 9, 1], 9);
@@ -250,8 +262,42 @@ const alreadySortedEvents = ALGORITHMS.binary.run([-3, -3, 0, 8], -3);
 ok('binary search recognizes sorted input with duplicates', alreadySortedEvents[0].message.includes('already sorted') && alreadySortedEvents[0].frame.array.join(',') === '-3,-3,0,8');
 ok('insertion sort declares moves instead of swaps', ALGORITHMS.insertion.metrics.some((m) => m.key === 'moves') && !ALGORITHMS.insertion.metrics.some((m) => m.key === 'swaps'));
 ok('insertion move events use the declared move metric', ALGORITHMS.insertion.run([3, -1, 2]).some((event) => event.metrics.moves > 0 && event.frame.highlight.move));
+ok('array timelines retain stable slot identities', ALGORITHMS.bubble.run([3, 1, 2]).every((event) => event.frame.items.every((item, index) => item.id === `slot:${index}`)));
 const appSource = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
 ok('visual input uses one 18-value limit', appSource.includes('const MAX_VISUAL_VALUES = 18') && /parsed\.length > MAX_VISUAL_VALUES/.test(appSource));
+
+const workspaceEngine = load(['playback.js', 'algorithms.js', 'activity-catalog.js', 'visualizer-registry.js'], { setTimeout, clearTimeout });
+const Activities = workspaceEngine.get('ITCC47Activities');
+const Registry = workspaceEngine.get('ITCC47VisualizerRegistry');
+ok('activity catalog is versioned', Activities.SCHEMA_VERSION === 1 && /^\d{4}\.\d{2}$/.test(Activities.CONTENT_VERSION));
+['bubble-sort', 'selection-sort', 'insertion-sort', 'linear-search', 'binary-search', 'array-list-insert', 'array-list-remove']
+  .forEach((id) => ok(`activity catalog contains ${id}`, Activities.list().some((activity) => activity.id === id)));
+const insertResultA = Activities.get('array-list-insert').run({ values: [18, 7, 31, 12], index: 2, value: 24 });
+const insertResultB = Activities.get('array-list-insert').run({ values: [18, 7, 31, 12], index: 2, value: 24 });
+ok('array-list insertion timeline is deterministic', JSON.stringify(insertResultA) === JSON.stringify(insertResultB));
+ok('array-list insertion shifts before storing', insertResultA.events.map((event) => event.type).join(',') === 'state,move,move,insert' && insertResultA.events.at(-1).frame.array.join(',') === '18,7,24,31,12');
+const removeResult = Activities.get('array-list-remove').run({ values: [18, 7, 31, 12], index: 1 });
+ok('array-list removal closes the gap', removeResult.events.map((event) => event.type).join(',') === 'remove,move,move,complete' && removeResult.events.at(-1).frame.array.join(',') === '18,31,12');
+ok('visualizer capabilities include all synchronized evidence', insertResultA.capabilities.visualize && insertResultA.capabilities.trace && insertResultA.capabilities.operations);
+const goldenTimelines = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests', 'golden-timelines.json'), 'utf8'));
+Object.entries(goldenTimelines).forEach(([id, golden]) => {
+  const options = id === 'array-list-insert' ? { values: [3, 1, 2], index: 1, value: 9 }
+    : id === 'array-list-remove' ? { values: [3, 1, 2], index: 1 }
+      : { values: [3, 1, 2], target: 2 };
+  const result = Activities.get(id).run(options);
+  const signature = {
+    types: result.events.map((event) => event.type),
+    final: result.events.at(-1).frame.array,
+    metrics: result.events.at(-1).metrics,
+  };
+  ok(`${id} matches its golden timeline`, JSON.stringify(signature) === JSON.stringify(golden));
+});
+const extensionActivity = { id: 'test-extension', input: {}, run() { return Playback.runResult(); } };
+ok('activity catalog accepts later adapters', Activities.register(extensionActivity) && Activities.list().some((activity) => activity.id === extensionActivity.id));
+Registry.registerRenderer('test', function TestRenderer() {});
+Registry.registerEvidenceView('test-trace', function TestEvidence() {});
+ok('visualizer registries report renderers and evidence views', Registry.rendererDomains().includes('test') && Registry.evidenceIds().includes('test-trace'));
+ok('algorithm metrics remain separate from primitive-operation analysis', !fs.readFileSync(path.join(ROOT, 'visualizer-src', 'main.jsx'), 'utf8').includes('primitiveTotal +'));
 
 // ---------- shipped content ----------
 

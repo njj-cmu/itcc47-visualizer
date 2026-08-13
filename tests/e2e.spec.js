@@ -66,6 +66,37 @@ test('custom signed data is rendered and oversized data is rejected inline', asy
   await expect(page.locator('#data-error')).toContainText('at most 18 values');
 });
 
+test('array-list activity synchronizes source, structure, trace, and metrics', async ({ page }, testInfo) => {
+  await page.goto('/visualizer.html?activity=array-list-insert');
+  await expect(page.getByRole('heading', { name: 'Insert at an index' })).toBeVisible();
+  await expect(page.locator('.source-line code').nth(0)).toContainText('index <- 2');
+  await expect(page.locator('.source-line code').nth(1)).toContainText('value <- 24');
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('#step-slider')).toHaveValue('1');
+  await expect(page.locator('.source-line.is-current')).toContainText('values[i + 1] <- values[i]');
+  await expect(page.locator('.bar-move')).toHaveCount(2);
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'More' }).click();
+  await page.getByRole('tab', { name: 'Operations' }).click();
+  const visibleEvidence = page.locator('.evidence-drawer:visible');
+  await expect(visibleEvidence.locator('.metric-summary')).toContainText('Moves');
+  await expect(visibleEvidence.locator('.metric-summary')).toContainText('1');
+  await visibleEvidence.getByRole('button', { name: 'Primitive model' }).click();
+  await expect(visibleEvidence.getByText('These algorithm metrics are never added to it.')).toBeVisible();
+});
+
+test('mobile visualizer tabs replace the central surface without resetting playback', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone');
+  await page.goto('/visualizer.html');
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('#step-slider')).toHaveValue('1');
+  await page.getByRole('tab', { name: 'Code' }).click();
+  await expect(page.locator('.desktop-source')).toBeVisible();
+  await expect(page.locator('.visual-canvas')).toBeHidden();
+  await page.getByRole('tab', { name: 'Trace' }).click();
+  await expect(page.locator('.mobile-evidence')).toBeVisible();
+  await expect(page.locator('#step-slider')).toHaveValue('1');
+});
+
 test('tracer runs and its result tabs work from the keyboard', async ({ page }) => {
   await page.goto('/tracer.html');
   await page.getByRole('button', { name: /run/i }).click();

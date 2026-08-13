@@ -110,10 +110,59 @@ const LinkedListRenderer = memo(function LinkedListRenderer({ frame }) {
 
 ITCC47VisualizerRegistry.registerRenderer('linked-list', LinkedListRenderer);
 
-function SourcePanel({ activity, event }) {
-  const activeLine = event?.source?.line || (event?.type === 'complete' ? activity.source.length : Math.min(2, activity.source.length));
-  return <section className="source-panel" aria-label="Pseudocode">
-    {activity.source.map((line, index) => <div className={`source-line ${activeLine === index + 1 ? 'is-current' : ''}`} key={`${activity.id}:${index}`}>
+const ObjectModelRenderer = memo(function ObjectModelRenderer({ frame }) {
+  const classes = frame?.classes || [];
+  const objects = frame?.objects || [];
+  const references = Object.entries(frame?.references || {}).reduce((grouped, [name, objectId]) => {
+    grouped[objectId] = [...(grouped[objectId] || []), name];
+    return grouped;
+  }, {});
+  return <div className="object-canvas" aria-label="Python classes, objects, and references">
+    <section className="object-class-region" aria-label="Class blueprints">
+      <h2>Class blueprints</h2>
+      <div className="object-class-grid">{classes.map((item) => <article className={`object-class-card status-${item.status || 'ready'}`} key={item.id} aria-label={`${item.name} class${item.bases.length ? `, inherits ${item.bases.join(', ')}` : ''}`}>
+        <header><span>class</span><strong>{item.name}</strong>{item.status === 'abstract' ? <em>abstract</em> : null}</header>
+        {item.bases.length ? <p className="object-bases">inherits {item.bases.map((id) => id.replace('class:', '')).join(', ')}</p> : null}
+        {item.attributes.map((attribute) => <code key={attribute}>{attribute}</code>)}
+        {item.methods.map((method) => <code key={method}>{method}</code>)}
+        {item.abstractMethods.map((method) => <code className="is-abstract" key={method}>required: {method}</code>)}
+      </article>)}</div>
+    </section>
+    <section className="object-instance-region" aria-label="Object instances">
+      <h2>Instances and references</h2>
+      {objects.length ? <div className="object-instance-grid">{objects.map((item) => {
+        const active = frame?.active?.receiverId === item.id || item.status === 'active';
+        return <article className={`object-instance-card status-${item.status || 'ready'} ${active ? 'is-current' : ''}`} key={item.id} aria-label={`${item.id}, ${item.classId.replace('class:', '')} object`}>
+          <div className="object-reference-labels">{(references[item.id] || []).map((name) => <span key={name}>{name} →</span>)}</div>
+          <header><span>{item.id}</span><strong>{item.label}</strong><small>{item.classId.replace('class:', '')}</small></header>
+          <dl>{Object.entries(item.fields).map(([name, value]) => <div key={name}><dt>{name}</dt><dd><code>{JSON.stringify(value)}</code></dd></div>)}</dl>
+        </article>;
+      })}</div> : <p className="object-empty">No instance has been allocated yet. The class blueprint exists on its own.</p>}
+    </section>
+    {frame?.active ? <aside className="object-active-call" aria-label="Current method call"><span>Current call</span><strong>{frame.active.method}</strong><small>lookup: {frame.active.lookupPath.map((id) => id.replace('class:', '')).join(' → ')}</small></aside> : null}
+    {frame?.notice ? <p className="object-notice">{frame.notice}</p> : null}
+  </div>;
+});
+
+BSITVisualizerRegistry.registerRenderer('object-model', ObjectModelRenderer);
+
+function SourcePanel({ activity, event, source }) {
+  const [copyState, setCopyState] = useState('Copy Python');
+  const activeLine = event?.source?.line || (event?.type === 'complete' ? source.length : Math.min(2, source.length));
+  async function copySource() {
+    const text = source.join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (error) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text; textarea.style.position = 'fixed'; textarea.style.opacity = '0'; document.body.appendChild(textarea); textarea.select();
+      document.execCommand('copy'); textarea.remove();
+    }
+    setCopyState('Copied'); window.setTimeout(() => setCopyState('Copy Python'), 1400);
+  }
+  return <section className="source-panel" aria-label={activity.language === 'python' ? 'Python source' : 'Pseudocode'}>
+    {activity.language === 'python' ? <header className="source-language"><strong>Python source</strong><button type="button" onClick={copySource}><Icon name="code" size={16}/>{copyState}</button></header> : null}
+    {source.map((line, index) => <div className={`source-line ${activeLine === index + 1 ? 'is-current' : ''}`} key={`${activity.id}:${index}`}>
       <span>{index + 1}</span><code>{line}</code>
     </div>)}
   </section>;
@@ -148,9 +197,23 @@ function VariablesView({ frame, inputs }) {
   </dl>;
 }
 
+function ObjectStateView({ frame }) {
+  const objects = frame?.objects || [];
+  return <div className="object-state-view">
+    {objects.length ? objects.map((item) => <section key={item.id}><header><strong>{item.id}</strong><span>{item.classId.replace('class:', '')}</span></header><dl>{Object.entries(item.fields).map(([name, value]) => <div key={name}><dt>{name}</dt><dd><code>{JSON.stringify(value)}</code></dd></div>)}</dl></section>) : <p className="model-note">No object state exists at this step.</p>}
+    {Object.keys(frame?.references || {}).length ? <section><header><strong>Name bindings</strong></header><dl>{Object.entries(frame.references).map(([name, id]) => <div key={name}><dt>{name}</dt><dd><code>{id}</code></dd></div>)}</dl></section> : null}
+  </div>;
+}
+
+function CallPathView({ frame }) {
+  const active = frame?.active;
+  if (!active) return <p className="model-note">No method call is active at this step.</p>;
+  return <div className="call-path-view"><span>Receiver</span><strong>{active.receiverId}</strong><span>Resolved method</span><strong>{active.method}</strong><span>Lookup path</span><ol>{active.lookupPath.map((id, index) => <li className={index === active.lookupPath.length - 1 ? 'resolved' : ''} key={id}>{id.replace('class:', '')}</li>)}</ol><span>Call frame</span><dl>{Object.entries(active.callFrame || {}).map(([name, value]) => <div key={name}><dt>{name}</dt><dd><code>{String(value)}</code></dd></div>)}</dl></div>;
+}
+
 function OperationsView({ activity, event }) {
   const [mode, setMode] = useState('metrics');
-  const metricRows = activity.metrics.map((metric) => ({ ...metric, value: event?.metrics?.[metric.key] ?? 0 }));
+  const metricRows = (activity.metrics || []).map((metric) => ({ ...metric, value: event?.metrics?.[metric.key] ?? 0 }));
   return <div className="operations-view">
     <div className="mode-switch" role="group" aria-label="Operation model">
       <button type="button" className={mode === 'metrics' ? 'active' : ''} onClick={() => setMode('metrics')}>Algorithm metrics</button>
@@ -164,7 +227,8 @@ function OperationsView({ activity, event }) {
 }
 
 function OutputView({ event, result }) {
-  return <div className="output-view"><span>Current explanation</span><strong>{event?.message || 'Choose an activity to begin.'}</strong>{result?.removed != null ? <p>Removed value: {result.removed}</p> : null}</div>;
+  const output = event?.frame?.output || [];
+  return <div className="output-view"><span>Current explanation</span><strong>{event?.message || 'Choose an activity to begin.'}</strong>{output.length ? <pre aria-label="Program output">{output.join('\n')}</pre> : null}{result?.removed != null ? <p>Removed value: {result.removed}</p> : null}</div>;
 }
 
 ITCC47VisualizerRegistry.registerEvidenceView('trace', TraceView);
@@ -173,14 +237,17 @@ ITCC47VisualizerRegistry.registerEvidenceView('operations', OperationsView);
 ITCC47VisualizerRegistry.registerEvidenceView('output', OutputView);
 
 function EvidenceDrawer({ tab, setTab, activity, result, event, index, controller, inputs }) {
-  const tabs = ['trace', 'variables', 'operations', 'output'];
+  const tabs = activity.evidenceViews || ['trace', 'variables', 'operations', 'output'];
+  const labels = { trace: 'Trace', variables: 'Variables', operations: 'Operations', output: 'Output', steps: 'Steps', objects: 'Object state', calls: 'Call path' };
   return <aside className="evidence-drawer">
     <div className="evidence-tabs" role="tablist" aria-label="Learning evidence">
-      {tabs.map((id) => <button type="button" role="tab" aria-selected={tab === id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)} key={id}>{id[0].toUpperCase() + id.slice(1)}</button>)}
+      {tabs.map((id) => <button type="button" role="tab" aria-selected={tab === id} className={tab === id ? 'active' : ''} onClick={() => setTab(id)} key={id}>{labels[id] || id}</button>)}
     </div>
     <div className="evidence-content" role="tabpanel">
-      {tab === 'trace' ? <TraceView events={result.events} currentIndex={index} onSelect={controller.seek} /> : null}
+      {tab === 'trace' || tab === 'steps' ? <TraceView events={result.events} currentIndex={index} onSelect={controller.seek} /> : null}
       {tab === 'variables' ? <VariablesView frame={event?.frame} inputs={inputs} /> : null}
+      {tab === 'objects' ? <ObjectStateView frame={event?.frame} /> : null}
+      {tab === 'calls' ? <CallPathView frame={event?.frame} /> : null}
       {tab === 'operations' ? <OperationsView activity={activity} event={event} /> : null}
       {tab === 'output' ? <OutputView event={event} result={result.result} /> : null}
     </div>
@@ -207,7 +274,7 @@ function MobileActivityPicker({ activities, selectedId, onSelect }) {
   </nav>;
 }
 
-function DataControls({ activity, inputs, setInputs, onShuffle }) {
+function ArrayDataControls({ activity, inputs, setInputs, onShuffle }) {
   const [draft, setDraft] = useState(inputs.values.join(', '));
   const [error, setError] = useState('');
   useEffect(() => setDraft(inputs.values.join(', ')), [activity.id, inputs.values]);
@@ -231,8 +298,22 @@ function DataControls({ activity, inputs, setInputs, onShuffle }) {
   </details>;
 }
 
+function OOPDataControls({ activity, inputs, setInputs }) {
+  return <section className="oop-data-controls" aria-label="Scenario inputs">
+    <div><strong>Scenario</strong><span>Edit the values; the guided timeline rebuilds immediately.</span></div>
+    {activity.input.controls.map((control) => <label key={control.key}>{control.label}<input type={control.type} value={inputs[control.key] ?? ''}
+      min={control.min} max={control.max} maxLength={control.maxLength}
+      onChange={(event) => setInputs((current) => ({ ...current, [control.key]: control.type === 'number' ? Number(event.target.value) : event.target.value.slice(0, control.maxLength || 100) }))}/></label>)}
+    <button type="button" onClick={() => setInputs({ ...activity.input.defaults })}><Icon name="previous" size={16}/> Reset</button>
+  </section>;
+}
+
+function DataControls(props) {
+  return props.activity.input.kind === 'object-model' ? <OOPDataControls {...props}/> : <ArrayDataControls {...props}/>;
+}
+
 function PlaybackDock({ state, controller, activity, event }) {
-  const visibleMetrics = activity.metrics.slice(0, 2);
+  const visibleMetrics = (activity.metrics || []).slice(0, 2);
   return <footer className="playback-dock">
     <div className="transport">
       <button type="button" aria-label="Previous" onClick={() => controller.step(-1)} disabled={state.index === 0}><Icon name="previous"/></button>
@@ -254,50 +335,65 @@ function Header() {
 }
 
 function App() {
-  const initialId = new URLSearchParams(location.search).get('activity') || 'bubble-sort';
-  const activity = useMemo(() => ITCC47Activities.get(initialId), [initialId]);
-  const initialInputs = useCallback((nextActivity) => ({
-    values: [...nextActivity.input.defaultValues],
-    target: nextActivity.input.needsTarget ? nextActivity.input.defaultValues[Math.floor(nextActivity.input.defaultValues.length / 2)] : null,
-    index: nextActivity.input.index ?? null, value: nextActivity.input.value ?? null,
-  }), []);
+  const params = useMemo(() => new URLSearchParams(location.search), []);
+  const requestedCourse = params.get('course') || 'itcc47';
+  const courseId = BSITLearningLab.resolveCourse(requestedCourse);
+  const requestedId = params.get('activity') || (courseId === 'itcc45' ? 'itcc45-classes-blueprint' : 'bubble-sort');
+  const activity = useMemo(() => BSITLearningLab.getActivity(courseId, requestedId), [courseId, requestedId]);
+  const initialInputs = useCallback((nextActivity) => {
+    if (nextActivity.input.defaults) return { ...nextActivity.input.defaults };
+    return {
+      values: [...nextActivity.input.defaultValues],
+      target: nextActivity.input.needsTarget ? nextActivity.input.defaultValues[Math.floor(nextActivity.input.defaultValues.length / 2)] : null,
+      index: nextActivity.input.index ?? null, value: nextActivity.input.value ?? null,
+    };
+  }, []);
   const [inputs, setInputs] = useState(() => initialInputs(activity));
-  const [evidenceTab, setEvidenceTab] = useState('trace');
+  const primaryEvidence = activity.evidenceViews?.[0] || 'trace';
+  const [evidenceTab, setEvidenceTab] = useState(primaryEvidence);
   const [mobileTab, setMobileTab] = useState('visualize');
-  const controller = useMemo(() => ITCC47Playback.createController({ speed: DEFAULT_SPEED, delayForSpeed: (speed) => 1250 - speed * 110 }), []);
+  const controller = useMemo(() => BSITPlayback.createController({ speed: DEFAULT_SPEED, delayForSpeed: (speed) => 1250 - speed * 110 }), []);
   const playback = usePlayback(controller);
   const result = useMemo(() => activity.run(inputs), [activity, inputs]);
+  const source = useMemo(() => activity.sourceFor ? activity.sourceFor(inputs) : activity.source, [activity, inputs]);
   const event = result.events[playback.index] || result.events[0] || null;
-  const [Renderer, setRenderer] = useState(() => ArrayRenderer);
+  const [Renderer, setRenderer] = useState(() => activity.renderer === 'object-model' ? ObjectModelRenderer : ArrayRenderer);
 
   useEffect(() => { controller.load(result.events); }, [controller, result]);
   useEffect(() => () => controller.dispose(), [controller]);
   useEffect(() => {
+    document.body.dataset.course = courseId;
+    if (courseId === 'itcc45' || (params.get('activity') && params.get('activity') !== activity.id)) {
+      const url = new URL(location.href); url.searchParams.set('course', courseId); url.searchParams.set('activity', activity.id); history.replaceState({}, '', url);
+    }
+  }, [activity.id, courseId, params]);
+  useEffect(() => {
     let active = true;
-    ITCC47VisualizerRegistry.resolveRenderer(activity.renderer).then((resolved) => { if (active && resolved) setRenderer(() => resolved); });
+    BSITVisualizerRegistry.resolveRenderer(activity.renderer).then((resolved) => { if (active && resolved) setRenderer(() => resolved); });
     return () => { active = false; };
   }, [activity.renderer]);
 
   function shuffle() {
+    if (!Array.isArray(inputs.values)) return;
     const values = Array.from({ length: inputs.values.length }, () => Math.floor(Math.random() * 95) + 5);
     setInputs((current) => ({ ...current, values, target: activity.input.needsTarget ? values[Math.floor(values.length / 2)] : current.target }));
   }
 
-  const mobileTabs = [
-    ['visualize', 'grid', 'Visualize'], ['code', 'code', 'Code'], ['trace', 'list', 'Trace'], ['more', 'more', 'More'],
-  ];
-  return <div className="visualizer-workspace">
+  const mobileTabs = [['visualize', 'grid', 'Visualize'], ['code', 'code', 'Code'], ['trace', 'list', courseId === 'itcc45' ? 'Steps' : 'Trace'], ['more', 'more', 'More']];
+  const backHref = courseId === 'itcc45' ? 'itcc45-topics.html' : 'problems.html?view=visualizations';
+  const backLabel = courseId === 'itcc45' ? 'All topics' : 'All visualizations';
+  return <div className={`visualizer-workspace course-${courseId}`}>
     <main className="workspace-main">
-      <div className="activity-heading"><div><p><a href="problems.html?view=visualizations"><Icon name="back" size={14}/> All visualizations</a><span>Module {activity.module} / {activity.topic}</span></p><h1>{activity.title}</h1><span>{activity.subtitle}</span></div><a className="edit-code" href={`tracer.html?activity=${encodeURIComponent(activity.id)}`}><Icon name="code" size={17}/> Edit pseudocode</a></div>
+      <div className="activity-heading"><div><p><a href={backHref}><Icon name="back" size={14}/>{backLabel}</a><span>{courseId === 'itcc45' ? `Topic ${activity.module}` : `Module ${activity.module}`} / {activity.topic}</span></p><h1>{activity.title}</h1><span>{activity.subtitle}</span></div>{courseId === 'itcc45' ? <a className="edit-code" href={`itcc45-practice.html?topic=${activity.topicId}`}><Icon name="list" size={17}/> Practice this topic</a> : <a className="edit-code" href={`tracer.html?activity=${encodeURIComponent(activity.id)}`}><Icon name="code" size={17}/> Edit pseudocode</a>}</div>
       <DataControls activity={activity} inputs={inputs} setInputs={setInputs} onShuffle={shuffle}/>
       <div className="mobile-surface-tabs" role="tablist" aria-label="Workspace view">{mobileTabs.map(([id, icon, label]) => <button type="button" role="tab" aria-selected={mobileTab === id} className={mobileTab === id ? 'active' : ''} onClick={() => setMobileTab(id)} key={id}><Icon name={icon}/>{label}</button>)}</div>
-      <div className={`desktop-source mobile-surface ${mobileTab === 'code' ? 'mobile-active' : ''}`}><SourcePanel activity={activity} event={event}/></div>
+      <div className={`desktop-source mobile-surface ${mobileTab === 'code' ? 'mobile-active' : ''}`}><SourcePanel activity={activity} event={event} source={source}/></div>
       <section className={`visual-canvas mobile-surface ${mobileTab === 'visualize' ? 'mobile-active' : ''}`} tabIndex="0" aria-label={`${activity.title} visualization canvas`}>
         <Renderer frame={event?.frame} event={event} activity={activity}/>
       </section>
       <p id="result-caption" className="current-step" aria-live="polite"><span>{playback.index + 1}</span>{event?.message || 'Preparing activity…'}</p>
       <div className={`mobile-evidence mobile-surface ${mobileTab === 'trace' || mobileTab === 'more' ? 'mobile-active' : ''}`}>
-        <EvidenceDrawer tab={mobileTab === 'trace' ? 'trace' : evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs}/>
+        <EvidenceDrawer tab={mobileTab === 'trace' ? primaryEvidence : evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs}/>
       </div>
     </main>
     <div className="desktop-evidence"><EvidenceDrawer tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs}/></div>

@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 
-const entries = ['index.html', 'visualizer.html', 'writer.html', 'tracer.html', 'problems.html', 'problem-list.html?module=1', 'practice.html?module=1'];
+const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'visualizer.html', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'writer.html', 'tracer.html', 'problems.html', 'problem-list.html?module=1', 'practice.html?module=1'];
 
 for (const entry of entries) {
   test(`${entry} has no horizontal overflow`, async ({ page }) => {
@@ -13,7 +13,7 @@ for (const entry of entries) {
 
 test('mobile navigation opens and moves focus', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone');
-  await page.goto('/index.html');
+  await page.goto('/itcc47.html');
   const toggle = page.getByRole('button', { name: /menu/i });
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await toggle.click();
@@ -22,7 +22,7 @@ test('mobile navigation opens and moves focus', async ({ page }, testInfo) => {
 });
 
 test('start page gives students a clear route into practice', async ({ page }) => {
-  await page.goto('/index.html');
+  await page.goto('/itcc47.html');
   await expect(page.getByRole('heading', { name: /Start with a problem/ })).toBeVisible();
   await page.getByRole('link', { name: /Start practicing/ }).click();
   await expect(page).toHaveURL(/problems\.html$/);
@@ -30,11 +30,70 @@ test('start page gives students a clear route into practice', async ({ page }) =
 });
 
 test('Explore the Tools performs a guided transition and moves focus', async ({ page }) => {
-  await page.goto('/index.html');
+  await page.goto('/itcc47.html');
   await page.getByRole('link', { name: 'Explore the Tools' }).click();
   await expect(page).toHaveURL(/#tools$/);
   await expect(page.locator('#tools')).toHaveClass(/is-arriving/);
   await expect(page.getByRole('heading', { name: 'Open a tool' })).toBeFocused();
+});
+
+test('subject chooser routes to both course homes', async ({ page }) => {
+  await page.goto('/index.html');
+  await expect(page.getByRole('heading', { name: 'Choose a subject and start exploring.' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Open ITCC45/ })).toHaveAttribute('href', 'itcc45.html');
+  await expect(page.getByRole('link', { name: /Open ITCC47/ })).toHaveAttribute('href', 'itcc47.html');
+  await page.getByRole('link', { name: /Open ITCC45/ }).click();
+  await expect(page).toHaveURL(/itcc45\.html$/);
+  await expect(page.getByRole('heading', { name: /See what Python objects are doing/ })).toBeVisible();
+});
+
+test('ITCC45 exposes six ordered topics with lab and practice routes', async ({ page }) => {
+  await page.goto('/itcc45-topics.html');
+  await expect(page.getByRole('heading', { name: 'Build object-oriented thinking step by step.' })).toBeVisible();
+  await expect(page.locator('.oop-topic-path > li')).toHaveCount(6);
+  await expect(page.locator('.oop-topic-path h2')).toHaveText(['Classes', 'Objects', 'Encapsulation', 'Inheritance', 'Class Abstraction', 'Polymorphism']);
+  await page.getByRole('link', { name: 'Open lab' }).first().click();
+  await expect(page).toHaveURL(/visualizer\.html\?course=itcc45&activity=itcc45-classes-blueprint$/);
+});
+
+test('Python Object Lab synchronizes source, object state, lookup, output, and editable inputs', async ({ page }, testInfo) => {
+  await page.goto('/visualizer.html?course=itcc45&activity=itcc45-classes-blueprint');
+  await expect(page.getByRole('heading', { name: /Classes: turn a blueprint/ })).toBeVisible();
+  await expect(page.getByLabel('Python source')).toContainText('class Student');
+  await page.getByLabel('Student name').fill('Lia');
+  const slider = page.locator('#step-slider');
+  await slider.fill(await slider.getAttribute('max'));
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Visualize' }).click();
+  await expect(page.locator('.object-instance-card')).toContainText('Lia');
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'More' }).click();
+  await page.getByRole('tab', { name: 'Call path' }).click();
+  await expect(page.locator('.evidence-drawer:visible')).toContainText('Student.describe');
+  await page.getByRole('tab', { name: 'Output' }).click();
+  await expect(page.locator('.evidence-drawer:visible pre')).toContainText('Lia studies BSIT');
+  if (testInfo.project.name !== 'phone') {
+    await page.getByRole('button', { name: 'Copy Python' }).click();
+    await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible();
+  }
+});
+
+test('ITCC45 practice gives rationale and persists only solved progress', async ({ page }) => {
+  await page.goto('/itcc45-practice.html?topic=classes');
+  await page.evaluate(() => localStorage.removeItem('itcc45.practice:v1'));
+  await page.reload();
+  await page.getByLabel('CMU').check();
+  await page.getByRole('button', { name: 'Check answer' }).click();
+  await expect(page.getByRole('status')).toContainText('That reasoning holds.');
+  await expect(page.locator('#practice-progress-count')).toHaveText('1 / 18 complete');
+  await page.reload();
+  await expect(page.locator('#practice-progress-count')).toHaveText('1 / 18 complete');
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('itcc45.practice:v1')));
+  expect(Object.keys(stored).sort()).toEqual(['contentVersion', 'solvedIds']);
+});
+
+test('mismatched ITCC45 activity falls back and normalizes the URL', async ({ page }) => {
+  await page.goto('/visualizer.html?course=itcc45&activity=bubble-sort');
+  await expect(page.getByRole('heading', { name: /Classes: turn a blueprint/ })).toBeVisible();
+  await expect(page).toHaveURL(/course=itcc45&activity=itcc45-classes-blueprint/);
 });
 
 test('sorting can step, play, pause, and scrub backward', async ({ page }) => {
@@ -317,6 +376,10 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
   await page.getByRole('button', { name: 'Symbolic' }).click();
   await page.getByRole('button', { name: 'Confirm dimensions' }).click();
   await expect(page.locator('#ops-total-value')).toHaveText('T(n) = 4n + 6');
+
+  await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}?course=itcc45&activity=itcc45-object-state`);
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('#step-slider')).toHaveValue('1');
 });
 
 test('cached navigation remains available offline', async ({ page, context }, testInfo) => {

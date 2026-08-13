@@ -1,8 +1,8 @@
 # Setting up your computer
 
-**ITCC47 – Data Structures and Algorithms**
+**BSIT Learning Lab — ITCC45 and ITCC47**
 
-You need three things on your own laptop this semester: **Python 3**, **Git**,
+You need three things on your own laptop for these programming subjects: **Python 3**, **Git**,
 and a **code editor**. This folder checks whether you have them and tells you
 exactly what to do about anything missing.
 

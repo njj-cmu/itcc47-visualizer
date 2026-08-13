@@ -1,96 +1,86 @@
-# ITCC47 Algorithm Visualizer
+# BSIT Learning Lab
 
-Interactive tools for **ITCC47 – Data Structures and Algorithms** (BSIT, Central
-Mindanao University). Built to be opened and used directly — no install, no
-account, nothing to submit.
+Interactive, local-first learning tools for BSIT programming courses at Central
+Mindanao University. The site is static: students can open it directly, use it
+offline, and practise without an account or a submission system.
 
-| Page | What it does |
+## Subjects
+
+### ITCC45 — Object-Oriented Programming
+
+The Python Object Lab teaches six connected topics: Classes, Objects,
+Encapsulation, Inheritance, Class Abstraction, and Polymorphism. Each topic has
+one deterministic guided visualization and three structured practice tasks.
+Examples are valid Python 3.9+ programs that students can copy and run locally;
+the browser intentionally does not execute arbitrary Python.
+
+| Page | Purpose |
 |---|---|
-| [`index.html`](index.html) | Student start page with the recommended practice path and links to every tool |
-| [`visualizer.html`](visualizer.html) | Course-first React workspace with synchronized visualization, code, trace, variables, operations, and output |
-| [`writer.html`](writer.html) | Write an algorithm in plain language; it is checked against the five characteristics from Topic 01 |
-| [`tracer.html`](tracer.html) | Run course pseudocode step by step — variables and call frames, exact operation formulas, recursive functions, guided recurrences, and measured growth |
-| [`problems.html`](problems.html) | Browse equal-height module cards and see which problem sets are available |
-| [`practice.html`](practice.html) | Solve a selected module's pseudocode problems against visible examples and hidden cases |
+| [`itcc45.html`](itcc45.html) | ITCC45 subject home |
+| [`itcc45-topics.html`](itcc45-topics.html) | Ordered six-topic curriculum |
+| [`visualizer.html?course=itcc45`](visualizer.html?course=itcc45) | Python Object Lab |
+| [`itcc45-practice.html`](itcc45-practice.html) | Local structured practice |
 
-The three pseudocode tools hand off to each other: the Writer exports a skeleton
-into the Tracer, and a problem draft can be opened in the Tracer to see where it
-goes wrong.
+### ITCC47 — Data Structures and Algorithms
+
+The existing algorithm, pseudocode, complexity, recurrence, problem-set, array,
+and linked-list tools remain available under their original URLs. The former
+root learning page is now [`itcc47.html`](itcc47.html).
+
+| Page | Purpose |
+|---|---|
+| [`visualizer.html`](visualizer.html) | Synchronized algorithm and data-structure workspace |
+| [`writer.html`](writer.html) | Plain-language algorithm writer |
+| [`tracer.html`](tracer.html) | Pseudocode execution, counting, and recurrence lab |
+| [`problems.html`](problems.html) | ITCC47 module catalog |
+| [`practice.html`](practice.html) | Pseudocode problem practice |
+
+The root [`index.html`](index.html) is the **BSIT Learning Lab** subject chooser.
 
 ## Running it
 
-Students can open `index.html` directly in a browser, including through
-`file://`; the checked-in bundle works from a local folder, USB stick, or shared
-drive without a network. Contributors run `npm install` and rebuild the React
-visualizer bundle with `npm run build:visualizer` after changing
-`visualizer-src/`.
+Open `index.html` directly. Checked-in bundles and classic scripts keep every
+student route working through `file://`; no install or server is required.
+Opening the hosted version once also caches the complete shell for later offline
+use. Optional progress stays only in that browser.
 
-## Setting up for laboratory work
-
-The visualizer needs nothing installed. The *laboratory* exercises do — Python 3,
-Git and an editor — so [`setup/`](setup/) contains a check that finds what is
-missing, explains each fix, and proves the result by actually running a program.
-Students double-click `Check My Computer.cmd` and read the report it opens.
-
-See [`setup/README.md`](setup/README.md).
-
-## For students
-
-Everything here is practice. Passing every check is strong evidence your
-algorithm is right, but it is not a proof, and nothing you do here is recorded
-or submitted anywhere. Progress is saved only in your own browser.
-
-The point of the hidden cases is the boundaries: the values right at the edge of
-each rule, the invalid input, and the order the rules are applied in. If the
-examples pass but a hidden case does not, that is where to look.
-
-## Working on it
+Contributors install the locked dependencies and use:
 
 ```bash
-node tools/test.js              # dependency-free interpreter, engine, and content checks
-npm run test:unit               # the same dependency-free unit command
-npm run test:e2e                # laptop, phone, offline, and file-mode browser checks
-npm run test:a11y               # Axe WCAG checks in laptop and phone viewports
+npm run build:visualizer        # rebuild committed React workspace assets
+npm run test:unit               # dependency-free engines and content contracts
+npm run test:python             # execute every displayed ITCC45 Python example
+npm run test:e2e                # laptop, phone, file-mode, and offline flows
+npm run test:a11y               # Axe WCAG checks
 npm run check                   # complete release check
-npm run build:visualizer        # rebuild the static React visualizer bundle
-node tools/build-problems.js    # regenerate problems.data.js (instructor only)
+node tools/build-sw.js          # regenerate the offline precache list
 ```
 
-React, Vite, Playwright Chromium, and Axe are contributor dependencies only.
-The site still ships as static HTML, CSS, and JavaScript with no server. The
-shared engine contracts and the boundary between public practice and a future
-authenticated grading portal are documented in [`docs/architecture.md`](docs/architecture.md).
+`tools/build-problems.js` still requires the instructor-only,
+gitignored `problems.hidden.json`; see [`tools/README.md`](tools/README.md).
 
-`tools/test.js` needs nothing but Node. `tools/build-problems.js` additionally
-needs `problems.hidden.json`, which is gitignored and not in this repository —
-see [`tools/README.md`](tools/README.md).
+## Setup check
 
-### Branches
+[`setup/`](setup/) checks Python 3, Git, and an editor for both subjects. Its
+optional laboratory-package verification remains specifically for the
+ITCC47 laboratory package.
 
-- **`main`** — what students use. Always deployable; every push publishes to
-  GitHub Pages. Nothing lands here directly.
-- **`pre-production`** — integration branch. Finished work waits here until it
-  is ready to publish.
-- **`feat/*`** — one branch per feature, cut from `pre-production` and merged
-  back into it.
+## Branches
 
-Publishing is the act of merging `pre-production` into `main`. The separation
-exists because the semester does not pause: a partly-finished visualizer must
-never appear on the URL students were given mid-term.
+- `main` — published student version; every push deploys GitHub Pages.
+- `pre-production` — release integration branch.
+- `feat/*` — feature branches cut from `pre-production` and merged back into it.
 
-To preview `pre-production`, check it out and open `index.html`; generated
-visualizer assets are committed so previewing does not require a build.
+Publishing is the deliberate merge from `pre-production` to `main`. Generated
+visualizer assets are committed so previewing a branch never requires a build.
 
-## Course context
+## Architecture and trust boundary
 
-Aligned to the ITCC47 syllabus and its eight-module sequence. The pages
-currently cover Module 1 (algorithmic thinking, pseudocode, exact I/O,
-complexity basics), Module 2 searching and sorting foundations, and introductory
-array-list and singly linked-list activities. The interpreter supports recursive
-functions, call frames, and singly linked node references. Stacks, queues,
-trees, AVLs, and graphs remain later visualizer adapters.
+The versioned `BSITLearningLab` registry owns course metadata and activity
+catalogs. `BSITPlayback` and `BSITVisualizerRegistry` are course-neutral shared
+contracts; the original `ITCC47*` globals remain compatibility APIs.
 
-The pseudocode grammar, the primitive-operation cost model, and the worked
-examples follow the lecture material rather than any general convention — `/` is
-integer division, and a variable-indexed array access costs 4 operations, as in
-the complexity chapter's worked tables.
+This repository is public practice, not an academic record. It stores no
+identity, grades, timestamps, authentication, or authoritative submissions.
+The detailed engine, object-frame, offline, and hosted-portal boundaries are in
+[`docs/architecture.md`](docs/architecture.md).

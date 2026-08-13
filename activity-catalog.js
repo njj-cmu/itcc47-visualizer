@@ -190,3 +190,5 @@ const ITCC47Activities = (() => {
 
   return Object.freeze({ SCHEMA_VERSION, CONTENT_VERSION, get, list, register });
 })();
+
+if (typeof BSITLearningLab !== 'undefined') BSITLearningLab.registerActivities('itcc47', ITCC47Activities);

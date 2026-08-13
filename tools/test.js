@@ -536,6 +536,33 @@ Registry.registerEvidenceView('test-trace', function TestEvidence() {});
 ok('visualizer registries report renderers and evidence views', Registry.rendererDomains().includes('test') && Registry.evidenceIds().includes('test-trace'));
 ok('algorithm metrics remain separate from primitive-operation analysis', !fs.readFileSync(path.join(ROOT, 'visualizer-src', 'main.jsx'), 'utf8').includes('primitiveTotal +'));
 
+section('multi-course catalog and ITCC45 OOP');
+const oopEngine = load(['course-catalog.js', 'playback.js', 'itcc45-activities.js', 'itcc45-practice-data.js'], { setTimeout, clearTimeout });
+const Courses = oopEngine.get('BSITLearningLab');
+const OOPActivities = oopEngine.get('ITCC45Activities');
+const OOPPractice = oopEngine.get('BSITOOPPractice');
+ok('course catalog is versioned and contains ITCC45 and ITCC47', Courses.SCHEMA_VERSION === 1 && Courses.listCourses().map((course) => course.id).join(',') === 'itcc45,itcc47');
+ok('course IDs and activity IDs are unique', new Set(Courses.listCourses().map((course) => course.id)).size === 2 && new Set(OOPActivities.list().map((activity) => activity.id)).size === 6);
+ok('ITCC45 activity catalog has the six ordered topics', OOPActivities.list().map((activity) => activity.topicId).join(',') === 'classes,objects,encapsulation,inheritance,abstraction,polymorphism');
+OOPActivities.list().forEach((activity) => {
+  const a = activity.run(activity.input.defaults);
+  const b = activity.run(activity.input.defaults);
+  ok(`${activity.id}: timeline is deterministic`, JSON.stringify(a) === JSON.stringify(b));
+  ok(`${activity.id}: output matches its declared example`, JSON.stringify(a.events.at(-1).frame.output) === JSON.stringify(activity.expectedOutput));
+  a.events.forEach((item) => {
+    const classIds = new Set(item.frame.classes.map((model) => model.id));
+    const objectIds = new Set(item.frame.objects.map((model) => model.id));
+    ok(`${activity.id}: object classes and references are valid`, item.frame.objects.every((model) => classIds.has(model.classId)) && Object.values(item.frame.references).every((id) => objectIds.has(id)));
+    ok(`${activity.id}: lookup path references known classes`, !item.frame.active || item.frame.active.lookupPath.every((id) => classIds.has(id)));
+  });
+});
+const rejectedScore = OOPActivities.get('itcc45-encapsulation-property').run({ startingScore: 88, proposedScore: 120 });
+ok('encapsulation rejects invalid scores without changing state', rejectedScore.events.some((item) => item.type === 'reject') && rejectedScore.events.at(-1).frame.objects[0].fields._score === 88);
+ok('abstraction demonstrates incomplete subclass rejection', OOPActivities.get('itcc45-abstraction-contract').run().events.some((item) => item.type === 'reject'));
+ok('polymorphism dispatches through both concrete classes', OOPActivities.get('itcc45-polymorphic-dispatch').run().events.filter((item) => item.type === 'dispatch').map((item) => item.frame.active.method).join(',') === 'Student.role_summary,Instructor.role_summary');
+ok('practice has exactly three challenges for each topic', OOPPractice.topics.every((topic) => OOPPractice.forTopic(topic.id).length === 3) && OOPPractice.challenges.length === 18);
+ok('challenge IDs are unique and answer indexes are valid', new Set(OOPPractice.challenges.map((item) => item.id)).size === 18 && OOPPractice.challenges.every((item) => Number.isInteger(item.answer) && item.answer >= 0 && item.answer < item.choices.length));
+
 // ---------- shipped content ----------
 
 section('shipped content');
@@ -651,7 +678,7 @@ ok('precache list covers every shipped asset', missing.length === 0,
 ok('precache list has no stale entries', extra.length === 0,
   extra.length ? `no longer exist: ${extra.join(', ')} — run: node tools/build-sw.js` : '');
 ok('precache includes the site root', listed.includes('./'));
-ok('service worker uses the practice cache prefix', swSource.includes("const CACHE_PREFIX = 'itcc47-practice-'"));
+ok('service worker uses the BSIT cache prefix', swSource.includes("const CACHE_PREFIX = 'bsit-learning-lab-'") && swSource.includes("const LEGACY_CACHE_PREFIX = 'itcc47-practice-'"));
 ok('service worker precaches atomically', swSource.includes('cache.addAll(PRECACHE)'));
 ok('service worker cleans up old caches', swSource.includes('caches.delete'));
 ok('service worker preserves unrelated origin caches', swSource.includes('n.startsWith(CACHE_PREFIX) && n !== CACHE'));

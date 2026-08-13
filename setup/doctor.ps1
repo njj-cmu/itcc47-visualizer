@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Checks whether this computer is ready for ITCC47 laboratory work.
+    Checks whether this computer is ready for BSIT Python laboratory work.
 
 .DESCRIPTION
     Finds what is installed, says what is missing, and proves the result by
@@ -142,7 +142,7 @@ function Get-VersionFromText {
 # ---------------------------------------------------------------------------
 
 Write-Host ''
-Write-Host '  ITCC47 - Environment Check' -ForegroundColor Cyan
+Write-Host '  BSIT Learning Lab - Environment Check' -ForegroundColor Cyan
 Write-Host '  Data Structures and Algorithms' -ForegroundColor DarkGray
 Write-Host ''
 
@@ -574,7 +574,7 @@ if ($ready) {
   <h3>What to do next</h3>
   <ol>
     <li>Open the Algorithm Visualizer and work through a problem set. It needs no setup at all.</li>
-    <li>Make a folder for this course somewhere you will find it again, such as <code>Documents\ITCC47</code>.</li>
+    <li>Make a folder for your programming courses somewhere you will find it again, such as <code>Documents\BSIT</code>.</li>
     <li>When your instructor gives you the laboratory package, put it in that folder and run this check once more.</li>
   </ol>
 </div>
@@ -598,13 +598,13 @@ $html = @"
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ITCC47 - Environment Check</title>
+<title>BSIT Learning Lab - Environment Check</title>
 <style>$css</style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <h1><span class="code">ITCC47</span> Environment Check</h1>
+    <h1><span class="code">BSIT</span> Learning Lab Environment Check</h1>
     <div class="sub">Data Structures and Algorithms &middot; generated $generated</div>
   </header>
 

@@ -1,7 +1,8 @@
 /*
  * A small interpreter for the course's pseudocode grammar:
  *   READ, WRITE, assignment (<- or the arrow char), IF/ELSE IF/ELSE/ENDIF,
- *   FOR var <- start TO end DO/ENDFOR, WHILE cond DO/ENDWHILE,
+ *   FOR var <- start TO/DOWNTO end [STEP positiveValue] DO/ENDFOR,
+ *   WHILE cond DO/ENDWHILE,
  *   CASE var OF value: .../DEFAULT: .../ENDCASE, BREAK, RETURN, STOP,
  *   array literals [a, b, c] and indexing arr[i], # comments.
  *
@@ -15,7 +16,7 @@
 
 const KEYWORDS = new Set([
   'READ', 'WRITE', 'IF', 'THEN', 'ELSE', 'ENDIF',
-  'FOR', 'EACH', 'IN', 'TO', 'DO', 'ENDFOR',
+  'FOR', 'EACH', 'IN', 'TO', 'DOWNTO', 'STEP', 'DO', 'ENDFOR',
   'WHILE', 'ENDWHILE', 'CASE', 'OF', 'DEFAULT', 'ENDCASE',
   'BREAK', 'RETURN', 'STOP', 'AND', 'OR', 'NOT', 'TRUE', 'FALSE',
 ]);
@@ -273,14 +274,29 @@ class Parser {
     const varName = this.next().value;
     this.expectOp('<-');
     const start = this.parseExpr();
-    this.expectKeyword('TO');
+    if (!this.atKeyword('TO', 'DOWNTO')) {
+      this.err("Expected 'TO' or 'DOWNTO'", 'E_LOOP_DIRECTION',
+        'Use TO for increasing loops or DOWNTO for decreasing loops.');
+    }
+    const direction = this.next().value;
     const end = this.parseExpr();
+    let step = { type: 'Number', value: 1, line };
+    let stepExplicit = false;
+    if (this.atKeyword('STEP')) {
+      this.next();
+      step = this.parseExpr();
+      stepExplicit = true;
+    }
     this.expectKeyword('DO');
     this.loopDepth++;
     const block = this.parseBlock(() => this.atKeyword('ENDFOR'));
     this.loopDepth--;
     this.expectKeyword('ENDFOR');
-    return { type: 'For', varName, start, end, block, line, text: `FOR ${varName} <- ${exprToText(start)} TO ${exprToText(end)} DO` };
+    const stepText = step.type === 'Number' && step.value === 1 ? '' : ` STEP ${exprToText(step)}`;
+    return {
+      type: 'For', varName, start, end, step, stepExplicit, direction, block, line,
+      text: `FOR ${varName} <- ${exprToText(start)} ${direction} ${exprToText(end)}${stepText} DO`,
+    };
   }
 
   parseWhile() {
@@ -629,18 +645,26 @@ function* execStmt(stmt, env, ctx) {
     case 'For': {
       const startVal = evalExpr(stmt.start, env);
       const endVal = evalExpr(stmt.end, env);
+      const stepVal = evalExpr(stmt.step || { type: 'Number', value: 1 }, env);
+      if (!Number.isFinite(stepVal) || !Number.isInteger(stepVal) || stepVal <= 0) {
+        throw new TracerError('FOR STEP must be a positive whole number', stmt.line, null,
+          'E_INVALID_LOOP_STEP', 'Use STEP 1 or another positive whole number; TO or DOWNTO chooses the direction.');
+      }
+      const direction = stmt.direction === 'DOWNTO' ? 'DOWNTO' : 'TO';
+      const continues = (value) => direction === 'DOWNTO' ? value >= endVal : value <= endVal;
+      const delta = direction === 'DOWNTO' ? -stepVal : stepVal;
       env[stmt.varName] = startVal;
       // The lecture's totals (e.g. T(n) = 7n + 6) charge nothing for the FOR
       // header, so loop control is tracked separately and is off by default.
-      yield mkStep(stmt.line, stmt.text, `${stmt.varName} = ${startVal} (loop from ${startVal} to ${endVal})`, env, 'loop',
-        { controlCost: costExpr(stmt.start) + costExpr(stmt.end) + 1, loopLine: stmt.line });
+      yield mkStep(stmt.line, stmt.text, `${stmt.varName} = ${startVal} (${direction} ${endVal}, step ${stepVal})`, env, 'loop',
+        { controlCost: costExpr(stmt.start) + costExpr(stmt.end) + (stmt.stepExplicit ? costExpr(stmt.step) : 0) + 1, loopLine: stmt.line });
       let forIterations = 0;
       try {
-        while (env[stmt.varName] <= endVal) {
+        while (continues(env[stmt.varName])) {
           forIterations++;
           yield* execBlock(stmt.block, env, ctx);
-          env[stmt.varName] += 1;
-          if (env[stmt.varName] <= endVal) {
+          env[stmt.varName] += delta;
+          if (continues(env[stmt.varName])) {
             yield mkStep(stmt.line, `FOR ${stmt.varName} <- ...`, `Next iteration: ${stmt.varName} = ${env[stmt.varName]}`, env, 'loop',
               { controlCost: 2, loopLine: stmt.line, iteration: true });
           }

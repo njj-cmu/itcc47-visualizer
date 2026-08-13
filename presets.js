@@ -125,6 +125,41 @@ ENDFOR
 WRITE pairs`,
   },
   {
+    name: 'Counting: dependent pair loop — O(n²)',
+    inputs: '5',
+    code: `READ n
+count <- 0
+FOR i <- 1 TO n - 1 DO
+    FOR j <- i + 1 TO n DO
+        count <- count + 1
+    ENDFOR
+ENDFOR
+WRITE count`,
+  },
+  {
+    name: 'Counting: n by m grid — O(nm)',
+    inputs: '3, 4',
+    code: `READ n
+READ m
+visits <- 0
+FOR row <- 1 TO n DO
+    FOR column <- 1 TO m DO
+        visits <- visits + 1
+    ENDFOR
+ENDFOR
+WRITE visits`,
+  },
+  {
+    name: 'Loop: DOWNTO with STEP',
+    inputs: '9',
+    code: `READ n
+count <- 0
+FOR i <- n DOWNTO 1 STEP 2 DO
+    count <- count + 1
+ENDFOR
+WRITE count`,
+  },
+  {
     name: 'Counting: repeated halving — O(log n)',
     inputs: '16',
     code: `READ n

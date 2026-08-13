@@ -23,8 +23,13 @@
 
 <div class="layout layout-2col">
 
+  <div class="mobile-work-tabs" role="tablist" aria-label="Tracer workspace">
+    <button id="mobile-tab-code" class="tab active" type="button" role="tab" aria-selected="true" aria-controls="tracer-stage">Code &amp; Run</button>
+    <button id="mobile-tab-results" class="tab" type="button" role="tab" aria-selected="false" aria-controls="tracer-results" tabindex="-1">Results</button>
+  </div>
+
   <!-- EDITOR COLUMN -->
-  <main class="stage">
+  <main id="tracer-stage" class="stage" role="tabpanel" aria-labelledby="mobile-tab-code">
     <div class="card editor-card">
       <div class="editor-toolbar">
         <button id="btn-examples" class="btn btn-toolbar btn-load" data-icon="example">Load Example</button>
@@ -80,7 +85,7 @@
   </main>
 
   <!-- TRACE TABLE / OPERATION COUNTS -->
-  <aside class="trace-panel">
+  <aside id="tracer-results" class="trace-panel" role="tabpanel" aria-labelledby="mobile-tab-results">
     <div class="tabs" role="tablist" aria-label="Tracer details">
       <button id="tab-trace" class="tab active" role="tab" aria-selected="true" aria-controls="panel-trace">Trace Table</button>
       <button id="tab-ops" class="tab" role="tab" aria-selected="false" aria-controls="panel-ops" tabindex="-1">Operations</button>
@@ -116,10 +121,19 @@
           </fieldset>
         </div>
 
-        <div class="ops-input-row">
-          <label for="sweep-input">Treat <code>n</code> as</label>
-          <select id="sweep-input" class="text-input"></select>
-        </div>
+        <section id="ops-symbol-picker" class="ops-symbol-picker hidden" aria-labelledby="ops-symbol-title">
+          <div>
+            <h3 id="ops-symbol-title">Symbolic dimensions</h3>
+            <p>Choose which <code>READ</code> values represent input size. Suggested values come from loop bounds; confirm them before analysis.</p>
+          </div>
+          <div id="ops-symbol-options" class="ops-symbol-options"></div>
+          <div class="ops-symbol-actions">
+            <span id="ops-symbol-status" class="ops-symbol-status" role="status">Not confirmed</span>
+            <button id="btn-confirm-symbols" class="btn btn-primary" type="button">Confirm dimensions</button>
+          </div>
+        </section>
+
+        <div id="ops-assumptions" class="ops-assumptions hidden" aria-live="polite"></div>
 
         <section id="ops-summary" class="ops-summary" aria-live="polite">
           <div class="ops-formula">
@@ -129,20 +143,34 @@
           <div id="ops-symbolic-facts" class="ops-symbolic-facts hidden">
             <span>Dominant <strong id="ops-dominant">—</strong></span>
             <span>Growth <strong id="ops-growth">—</strong></span>
+            <span>Tight <strong id="ops-tight">—</strong></span>
             <span id="ops-confidence" class="ops-confidence">—</span>
           </div>
+          <p id="ops-domains" class="ops-domains hidden"></p>
         </section>
 
         <div id="ops-diagnostics" class="ops-diagnostics hidden" role="status" aria-live="polite"></div>
 
         <div class="trace-table-wrap ops-table-wrap ops-derivation-wrap" tabindex="0" aria-label="Operation counts table">
           <table class="trace-table">
-            <thead><tr><th>Line</th><th>Statement</th><th>Unit cost</th><th id="ops-runs-heading">Actual runs</th><th>Contribution</th></tr></thead>
+            <thead><tr><th>Line</th><th>Statement</th><th id="ops-runs-heading">Actual executions</th><th>Unit cost</th><th>Contribution</th></tr></thead>
             <tbody id="ops-body"></tbody>
           </table>
         </div>
 
+        <div id="ops-derivation" class="ops-derivation" aria-live="polite"></div>
+
+        <details id="ops-algebra" class="growth-disclosure hidden">
+          <summary>Show algebra</summary>
+          <div class="growth-content"><p id="ops-expanded" class="ops-expanded"></p></div>
+        </details>
+
         <div id="loop-notes" class="loop-explanations"></div>
+
+        <div class="ops-input-row ops-measure-input">
+          <label for="sweep-input">Measurement input</label>
+          <select id="sweep-input" class="text-input"></select>
+        </div>
 
         <details class="growth-disclosure">
           <summary>Measured growth <span>(experimental)</span></summary>
@@ -223,6 +251,10 @@ ENDIF</pre>
     statement
 ENDFOR
 
+FOR i &lt;- n DOWNTO 1 STEP 2 DO
+    statement
+ENDFOR
+
 FOR EACH item IN list DO
     statement
 ENDFOR
@@ -230,6 +262,7 @@ ENDFOR
 WHILE condition DO
     statement
 ENDWHILE</pre>
+      <p><code>STEP</code> must be a positive whole number. Use <code>TO</code> or <code>DOWNTO</code> to choose direction.</p>
     </section>
 
     <section class="grammar-card">

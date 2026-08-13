@@ -52,16 +52,24 @@ that version.
 
 ## Symbolic operation counting
 
-`symbolic-counting.js` is another framework-neutral engine. It consumes the
-interpreter AST plus an optional completed timeline and returns deterministic
-actual totals, an exact symbolic formula when one can be proved, per-line
-derivation rows, loop explanations, and diagnostics.
+`symbolic-counting.js` is another framework-neutral engine. Its versioned v2
+contract exposes exact `Rational` values and immutable `SymbolicExpr` nodes for
+rationals, symbols, addition, multiplication, powers, sums, floors, ceilings,
+maximums, and unknown expressions. `CountAnalysis` includes primary factored
+and secondary expanded forms, selected dimensions, domains, assumptions,
+worst-case choices, tight bounds, derivation steps, and compatibility aliases
+(`symbolicTotal` and `growthClass`).
 
-Phase 1 proves only straight-line statements, constant-bound `FOR` loops,
-simple affine bounds such as `1 TO n` and `0 TO n - 1`, and independent nested
-loops. Branches, `WHILE`, `FOR EACH`, early exits, dependent bounds, and
-flooring division in bounds return an unsupported diagnostic instead of an
-estimated formula.
+Release A proves straight-line statements, multivariable independent loops,
+dependent affine bounds, and closed forms whose loop-variable summands have
+degree at most two. It preserves exact fractions. Non-unit `STEP` and flooring
+bounds retain a structural max/floor expression when polynomial simplification
+would be unsound. Unsupported nonlinear bounds, data-dependent loops, and
+loop-altering `BREAK` produce diagnostics rather than invented formulas.
+
+Branches expose candidate paths and require a session-only worst-case choice.
+Symbol dimensions are also confirmed explicitly and reset with code changes;
+neither choice is stored as authoritative evidence.
 
 The Lecture model charges no operations to a `FOR` header. Full Control adds
 separate setup, condition-check, and increment rows; it never averages unequal

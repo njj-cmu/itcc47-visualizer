@@ -7,7 +7,7 @@ account, nothing to submit.
 | Page | What it does |
 |---|---|
 | [`index.html`](index.html) | Student start page with the recommended practice path and links to every tool |
-| [`visualizer.html`](visualizer.html) | Sorting and searching, stepped through one comparison at a time, with a trace table |
+| [`visualizer.html`](visualizer.html) | Course-first React workspace with synchronized visualization, code, trace, variables, operations, and output |
 | [`writer.html`](writer.html) | Write an algorithm in plain language; it is checked against the five characteristics from Topic 01 |
 | [`tracer.html`](tracer.html) | Run course pseudocode step by step — variable state, output, per-line operation counts, and a measured growth curve |
 | [`problems.html`](problems.html) | Browse equal-height module cards and see which problem sets are available |
@@ -19,9 +19,11 @@ goes wrong.
 
 ## Running it
 
-Open `index.html` in a browser. That is the whole setup — the project has no
-dependencies and no build step, so it works from a local folder, a USB stick, or
-a shared drive with no network.
+Students can open `index.html` directly in a browser, including through
+`file://`; the checked-in bundle works from a local folder, USB stick, or shared
+drive without a network. Contributors run `npm install` and rebuild the React
+visualizer bundle with `npm run build:visualizer` after changing
+`visualizer-src/`.
 
 ## Setting up for laboratory work
 
@@ -50,11 +52,12 @@ npm run test:unit               # the same dependency-free unit command
 npm run test:e2e                # laptop, phone, offline, and file-mode browser checks
 npm run test:a11y               # Axe WCAG checks in laptop and phone viewports
 npm run check                   # complete release check
+npm run build:visualizer        # rebuild the static React visualizer bundle
 node tools/build-problems.js    # regenerate problems.data.js (instructor only)
 ```
 
-Playwright Chromium and Axe are development/CI dependencies only. The pages
-still ship as plain HTML, CSS, and JavaScript with no runtime packages. The
+React, Vite, Playwright Chromium, and Axe are contributor dependencies only.
+The site still ships as static HTML, CSS, and JavaScript with no server. The
 shared engine contracts and the boundary between public practice and a future
 authenticated grading portal are documented in [`docs/architecture.md`](docs/architecture.md).
 
@@ -75,16 +78,16 @@ Publishing is the act of merging `pre-production` into `main`. The separation
 exists because the semester does not pause: a partly-finished visualizer must
 never appear on the URL students were given mid-term.
 
-To preview `pre-production`, check it out and open `index.html` — same as `main`,
-since there is no build step yet.
+To preview `pre-production`, check it out and open `index.html`; generated
+visualizer assets are committed so previewing does not require a build.
 
 ## Course context
 
 Aligned to the ITCC47 syllabus and its eight-module sequence. The pages
 currently cover Module 1 (algorithmic thinking, pseudocode, exact I/O,
-complexity basics) and part of Module 2 (searching and sorting foundations).
-Linked lists, stacks and queues, recursion, trees, and graphs are not yet
-covered.
+complexity basics), Module 2 searching and sorting foundations, and introductory
+array-list insertion and removal. Linked lists, stacks and queues, recursion,
+trees, and graphs remain later visualizer adapters.
 
 The pseudocode grammar, the primitive-operation cost model, and the worked
 examples follow the lecture material rather than any general convention — `/` is

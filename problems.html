@@ -3,39 +3,52 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ITCC47 Problem Sets</title>
+<title>ITCC47 Modules</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body class="catalog-page">
 
 <header class="topbar">
   <div class="topbar-title">
-    <span class="topbar-code">ITCC47</span> Problem Sets
+    <span class="topbar-code">ITCC47</span> Modules
   </div>
   <nav class="topbar-nav">
     <a href="index.html" data-icon="start">Start</a>
     <a href="visualizer.html" data-icon="visualize">Visualize</a>
     <a href="writer.html" data-icon="writer">Algorithm Writer</a>
     <a href="tracer.html" data-icon="tracer">Pseudocode Tracer</a>
-    <a href="problems.html" data-icon="problems">Problem Sets</a>
+    <a href="problems.html" data-icon="problems">Modules</a>
   </nav>
 </header>
 
 <main class="catalog-main">
   <header class="catalog-intro">
-    <h1>Choose a module</h1>
-    <p>Practice structured pseudocode, exact output, tracing, and algorithm analysis at your own pace.</p>
+    <h1>Explore the course</h1>
+    <p>Choose a problem to solve or open a synchronized visualization from the same module map.</p>
   </header>
 
-  <div id="module-grid" class="module-grid" aria-label="ITCC47 modules"></div>
+  <div class="catalog-tabs" role="tablist" aria-label="Module resources">
+    <button id="problems-tab" type="button" role="tab" aria-controls="problem-catalog" aria-selected="true" data-catalog-view="problems" data-icon="problemsList">Problem sets</button>
+    <button id="visualizations-tab" type="button" role="tab" aria-controls="visualization-catalog" aria-selected="false" tabindex="-1" data-catalog-view="visualizations" data-icon="visualize">Visualizations</button>
+  </div>
 
-  <aside class="practice-note" aria-label="Practice data notice">
-    <span class="practice-note-icon" aria-hidden="true">i</span>
-    <p>This is a public practice area. Your progress stays in this browser and is not a grade.</p>
-  </aside>
+  <section id="problem-catalog" class="catalog-view" role="tabpanel" aria-labelledby="problems-tab">
+    <div id="module-grid" class="module-grid" aria-label="ITCC47 problem-set modules"></div>
+    <aside class="practice-note" aria-label="Practice data notice">
+      <span class="practice-note-icon" aria-hidden="true">i</span>
+      <p>This is a public practice area. Your progress stays in this browser and is not a grade.</p>
+    </aside>
+  </section>
+
+  <section id="visualization-catalog" class="catalog-view" role="tabpanel" aria-labelledby="visualizations-tab" hidden>
+    <div id="visualization-grid" class="visualization-grid" aria-label="ITCC47 visualizations"></div>
+  </section>
 </main>
 
 <script src="nav.js"></script>
+<script src="playback.js"></script>
+<script src="algorithms.js"></script>
+<script src="activity-catalog.js"></script>
 <script src="problems.data.js"></script>
 <script src="problems-catalog.js"></script>
 <script src="sw-register.js" defer></script>

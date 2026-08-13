@@ -44,4 +44,55 @@
   document.querySelectorAll('#module-grid [data-icon]').forEach((element) => {
     if (window.ITCC47Icons) element.insertAdjacentHTML('afterbegin', window.ITCC47Icons(element.dataset.icon));
   });
+
+  const visualizationGrid = document.getElementById('visualization-grid');
+  const activities = typeof ITCC47Activities === 'undefined' ? [] : ITCC47Activities.list();
+  const families = [...new Set(activities.map((activity) => activity.family))];
+  families.forEach((family) => {
+    const group = document.createElement('section');
+    group.className = 'visualization-group';
+    group.innerHTML = `<header><p>Course visualizations</p><h2>${family}</h2></header><div class="visualization-cards"></div>`;
+    const cards = group.querySelector('.visualization-cards');
+    activities.filter((activity) => activity.family === family).forEach((activity) => {
+      const link = document.createElement('a');
+      link.className = 'visualization-card';
+      link.href = `visualizer.html?activity=${encodeURIComponent(activity.id)}`;
+      link.innerHTML = `<span class="visualization-module">Module ${activity.module} · ${activity.topic}</span><strong>${activity.title}</strong><span>${activity.subtitle}</span><em>Open visualization ${window.ITCC47Icons ? window.ITCC47Icons('arrow') : '→'}</em>`;
+      cards.appendChild(link);
+    });
+    visualizationGrid.appendChild(group);
+  });
+
+  const tabs = [...document.querySelectorAll('[data-catalog-view]')];
+  const views = {
+    problems: document.getElementById('problem-catalog'),
+    visualizations: document.getElementById('visualization-catalog'),
+  };
+  function selectView(name, updateUrl = true, focus = false) {
+    const selected = views[name] ? name : 'problems';
+    tabs.forEach((tab) => {
+      const active = tab.dataset.catalogView === selected;
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+      if (active && focus) tab.focus();
+    });
+    Object.entries(views).forEach(([key, panel]) => { panel.hidden = key !== selected; });
+    if (updateUrl) {
+      const url = new URL(location.href);
+      if (selected === 'problems') url.searchParams.delete('view');
+      else url.searchParams.set('view', selected);
+      history.replaceState({}, '', url);
+    }
+  }
+  tabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => selectView(tab.dataset.catalogView));
+    tab.addEventListener('keydown', (event) => {
+      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+        : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+      selectView(tabs[next].dataset.catalogView, true, true);
+    });
+  });
+  selectView(new URLSearchParams(location.search).get('view') || 'problems', false);
 })();

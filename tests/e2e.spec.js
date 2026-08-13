@@ -26,7 +26,7 @@ test('start page gives students a clear route into practice', async ({ page }) =
   await expect(page.getByRole('heading', { name: /Start with a problem/ })).toBeVisible();
   await page.getByRole('link', { name: /Start practicing/ }).click();
   await expect(page).toHaveURL(/problems\.html$/);
-  await expect(page.getByRole('heading', { name: 'Choose a module' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Explore the course' })).toBeVisible();
 });
 
 test('Explore the Tools performs a guided transition and moves focus', async ({ page }) => {
@@ -49,8 +49,7 @@ test('sorting can step, play, pause, and scrub backward', async ({ page }) => {
 });
 
 test('binary search explains its sorted copy before searching', async ({ page }) => {
-  await page.goto('/visualizer.html');
-  await page.getByRole('button', { name: 'Binary Search' }).click();
+  await page.goto('/visualizer.html?activity=binary-search');
   await expect(page.locator('#result-caption')).toContainText('Binary search requires sorted data');
 });
 
@@ -59,8 +58,9 @@ test('custom signed data is rendered and oversized data is rejected inline', asy
   const input = page.getByLabel('Custom values (comma-separated)');
   await input.fill('-8, -2, 0, 5');
   await page.getByRole('button', { name: 'Apply' }).click();
-  await expect(page.locator('.chart-zero')).toBeVisible();
-  await expect(page.locator('.bar-negative')).toHaveCount(2);
+  await expect(page.locator('.array-cell')).toHaveCount(4);
+  await expect(page.locator('.array-cell').nth(0)).toContainText('-8');
+  await expect(page.locator('.array-cell').nth(2)).toContainText('0');
   await input.fill(Array.from({ length: 19 }, (_, i) => i).join(','));
   await page.getByRole('button', { name: 'Apply' }).click();
   await expect(page.locator('#data-error')).toContainText('at most 18 values');
@@ -74,7 +74,7 @@ test('array-list activity synchronizes source, structure, trace, and metrics', a
   await page.getByRole('button', { name: 'Step' }).click();
   await expect(page.locator('#step-slider')).toHaveValue('1');
   await expect(page.locator('.source-line.is-current')).toContainText('values[i + 1] <- values[i]');
-  await expect(page.locator('.bar-move')).toHaveCount(2);
+  await expect(page.locator('.array-cell.bar-move')).toHaveCount(2);
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'More' }).click();
   await page.getByRole('tab', { name: 'Operations' }).click();
   const visibleEvidence = page.locator('.evidence-drawer:visible');
@@ -223,7 +223,7 @@ test('problem work tabs reach code and results on a phone', async ({ page }, tes
 
 test('module catalog opens an intermediate problem list before practice', async ({ page }, testInfo) => {
   await page.goto('/problems.html');
-  await expect(page.getByRole('heading', { name: 'Choose a module' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Explore the course' })).toBeVisible();
   await expect(page.locator('.module-card')).toHaveCount(8);
   await expect(page.getByText('Not implemented', { exact: true })).toHaveCount(12);
   const heights = await page.locator('.module-card').evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height));
@@ -238,6 +238,16 @@ test('module catalog opens an intermediate problem list before practice', async 
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
   await expect(page.getByRole('link', { name: 'Back to Problem List' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'All Problems' })).toHaveCount(0);
+});
+
+test('modules catalog separates problem sets and visualizations without duplicating the visualizer rail', async ({ page }) => {
+  await page.goto('/problems.html?view=visualizations');
+  await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.visualization-card')).toHaveCount(9);
+  await page.getByRole('link', { name: /Bubble Sort/ }).click();
+  await expect(page).toHaveURL(/visualizer\.html\?activity=bubble-sort$/);
+  await expect(page.locator('.activity-rail')).toHaveCount(0);
+  await expect(page.locator('.topbar-nav a[href="visualizer.html"]')).toHaveAttribute('aria-current', 'page');
 });
 
 test('difficulty tags use a distinct increasing-intensity palette', async ({ page }) => {

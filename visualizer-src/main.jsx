@@ -43,27 +43,31 @@ function classifyIndex(index, highlight = {}) {
 
 const ArrayRenderer = memo(function ArrayRenderer({ frame }) {
   const values = frame?.array || [];
-  const min = Math.min(0, ...values.filter(Number.isFinite));
-  const max = Math.max(0, ...values.filter(Number.isFinite));
-  const range = Math.max(max - min, 1);
-  const zeroPct = ((0 - min) / range) * 100;
+  const action = frame?.highlight?.swap || frame?.highlight?.move || null;
+  const actionStart = action ? ((Math.min(...action) + 0.5) / values.length) * 100 : 0;
+  const actionEnd = action ? ((Math.max(...action) + 0.5) / values.length) * 100 : 0;
   return <div className="array-canvas" aria-label="Array visualization">
-    <div className="array-zero chart-zero" style={{ bottom: `${zeroPct}%` }} aria-hidden="true" />
-    <div className="array-bars">
+    <div className="array-stage">
+    <div className="array-cells" style={{ '--array-count': values.length }}>
       {values.map((value, index) => {
-        const numeric = Number.isFinite(value) ? value : 0;
-        const height = (Math.abs(numeric) / range) * 100;
         const state = classifyIndex(index, frame.highlight);
-        return <div className="array-column" key={frame.items?.[index]?.id || index}>
-          <div className={`array-bar bar bar-${state} ${numeric < 0 ? 'bar-negative' : 'bar-positive'} ${value == null ? 'bar-empty' : ''}`}
-            style={{ height: `${Math.max(height, numeric === 0 ? 2 : 0)}%`, bottom: `${numeric >= 0 ? zeroPct : zeroPct - height}%` }}
-            aria-label={`Index ${index}, value ${value == null ? 'empty' : value}`}>
+        const marker = frame?.markers?.index === index;
+        return <div className={`array-item ${marker ? 'has-marker' : ''}`} key={frame.items?.[index]?.id || index}>
+          {marker ? <span className="array-marker">index</span> : null}
+          <div className={`array-cell bar-${state} ${value == null ? 'is-empty' : ''}`}
+            aria-label={`Index ${index}, value ${value == null ? 'empty' : value}, ${state}`}>
             <span className="array-value">{value == null ? '—' : value}</span>
           </div>
-          <span className="array-index">{index}</span>
+          <span className="array-index" aria-hidden="true">{index}</span>
         </div>;
       })}
     </div>
+    {action ? <div className={`array-connector ${frame?.highlight?.swap ? 'is-swap' : 'is-move'}`} aria-hidden="true">
+      <svg viewBox="0 0 100 24" preserveAspectRatio="none"><path d={`M ${actionStart} 3 C ${actionStart} 22, ${actionEnd} 22, ${actionEnd} 3`} /><path d={`M ${actionEnd - 1.4} 5 L ${actionEnd} 2 L ${actionEnd + 1.4} 5`} /></svg>
+      <span style={{ left: `${(actionStart + actionEnd) / 2}%` }}>{frame?.highlight?.swap ? 'swap' : 'move'}</span>
+    </div> : null}
+    </div>
+    <div className="array-legend" aria-label="Visualization legend"><span><i className="legend-current"/>Active</span><span><i className="legend-sorted"/>Complete</span><span>Position is shown by index, not height.</span></div>
   </div>;
 });
 
@@ -241,10 +245,8 @@ function Header() {
 }
 
 function App() {
-  const activities = useMemo(() => ITCC47Activities.list(), []);
   const initialId = new URLSearchParams(location.search).get('activity') || 'bubble-sort';
-  const [activityId, setActivityId] = useState(() => ITCC47Activities.get(initialId).id);
-  const activity = ITCC47Activities.get(activityId);
+  const activity = useMemo(() => ITCC47Activities.get(initialId), [initialId]);
   const initialInputs = useCallback((nextActivity) => ({
     values: [...nextActivity.input.defaultValues],
     target: nextActivity.input.needsTarget ? nextActivity.input.defaultValues[Math.floor(nextActivity.input.defaultValues.length / 2)] : null,
@@ -267,11 +269,6 @@ function App() {
     return () => { active = false; };
   }, [activity.renderer]);
 
-  function selectActivity(id) {
-    const next = ITCC47Activities.get(id);
-    controller.pause(false); setActivityId(next.id); setInputs(initialInputs(next)); setEvidenceTab('trace'); setMobileTab('visualize');
-    const url = new URL(location.href); url.searchParams.set('activity', next.id); history.replaceState({}, '', url);
-  }
   function shuffle() {
     const values = Array.from({ length: inputs.values.length }, () => Math.floor(Math.random() * 95) + 5);
     setInputs((current) => ({ ...current, values, target: activity.input.needsTarget ? values[Math.floor(values.length / 2)] : current.target }));
@@ -281,11 +278,8 @@ function App() {
     ['visualize', 'grid', 'Visualize'], ['code', 'code', 'Code'], ['trace', 'list', 'Trace'], ['more', 'more', 'More'],
   ];
   return <div className="visualizer-workspace">
-    <Header />
-    <ActivityRail activities={activities} selectedId={activity.id} onSelect={selectActivity}/>
     <main className="workspace-main">
-      <div className="activity-heading"><div><p><a href="problems.html">Module {activity.module}</a> / {activity.topic}</p><h1>{activity.title}</h1><span>{activity.subtitle}</span></div><a className="edit-code" href={`tracer.html?activity=${encodeURIComponent(activity.id)}`}><Icon name="code" size={17}/> Edit pseudocode</a></div>
-      <MobileActivityPicker activities={activities} selectedId={activity.id} onSelect={selectActivity}/>
+      <div className="activity-heading"><div><p><a href="problems.html?view=visualizations"><Icon name="back" size={14}/> All visualizations</a><span>Module {activity.module} / {activity.topic}</span></p><h1>{activity.title}</h1><span>{activity.subtitle}</span></div><a className="edit-code" href={`tracer.html?activity=${encodeURIComponent(activity.id)}`}><Icon name="code" size={17}/> Edit pseudocode</a></div>
       <DataControls activity={activity} inputs={inputs} setInputs={setInputs} onShuffle={shuffle}/>
       <div className="mobile-surface-tabs" role="tablist" aria-label="Workspace view">{mobileTabs.map(([id, icon, label]) => <button type="button" role="tab" aria-selected={mobileTab === id} className={mobileTab === id ? 'active' : ''} onClick={() => setMobileTab(id)} key={id}><Icon name={icon}/>{label}</button>)}</div>
       <div className={`desktop-source mobile-surface ${mobileTab === 'code' ? 'mobile-active' : ''}`}><SourcePanel activity={activity} event={event}/></div>

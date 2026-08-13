@@ -1,0 +1,9 @@
+{
+  "bubble-sort": { "types": ["state", "compare", "swap", "compare", "swap", "state", "compare", "state", "complete"], "final": [1, 2, 3], "metrics": { "pass": null, "comparisons": 3, "swaps": 2 } },
+  "selection-sort": { "types": ["state", "state", "compare", "state", "compare", "swap", "state", "state", "compare", "state", "swap", "state", "complete"], "final": [1, 2, 3], "metrics": { "pass": null, "comparisons": 3, "swaps": 2 } },
+  "insertion-sort": { "types": ["state", "state", "compare", "move", "state", "state", "compare", "move", "compare", "state", "complete"], "final": [1, 2, 3], "metrics": { "pass": null, "comparisons": 3, "moves": 2 } },
+  "linear-search": { "types": ["state", "state", "state", "complete"], "final": [3, 1, 2], "metrics": { "comparisons": 3 } },
+  "binary-search": { "types": ["preprocess", "preprocess", "range", "complete"], "final": [1, 2, 3], "metrics": { "comparisons": 1 } },
+  "array-list-insert": { "types": ["state", "move", "move", "insert"], "final": [3, 9, 1, 2], "metrics": { "moves": 2, "writes": 3 } },
+  "array-list-remove": { "types": ["remove", "move", "complete"], "final": [3, 2], "metrics": { "moves": 1, "writes": 1 } }
+}

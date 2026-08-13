@@ -6,19 +6,33 @@
  * coupling their renderers or domain models to the DOM.
  */
 const ITCC47Playback = (() => {
+  const EVENT_SCHEMA_VERSION = 2;
   const STATES = new Set(['idle', 'paused', 'playing', 'complete']);
+
+  function deepFreeze(value, seen = new Set()) {
+    if (!value || typeof value !== 'object' || Object.isFrozen(value) || seen.has(value)) return value;
+    seen.add(value);
+    Reflect.ownKeys(value).forEach((key) => deepFreeze(value[key], seen));
+    return Object.freeze(value);
+  }
+
+  function freezeFrame(frame) {
+    if (!frame || typeof frame !== 'object') return Object.freeze({});
+    return deepFreeze(frame);
+  }
 
   function timelineEvent(spec) {
     if (!spec || !spec.id || !spec.domain || !spec.type) {
       throw new Error('Timeline events require id, domain, and type.');
     }
     return Object.freeze({
+      schemaVersion: EVENT_SCHEMA_VERSION,
       id: String(spec.id),
       domain: String(spec.domain),
       type: String(spec.type),
       message: String(spec.message || ''),
-      frame: spec.frame || {},
-      metrics: Object.freeze({ ...(spec.metrics || {}) }),
+      frame: freezeFrame({ ...(spec.frame || {}) }),
+      metrics: deepFreeze({ ...(spec.metrics || {}) }),
       source: spec.source || null,
       segment: spec.segment || null,
       boundary: !!spec.boundary,
@@ -28,6 +42,7 @@ const ITCC47Playback = (() => {
 
   function createController(options = {}) {
     const onChange = typeof options.onChange === 'function' ? options.onChange : () => {};
+    const listeners = new Set();
     const delayForSpeed = typeof options.delayForSpeed === 'function'
       ? options.delayForSpeed : (speed) => Math.max(50, 1100 - speed * 100);
 
@@ -37,20 +52,27 @@ const ITCC47Playback = (() => {
     let status = 'idle';
     let timer = null;
     let disposed = false;
+    let cachedSnapshot = null;
 
     function snapshot() {
-      return Object.freeze({
+      const next = {
         status,
         index,
         total: events.length,
         speed,
         currentEvent: events[index] || null,
         atEnd: events.length === 0 || index >= events.length - 1,
-      });
+      };
+      if (cachedSnapshot && Object.keys(next).every((key) => cachedSnapshot[key] === next[key])) return cachedSnapshot;
+      cachedSnapshot = Object.freeze(next);
+      return cachedSnapshot;
     }
 
     function emit() {
-      if (!disposed) onChange(snapshot());
+      if (disposed) return;
+      const state = snapshot();
+      onChange(state);
+      listeners.forEach((listener) => listener(state));
     }
 
     function clearTimer() {
@@ -149,10 +171,42 @@ const ITCC47Playback = (() => {
       disposed = true;
       events = [];
       status = 'idle';
+      listeners.clear();
     }
 
-    return { load, play, pause, toggle, step, seek, finishSegment, setSpeed, dispose, getState: snapshot };
+    function subscribe(listener) {
+      if (typeof listener !== 'function') return () => {};
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    }
+
+    return { load, play, pause, toggle, step, seek, finishSegment, setSpeed, dispose,
+      subscribe, getSnapshot: snapshot, getState: snapshot };
   }
 
-  return { timelineEvent, createController };
+  function runResult(spec = {}) {
+    const events = Object.freeze([...(spec.events || [])]);
+    const diagnostics = Object.freeze([...(spec.diagnostics || [])]);
+    const capabilities = Object.freeze({
+      visualize: events.some((event) => event.frame && event.frame.kind),
+      trace: events.length > 0,
+      variables: events.some((event) => event.frame && event.frame.vars),
+      operations: events.some((event) => Object.keys(event.metrics || {}).length > 0),
+      output: events.some((event) => event.frame && event.frame.outputValue !== undefined),
+      ...(spec.capabilities || {}),
+    });
+    return Object.freeze({
+      schemaVersion: 2,
+      events,
+      steps: events,
+      outcome: spec.outcome || (diagnostics.length ? 'error' : 'complete'),
+      diagnostics,
+      capabilities,
+      result: spec.result || null,
+      truncated: !!spec.truncated,
+      error: spec.error || null,
+    });
+  }
+
+  return { EVENT_SCHEMA_VERSION, timelineEvent, createController, runResult, deepFreeze };
 })();

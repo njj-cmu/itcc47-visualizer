@@ -57,6 +57,8 @@ function Icon({ name, size = 20 }) {
   const paths = {
     back: <><path d="M19 12H5"/><path d="m10 7-5 5 5 5"/></>,
     code: <><path d="m8 9-3 3 3 3"/><path d="m16 9 3 3-3 3"/><path d="m14 5-4 14"/></>,
+    close: <><path d="M6 6l12 12"/><path d="M18 6 6 18"/></>,
+    expand: <><path d="M8 3H3v5"/><path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M16 21h5v-5"/></>,
     grid: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></>,
     link: <><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/></>,
     list: <><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></>,
@@ -89,16 +91,28 @@ function classifyIndex(index, highlight = {}) {
   return 'default';
 }
 
+function slotIndex(location) {
+  const match = String(location || '').match(/^slot:(\d+)$/);
+  return match ? Number(match[1]) : null;
+}
+
 const ArrayRenderer = memo(function ArrayRenderer({ frame, event, motionMode, duration, onEntityComplete }) {
   const values = frame?.array || [];
   const fallbackEntities = (frame?.items || []).map((item, index) => ({ id: item.id, value: values[index] }));
   const presentation = frame?.presentation || { entities: fallbackEntities, slots: fallbackEntities.map((entity) => entity.id), held: null };
   const entities = new Map(presentation.entities.map((entity) => [entity.id, entity]));
   const slots = presentation.slots || [];
-  const action = frame?.highlight?.swap || frame?.highlight?.move || null;
+  const structuralMove = event?.transition?.moves?.find((move) => slotIndex(move.from) !== null && slotIndex(move.to) !== null) || null;
+  const moveFrom = structuralMove ? slotIndex(structuralMove.from) : null;
+  const moveTo = structuralMove ? slotIndex(structuralMove.to) : null;
+  const action = structuralMove ? [moveFrom, moveTo] : frame?.highlight?.swap || frame?.highlight?.move || null;
   const heldEntity = presentation.held ? entities.get(presentation.held.entityId) : null;
-  const actionStart = action ? ((Math.min(...action) + 0.5) / slots.length) * 100 : 0;
-  const actionEnd = action ? ((Math.max(...action) + 0.5) / slots.length) * 100 : 0;
+  const actionStart = action ? ((action[0] + 0.5) / slots.length) * 100 : 0;
+  const actionEnd = action ? ((action[1] + 0.5) / slots.length) * 100 : 0;
+  const movingValue = structuralMove ? entities.get(structuralMove.entityId)?.value : null;
+  const actionLabel = event?.transition?.kind === 'swap'
+    ? `swap [${Math.min(...action)}] ↔ [${Math.max(...action)}]`
+    : structuralMove ? `shift ${movingValue}: [${moveFrom}] → [${moveTo}]` : 'move';
   return <div className="array-canvas" aria-label="Array visualization"><LayoutGroup id="array-layout">
     <div className="array-stage" style={{ '--array-count': slots.length }}>
     <div className="array-cells" style={{ '--array-count': slots.length }}>
@@ -106,11 +120,18 @@ const ArrayRenderer = memo(function ArrayRenderer({ frame, event, motionMode, du
         const state = classifyIndex(index, frame.highlight);
         const marker = frame?.markers?.index === index;
         const entity = entities.get(entityId);
-        return <div className={`array-item ${marker ? 'has-marker' : ''}`} data-slot={`slot:${index}`} key={`slot:${index}`}>
+        const isMoving = event?.transition?.moves?.some((move) => move.entityId === entityId);
+        const entersFromOutside = entity && event?.transition?.enter?.includes(entity.id)
+          && !event?.transition?.moves?.some((move) => move.entityId === entity.id && move.from === 'held');
+        const motionRole = structuralMove && index === moveFrom ? 'source' : structuralMove && index === moveTo ? 'destination' : null;
+        const lifted = ['compare', 'mid', 'active', 'swap', 'move'].includes(state);
+        return <div className={`array-item ${marker ? 'has-marker' : ''} ${motionRole ? `is-${motionRole}` : ''}`} data-slot={`slot:${index}`} key={`slot:${index}`}>
           {marker ? <span className="array-marker">index</span> : null}
           <div className={`array-cell-slot ${entity ? '' : 'is-empty'}`} aria-label={`Index ${index}, ${entity ? `value ${entity.value}` : 'temporarily empty'}, ${state}`}>
             <AnimatePresence initial={false}>{entity ? <m.div layout layoutId={entity.id} data-entity-id={entity.id} className={`array-cell bar-${state}`}
-              initial={event?.transition?.enter?.includes(entity.id) ? { opacity: 0, scale: .72 } : false} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .72 }}
+              data-motion-role={isMoving ? 'moving' : undefined}
+              initial={entersFromOutside ? { opacity: 0, scale: .72, y: -12 } : false}
+              animate={{ opacity: 1, scale: 1, y: lifted ? -10 : 0, zIndex: isMoving ? 4 : 1 }} exit={{ opacity: 0, scale: .72, y: 10 }}
               transition={{ layout: { duration, ease: [0.22, 0.75, 0.28, 1] }, opacity: { duration: Math.min(duration, .18) } }}
               onLayoutAnimationComplete={() => onEntityComplete(entity.id)} onAnimationComplete={() => onEntityComplete(entity.id)}>
               <span className="array-value">{entity.value}</span>
@@ -122,10 +143,10 @@ const ArrayRenderer = memo(function ArrayRenderer({ frame, event, motionMode, du
     </div>
     <AnimatePresence initial={false}>{heldEntity ? <m.div layout layoutId={heldEntity.id} data-entity-id={heldEntity.id} className="array-held-value" style={{ '--held-column': (presentation.held.from ?? 0) + 1 }}
       transition={{ layout: { duration, ease: [0.22, 0.75, 0.28, 1] } }} onLayoutAnimationComplete={() => onEntityComplete(heldEntity.id)} onAnimationComplete={() => onEntityComplete(heldEntity.id)} aria-label={`Held insertion value ${heldEntity.value}`}>
-      <span>held</span><strong>{heldEntity.value}</strong></m.div> : null}</AnimatePresence>
-    {action ? <div className={`array-connector ${frame?.highlight?.swap ? 'is-swap' : 'is-move'}`} aria-hidden="true">
+      <strong>{heldEntity.value}</strong></m.div> : null}</AnimatePresence>
+    {action ? <div className={`array-connector ${frame?.highlight?.swap ? 'is-swap' : 'is-move'} ${actionEnd < actionStart ? 'moves-left' : 'moves-right'}`} aria-hidden="true">
       <m.svg viewBox="0 0 100 24" preserveAspectRatio="none" initial={motionMode === 'on' ? { opacity: 0 } : false} animate={{ opacity: 1 }} transition={{ duration: Math.min(duration, .2) }}><m.path d={`M ${actionStart} 3 C ${actionStart} 22, ${actionEnd} 22, ${actionEnd} 3`} initial={motionMode === 'on' ? { pathLength: 0 } : false} animate={{ pathLength: 1 }} transition={{ duration }}/><path d={`M ${actionEnd - 1.4} 5 L ${actionEnd} 2 L ${actionEnd + 1.4} 5`} /></m.svg>
-      <span style={{ left: `${(actionStart + actionEnd) / 2}%` }}>{frame?.highlight?.swap ? 'swap' : 'move'}</span>
+      <span style={{ left: `${(actionStart + actionEnd) / 2}%` }}>{actionLabel}</span>
     </div> : null}
     </div>
     <div className="array-legend" aria-label="Visualization legend"><span><i className="legend-current"/>Active</span><span><i className="legend-sorted"/>Complete</span><span>Position is shown by index, not height.</span></div>
@@ -144,9 +165,9 @@ const LinkedListRenderer = memo(function LinkedListRenderer({ frame, event, dura
   return <div className="linked-canvas" aria-label="Singly linked list visualization"><LayoutGroup id="linked-layout">
     <div className="linked-chain">
       {nodes.map((node, index) => <React.Fragment key={node.id}>
-        <m.div layout layoutId={`node:${node.id}`} data-node-id={node.id} className="linked-node-wrap" initial={event?.transition?.enter?.includes(node.id) ? { opacity: 0, scale: .72 } : false} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: .72 }} transition={{ layout: { duration }, opacity: { duration: Math.min(duration, .18) } }} onLayoutAnimationComplete={() => onEntityComplete(node.id)} onAnimationComplete={() => onEntityComplete(node.id)}>
-          <div className="pointer-labels">{(pointersByNode[node.id] || []).map((name) => <m.span layout layoutId={`pointer:${name}`} data-pointer-name={name} transition={{ layout: { duration } }} onLayoutAnimationComplete={() => onEntityComplete(`pointer:${name}`)} key={name}>{name}</m.span>)}</div>
-          <div className="linked-node" aria-label={`${node.id}, value ${node.value}`}>
+        <m.div layout layoutId={`node:${node.id}`} data-node-id={node.id} className={`linked-node-wrap ${pointersByNode[node.id]?.includes('head') ? 'has-head' : ''} ${pointersByNode[node.id]?.includes('current') ? 'is-current' : ''}`} initial={event?.transition?.enter?.includes(node.id) ? { opacity: 0, scale: .72 } : false} animate={{ opacity: 1, scale: 1, y: pointersByNode[node.id]?.includes('current') ? -7 : 0 }} exit={{ opacity: 0, scale: .72 }} transition={{ layout: { duration }, opacity: { duration: Math.min(duration, .18) } }} onLayoutAnimationComplete={() => onEntityComplete(node.id)} onAnimationComplete={() => onEntityComplete(node.id)}>
+          <div className="pointer-labels">{(pointersByNode[node.id] || []).map((name) => <m.span layout layoutId={`pointer:${name}`} data-pointer-name={name} className={`pointer-${name.toLowerCase()}`} transition={{ layout: { duration } }} onLayoutAnimationComplete={() => onEntityComplete(`pointer:${name}`)} key={name}>{name}</m.span>)}</div>
+          <div className="linked-node" aria-label={`${node.id}, value ${node.value}${pointersByNode[node.id]?.includes('current') ? ', current node' : ''}${pointersByNode[node.id]?.includes('head') ? ', head node' : ''}`}>
             <strong>{node.value}</strong><span className={frame.highlightedEdges?.some((edge) => edge.from === node.id) ? 'is-highlighted' : ''}>●</span>
           </div>
           <small>{node.id}</small>
@@ -155,7 +176,7 @@ const LinkedListRenderer = memo(function LinkedListRenderer({ frame, event, dura
           ? <m.div layout data-edge-id={`edge:${node.id}->${nodes[index + 1].id}`} initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }} transition={{ duration }} onAnimationComplete={() => onEntityComplete(`edge:${node.id}->${nodes[index + 1].id}`)} className={`linked-arrow ${frame.highlightedEdges?.some((edge) => edge.from === node.id && edge.to === nodes[index + 1].id) ? 'is-highlighted' : ''}`} aria-hidden="true">→</m.div>
           : index < nodes.length - 1 ? <div className="linked-chain-gap" aria-hidden="true"/> : null}
       </React.Fragment>)}
-      <div className="linked-null"><span>NULL</span>{(pointersByNode.NULL || []).map((name) => <m.small layout layoutId={`pointer:${name}`} data-pointer-name={name} transition={{ layout: { duration } }} onLayoutAnimationComplete={() => onEntityComplete(`pointer:${name}`)} key={name}>{name}</m.small>)}</div>
+      <div className="linked-null"><span>NULL</span>{(pointersByNode.NULL || []).map((name) => <m.small layout layoutId={`pointer:${name}`} data-pointer-name={name} className={`pointer-${name.toLowerCase()}`} transition={{ layout: { duration } }} onLayoutAnimationComplete={() => onEntityComplete(`pointer:${name}`)} key={name}>{name}</m.small>)}</div>
     </div>
   </LayoutGroup></div>;
 });
@@ -198,9 +219,29 @@ const ObjectModelRenderer = memo(function ObjectModelRenderer({ frame }) {
 
 BSITVisualizerRegistry.registerRenderer('object-model', ObjectModelRenderer);
 
+function ObjectModelSurface({ activity, frame }) {
+  const dialogRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (open && !dialog?.open) dialog?.showModal();
+    if (!open && dialog?.open) dialog.close();
+  }, [open]);
+  return <>
+    <button type="button" className="object-expand-button" aria-haspopup="dialog" onClick={() => setOpen(true)}><Icon name="expand" size={16}/> Expand model</button>
+    <ObjectModelRenderer frame={frame}/>
+    <dialog ref={dialogRef} className="object-model-dialog" aria-labelledby="object-model-dialog-title" onClose={() => setOpen(false)}>
+      {open ? <><header><div><span>Full model view</span><h2 id="object-model-dialog-title">{activity.title}</h2></div><button type="button" onClick={() => setOpen(false)} aria-label="Close full model view"><Icon name="close"/></button></header>
+      <div className="object-model-dialog-body"><ObjectModelRenderer frame={frame}/></div></> : null}
+    </dialog>
+  </>;
+}
+
 function SourcePanel({ activity, event, source }) {
   const [copyState, setCopyState] = useState('Copy Python');
+  const activeLineRef = useRef(null);
   const activeLine = event?.source?.line || (event?.type === 'complete' ? source.length : Math.min(2, source.length));
+  useEffect(() => { activeLineRef.current?.scrollIntoView({ block: 'nearest' }); }, [activeLine, activity.id]);
   async function copySource() {
     const text = source.join('\n');
     try {
@@ -214,7 +255,7 @@ function SourcePanel({ activity, event, source }) {
   }
   return <section className="source-panel" aria-label={activity.language === 'python' ? 'Python source' : 'Pseudocode'}>
     {activity.language === 'python' ? <header className="source-language"><strong>Python source</strong><button type="button" onClick={copySource}><Icon name="code" size={16}/>{copyState}</button></header> : null}
-    {source.map((line, index) => <div className={`source-line ${activeLine === index + 1 ? 'is-current' : ''}`} key={`${activity.id}:${index}`}>
+    {source.map((line, index) => <div ref={activeLine === index + 1 ? activeLineRef : null} className={`source-line ${activeLine === index + 1 ? 'is-current' : ''}`} key={`${activity.id}:${index}`}>
       <span>{index + 1}</span><code>{line}</code>
     </div>)}
   </section>;
@@ -329,6 +370,7 @@ function MobileActivityPicker({ activities, selectedId, onSelect }) {
 function ArrayDataControls({ activity, inputs, setInputs, onShuffle }) {
   const [draft, setDraft] = useState(inputs.values.join(', '));
   const [error, setError] = useState('');
+  const [controlsOpen, setControlsOpen] = useState(() => window.innerWidth > 1000 && window.innerHeight >= 800);
   useEffect(() => setDraft(inputs.values.join(', ')), [activity.id, inputs.values]);
   function apply() {
     const parts = draft.split(/[,\s]+/).filter(Boolean);
@@ -338,7 +380,7 @@ function ArrayDataControls({ activity, inputs, setInputs, onShuffle }) {
     setError(''); setInputs((current) => ({ ...current, values: parts.map(Number) }));
   }
   if (activity.input.editable === false) return <div className="data-controls curated-note"><strong>Curated pseudocode activity</strong><span>Open it in Pseudocode Lab to edit or experiment with compatible node programs.</span></div>;
-  return <details className="data-controls" open>
+  return <details className="data-controls" open={controlsOpen} onToggle={(event) => setControlsOpen(event.currentTarget.open)}>
     <summary>Data and inputs</summary>
     <div className="data-grid">
       <label>Custom values (comma-separated)<span><input value={draft} onChange={(e) => setDraft(e.target.value)} /><button type="button" onClick={apply}>Apply</button></span></label>
@@ -351,12 +393,28 @@ function ArrayDataControls({ activity, inputs, setInputs, onShuffle }) {
 }
 
 function OOPDataControls({ activity, inputs, setInputs }) {
-  return <section className="oop-data-controls" aria-label="Scenario inputs">
-    <div><strong>Scenario</strong><span>Edit the values; the guided timeline rebuilds immediately.</span></div>
-    {activity.input.controls.map((control) => <label key={control.key}>{control.label}<input type={control.type} value={inputs[control.key] ?? ''}
-      min={control.min} max={control.max} maxLength={control.maxLength}
-      onChange={(event) => setInputs((current) => ({ ...current, [control.key]: control.type === 'number' ? Number(event.target.value) : event.target.value.slice(0, control.maxLength || 100) }))}/></label>)}
-    <button type="button" onClick={() => setInputs({ ...activity.input.defaults })}><Icon name="previous" size={16}/> Reset</button>
+  const dialogRef = useRef(null);
+  const [draft, setDraft] = useState(() => ({ ...inputs }));
+  const summary = activity.input.controls.map((control) => `${control.label}: ${inputs[control.key]}`).join(' · ');
+  function openDialog() { setDraft({ ...inputs }); dialogRef.current?.showModal(); }
+  function closeDialog() { dialogRef.current?.close(); }
+  function applyScenario(event) { event.preventDefault(); setInputs({ ...draft }); closeDialog(); }
+  return <section className="oop-scenario-launcher" aria-label="Scenario">
+    <div><strong>Scenario</strong><span>{summary}</span></div>
+    <button type="button" aria-haspopup="dialog" onClick={openDialog}><Icon name="grid" size={16}/> Edit scenario</button>
+    <dialog ref={dialogRef} className="scenario-dialog" aria-labelledby="scenario-dialog-title">
+      <form onSubmit={applyScenario}>
+        <header><div><span>Activity inputs</span><h2 id="scenario-dialog-title">Edit scenario</h2></div><button type="button" onClick={closeDialog} aria-label="Close scenario dialog"><Icon name="close"/></button></header>
+        <div className="scenario-dialog-fields">{activity.input.controls.map((control) => {
+          const id = `scenario-${activity.id}-${control.key}`;
+          return <label htmlFor={id} key={control.key}>{control.label}<input id={id} type={control.type} value={draft[control.key] ?? ''}
+            min={control.min} max={control.max} maxLength={control.maxLength}
+            onChange={(event) => setDraft((current) => ({ ...current, [control.key]: control.type === 'number' ? Number(event.target.value) : event.target.value.slice(0, control.maxLength || 100) }))}/></label>;
+        })}</div>
+        <p>Apply the values to rebuild the Python source and guided timeline.</p>
+        <footer><button type="button" className="scenario-reset" onClick={() => setDraft({ ...activity.input.defaults })}>Reset defaults</button><button type="button" onClick={closeDialog}>Cancel</button><button type="submit" className="scenario-apply">Apply scenario</button></footer>
+      </form>
+    </dialog>
   </section>;
 }
 
@@ -446,7 +504,7 @@ function App() {
       <div className="mobile-surface-tabs" role="tablist" aria-label="Workspace view">{mobileTabs.map(([id, icon, label]) => <button type="button" role="tab" aria-selected={mobileTab === id} className={mobileTab === id ? 'active' : ''} onClick={() => setMobileTab(id)} key={id}><Icon name={icon}/>{label}</button>)}</div>
       <div className={`desktop-source mobile-surface ${mobileTab === 'code' ? 'mobile-active' : ''}`}><SourcePanel activity={activity} event={event} source={source}/></div>
       <section className={`visual-canvas mobile-surface ${mobileTab === 'visualize' ? 'mobile-active' : ''}`} tabIndex="0" aria-label={`${activity.title} visualization canvas`}>
-        <Renderer frame={event?.frame} event={event} activity={activity} motionMode={motionPreference.mode} duration={visualDuration} onEntityComplete={onEntityComplete}/>
+        {activity.renderer === 'object-model' ? <ObjectModelSurface activity={activity} frame={event?.frame}/> : <Renderer frame={event?.frame} event={event} activity={activity} motionMode={motionPreference.mode} duration={visualDuration} onEntityComplete={onEntityComplete}/>}
       </section>
       <p id="result-caption" className="current-step" aria-live="polite"><span>{playback.index + 1}</span>{event?.message || 'Preparing activity…'}</p>
       <div className={`mobile-evidence mobile-surface ${mobileTab === 'trace' || mobileTab === 'more' ? 'mobile-active' : ''}`}>

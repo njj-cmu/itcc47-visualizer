@@ -84,6 +84,26 @@ test('array-list activity synchronizes source, structure, trace, and metrics', a
   await expect(visibleEvidence.getByText('These algorithm metrics are never added to it.')).toBeVisible();
 });
 
+test('insertion shifts stage the held value and moving block without visual overwrite', async ({ page }) => {
+  await page.goto('/visualizer.html?activity=insertion-sort');
+  const slider = page.locator('#step-slider');
+  await slider.fill('3');
+  await expect(page.locator('.array-held-value')).toContainText('held17');
+  await expect(page.locator('.array-moving-value')).toContainText('42');
+  await expect(page.locator('.array-cell.is-empty')).toHaveCount(1);
+  await expect(page.locator('.array-cell.is-receiving')).toHaveCount(1);
+  const geometry = await page.evaluate(() => {
+    const indices = [...document.querySelectorAll('.array-index')].map((node) => node.getBoundingClientRect().bottom);
+    const connector = document.querySelector('.array-connector').getBoundingClientRect();
+    return { lowestIndex: Math.max(...indices), connectorTop: connector.top };
+  });
+  expect(geometry.connectorTop).toBeGreaterThan(geometry.lowestIndex + 8);
+  for (let step = 0; step < 5; step += 1) await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('.array-held-value')).toContainText('held8');
+  await expect(page.locator('.array-cell.is-empty')).toHaveCount(1);
+  await expect(page.locator('.array-moving-value')).toHaveCount(0);
+});
+
 test('linked-list head insertion synchronizes references, links, source, and metrics', async ({ page }, testInfo) => {
   await page.goto('/visualizer.html?activity=linked-list-insert-head');
   await expect(page.getByRole('heading', { name: 'Insert at the head' })).toBeVisible();

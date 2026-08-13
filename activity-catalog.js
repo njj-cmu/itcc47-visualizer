@@ -62,9 +62,10 @@ const ITCC47Activities = (() => {
       events.push(arrayListEvent(this.id, events.length, 'state', `Insert ${value} at index ${index}.`, values, { moves, writes: 0 }, { line: 1, code: this.source[0] }, { markers: { index } }));
       values.push(null);
       for (let i = values.length - 2; i >= index; i--) {
+        const displacedValue = values[i + 1];
         values[i + 1] = values[i];
         moves += 1;
-        events.push(arrayListEvent(this.id, events.length, 'move', `Shift ${values[i]} from index ${i} to ${i + 1}.`, values, { moves, writes: moves }, { line: 4, code: this.source[3] }, { highlight: { move: [i, i + 1] }, markers: { index } }));
+        events.push(arrayListEvent(this.id, events.length, 'move', `Shift ${values[i]} from index ${i} to ${i + 1}.`, values, { moves, writes: moves }, { line: 4, code: this.source[3] }, { highlight: { move: [i, i + 1], held: { value, from: index, hole: i }, transition: { kind: 'shift', from: i, to: i + 1, value: values[i], displacedValue } }, markers: { index } }));
       }
       values[index] = value;
       events.push(arrayListEvent(this.id, events.length, 'insert', `Store ${value} at index ${index}.`, values, { moves, writes: moves + 1 }, { line: 5, code: this.source[4] }, { highlight: { found: index }, markers: { index }, terminal: true }));
@@ -89,9 +90,10 @@ const ITCC47Activities = (() => {
       let moves = 0;
       events.push(arrayListEvent(this.id, events.length, 'remove', `Mark ${removed} at index ${index} for removal.`, values, { moves, writes: 0 }, { line: 2, code: this.source[1] }, { highlight: { compare: [index] }, markers: { index } }));
       for (let i = index; i < values.length - 1; i++) {
+        const displacedValue = values[i];
         values[i] = values[i + 1];
         moves += 1;
-        events.push(arrayListEvent(this.id, events.length, 'move', `Shift ${values[i]} from index ${i + 1} to ${i}.`, values, { moves, writes: moves }, { line: 4, code: this.source[3] }, { highlight: { move: [i, i + 1] }, markers: { index } }));
+        events.push(arrayListEvent(this.id, events.length, 'move', `Shift ${values[i]} from index ${i + 1} to ${i}.`, values, { moves, writes: moves }, { line: 4, code: this.source[3] }, { highlight: { move: [i, i + 1], transition: { kind: 'shift', from: i + 1, to: i, value: values[i], displacedValue } }, markers: { index } }));
       }
       values.pop();
       events.push(arrayListEvent(this.id, events.length, 'complete', `Removed ${removed}; logical size is now ${values.length}.`, values, { moves, writes: moves }, { line: 5, code: this.source[4] }, { highlight: { sorted: values.map((_, i) => i) }, terminal: true }));

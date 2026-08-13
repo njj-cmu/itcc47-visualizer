@@ -10,6 +10,12 @@ const tstate = {
   symbolSelection: {},
   symbolSignature: '',
   branchSelections: {},
+  recurrenceConfirmed: false,
+  recurrenceFunction: '',
+  recurrenceMeasure: '',
+  recurrenceBranch: '',
+  recurrenceCombine: '',
+  selectedFrameId: null,
 };
 
 const tels = {
@@ -27,12 +33,32 @@ const tels = {
   stepSlider: document.getElementById('step-slider'),
   stepCounter: document.getElementById('step-counter'),
   varsBox: document.getElementById('vars-box'),
+  callStackBox: document.getElementById('call-stack-box'),
   outputBox: document.getElementById('output-box'),
   traceBody: document.getElementById('trace-body'),
   tabTrace: document.getElementById('tab-trace'),
   tabOps: document.getElementById('tab-ops'),
+  tabRecurrence: document.getElementById('tab-recurrence'),
   panelTrace: document.getElementById('panel-trace'),
   panelOps: document.getElementById('panel-ops'),
+  panelRecurrence: document.getElementById('panel-recurrence'),
+  recurrenceEmpty: document.getElementById('recurrence-empty'),
+  recurrenceContent: document.getElementById('recurrence-content'),
+  recurrenceFunctionSelect: document.getElementById('recurrence-function'),
+  recurrenceMeasureSelect: document.getElementById('recurrence-measure'),
+  btnConfirmRecurrence: document.getElementById('btn-confirm-recurrence'),
+  recurrenceConfirmStatus: document.getElementById('recurrence-confirm-status'),
+  recurrenceAssumptions: document.getElementById('recurrence-assumptions'),
+  recurrenceResult: document.getElementById('recurrence-result'),
+  recurrenceFormula: document.getElementById('recurrence-formula'),
+  recurrenceConfidence: document.getElementById('recurrence-confidence'),
+  recurrenceActualCalls: document.getElementById('recurrence-actual-calls'),
+  recurrenceActualDepth: document.getElementById('recurrence-actual-depth'),
+  recurrenceBigO: document.getElementById('recurrence-big-o'),
+  recurrenceTheta: document.getElementById('recurrence-theta'),
+  recurrenceSpace: document.getElementById('recurrence-space'),
+  recurrenceDerivation: document.getElementById('recurrence-derivation'),
+  recurrenceDiagnostics: document.getElementById('recurrence-diagnostics'),
   opsEmpty: document.getElementById('ops-empty'),
   opsContent: document.getElementById('ops-content'),
   opsTotal: document.getElementById('ops-total-value'),
@@ -188,6 +214,12 @@ function runCode() {
   tstate.symbolSelection = {};
   tstate.symbolSignature = '';
   tstate.branchSelections = {};
+  tstate.recurrenceConfirmed = false;
+  tstate.recurrenceFunction = '';
+  tstate.recurrenceMeasure = '';
+  tstate.recurrenceBranch = '';
+  tstate.recurrenceCombine = '';
+  tstate.selectedFrameId = null;
 
   buildCodeView(source);
   tels.codeBox.classList.add('hidden');
@@ -201,8 +233,90 @@ function runCode() {
 
   buildTraceTable();
   renderOperations();
+  renderRecurrence();
   tracerPlayback.load(steps);
   selectMobileWorkspace('results');
+}
+
+// ---------- guided recurrence analysis ----------
+
+function renderRecurrence() {
+  const functions = tstate.ast && tstate.ast.type === 'Program' ? tstate.ast.functions : [];
+  const recursive = functions.filter((fn) => {
+    let found = false;
+    const walk = (block) => (block || []).forEach((stmt) => {
+      if (stmt.type === 'Call' && stmt.name === fn.name) found = true;
+      if (stmt.block) walk(stmt.block);
+      (stmt.branches || []).forEach((branch) => walk(branch.block));
+      (stmt.cases || []).forEach((item) => walk(item.block));
+      if (stmt.defaultBlock) walk(stmt.defaultBlock);
+    });
+    walk(fn.block);
+    return found;
+  });
+  const available = tstate.running && recursive.length > 0;
+  tels.recurrenceEmpty.classList.toggle('hidden', available);
+  tels.recurrenceContent.classList.toggle('hidden', !available);
+  if (!available) return;
+
+  if (!recursive.some((fn) => fn.name === tstate.recurrenceFunction)) tstate.recurrenceFunction = recursive[0].name;
+  const previousFunction = tels.recurrenceFunctionSelect.value;
+  tels.recurrenceFunctionSelect.innerHTML = recursive.map((fn) => `<option value="${escapeHtml(fn.name)}">${escapeHtml(fn.name)}</option>`).join('');
+  tels.recurrenceFunctionSelect.value = tstate.recurrenceFunction || previousFunction;
+  const measures = ITCC47Recurrence.suggestMeasures(tstate.ast, tstate.recurrenceFunction);
+  if (!measures.some((measure) => measure.id === tstate.recurrenceMeasure)) tstate.recurrenceMeasure = measures[0]?.id || '';
+  tels.recurrenceMeasureSelect.innerHTML = measures.length
+    ? measures.map((measure) => `<option value="${escapeHtml(measure.id)}">${escapeHtml(measure.label)} — ${escapeHtml(measure.reason)}</option>`).join('')
+    : '<option value="">No size measure suggested</option>';
+  tels.recurrenceMeasureSelect.value = tstate.recurrenceMeasure;
+  tels.recurrenceConfirmStatus.textContent = tstate.recurrenceConfirmed ? `Confirmed: ${measures.find((item) => item.id === tstate.recurrenceMeasure)?.label || tstate.recurrenceMeasure}` : 'Not confirmed';
+  tels.recurrenceConfirmStatus.classList.toggle('confirmed', tstate.recurrenceConfirmed);
+
+  const actualCalls = tstate.steps.filter((step) => step.type === 'call' && step.frame.functionName === tstate.recurrenceFunction).length;
+  const actualDepth = tstate.steps.reduce((max, step) => Math.max(max, step.frame.callDepth || 0), 0);
+  tels.recurrenceActualCalls.textContent = String(actualCalls);
+  tels.recurrenceActualDepth.textContent = String(actualDepth);
+  if (!tstate.recurrenceConfirmed) {
+    tels.recurrenceAssumptions.classList.add('hidden');
+    tels.recurrenceResult.classList.add('hidden');
+    tels.recurrenceDiagnostics.classList.add('hidden');
+    return;
+  }
+
+  const analysis = ITCC47Recurrence.analyse({
+    program: tstate.ast,
+    functionName: tstate.recurrenceFunction,
+    measure: tstate.recurrenceMeasure,
+    branchSelection: tstate.recurrenceBranch || undefined,
+    combineBound: tstate.recurrenceCombine || undefined,
+  });
+  const branchRequirement = analysis.requiredAssumptions.find((item) => item.kind === 'worst-case-branch');
+  const combinePrompt = !branchRequirement && !tstate.recurrenceCombine;
+  tels.recurrenceAssumptions.innerHTML = branchRequirement
+    ? `<fieldset class="assumption-fieldset"><legend>Which recursive branch is the worst case?</legend>${branchRequirement.candidates.map((item) => `<label><input type="radio" name="recurrence-branch" value="${escapeHtml(item.value)}"><span>${escapeHtml(item.label)}</span></label>`).join('')}<p>This session-only choice resets when the code changes.</p></fieldset>`
+    : combinePrompt ? `<fieldset class="assumption-fieldset"><legend>Bound the non-recursive work in one call</legend>
+      <label><input type="radio" name="recurrence-combine" value="constant"><span>Constant, c</span></label>
+      <label><input type="radio" name="recurrence-combine" value="linear"><span>Linear in the confirmed size, cn</span></label>
+      <p>Choose only what the work outside recursive calls justifies.</p></fieldset>` : '';
+  tels.recurrenceAssumptions.classList.toggle('hidden', !tels.recurrenceAssumptions.innerHTML);
+  tels.recurrenceAssumptions.querySelectorAll('input').forEach((input) => input.addEventListener('change', () => {
+    if (input.name === 'recurrence-branch') tstate.recurrenceBranch = input.value;
+    else tstate.recurrenceCombine = input.value;
+    renderRecurrence();
+  }));
+
+  const solved = Boolean(analysis.recurrence) && !combinePrompt;
+  tels.recurrenceResult.classList.toggle('hidden', !solved);
+  if (solved) {
+    tels.recurrenceFormula.textContent = analysis.recurrence;
+    tels.recurrenceConfidence.textContent = 'Worst case, based on the confirmed size and combine-work assumptions.';
+    tels.recurrenceBigO.textContent = analysis.bigO || '—';
+    tels.recurrenceTheta.textContent = analysis.tightTheta || 'Not established';
+    tels.recurrenceSpace.textContent = analysis.stackSpace || '—';
+    tels.recurrenceDerivation.innerHTML = `<h3>How was this solved?</h3><ol>${analysis.derivation.map((step) => `<li>${escapeHtml(step)}</li>`).join('')}</ol>`;
+  }
+  tels.recurrenceDiagnostics.innerHTML = analysis.diagnostics.map((item) => `<div class="ops-diagnostic"><strong>${escapeHtml(item.code)}:</strong> ${escapeHtml(item.message)}</div>`).join('');
+  tels.recurrenceDiagnostics.classList.toggle('hidden', analysis.diagnostics.length === 0 || branchRequirement || combinePrompt);
 }
 
 // ---------- operation counting ----------
@@ -408,6 +522,7 @@ function exitRunMode() {
   tels.btnPlay.textContent = 'Play';
   tels.traceBody.innerHTML = '';
   tels.varsBox.textContent = 'Run the pseudocode to see variable state.';
+  tels.callStackBox.textContent = 'No function is active.';
   tels.outputBox.textContent = '(no output yet)';
   tels.statusLine.textContent = 'Write or load pseudocode, then Run.';
   tels.opsEmpty.classList.remove('hidden');
@@ -460,10 +575,23 @@ function renderStep() {
     keepInView(card, lineEl, toolbar ? toolbar.offsetHeight : 0);
   }
 
-  const varNames = Object.keys(step.frame.vars);
+  const frames = step.frame.callStack || [];
+  if (!frames.some((frame) => frame.id === tstate.selectedFrameId)) tstate.selectedFrameId = step.frame.activeFrameId;
+  const selectedFrame = frames.find((frame) => frame.id === tstate.selectedFrameId);
+  const visibleVars = selectedFrame ? selectedFrame.locals : step.frame.vars;
+  const varNames = Object.keys(visibleVars || {});
   tels.varsBox.innerHTML = varNames.length
-    ? varNames.map((k) => `<div class="var-row"><span class="var-name">${escapeHtml(k)}</span><span class="var-value">${escapeHtml(step.frame.vars[k])}</span></div>`).join('')
+    ? `${selectedFrame ? `<p class="frame-scope-label">Locals in ${escapeHtml(selectedFrame.functionName)}</p>` : ''}${varNames.map((k) => `<div class="var-row"><span class="var-name">${escapeHtml(k)}</span><span class="var-value">${escapeHtml(visibleVars[k])}</span></div>`).join('')}${selectedFrame && Object.keys(step.frame.globals || {}).length ? `<details class="global-scope"><summary>Globals</summary>${Object.entries(step.frame.globals).map(([name, value]) => `<div class="var-row"><span class="var-name">${escapeHtml(name)}</span><span class="var-value">${escapeHtml(value)}</span></div>`).join('')}</details>` : ''}`
     : '<span class="muted">(no variables yet)</span>';
+
+  tels.callStackBox.innerHTML = frames.length ? frames.slice().reverse().map((frame) => `<details class="call-frame${frame.id === tstate.selectedFrameId ? ' active' : ''}" data-frame-id="${escapeHtml(frame.id)}"${frame.id === step.frame.activeFrameId ? ' open' : ''}>
+    <summary><span><strong>${escapeHtml(frame.functionName)}</strong><small>depth ${frame.depth}</small></span><code>line ${frame.callLine}</code></summary>
+    <div class="call-frame-body"><p>${Object.entries(frame.arguments).map(([name, value]) => `${escapeHtml(name)} = ${escapeHtml(value)}`).join(', ') || 'No arguments'}</p><button class="btn btn-small select-frame" type="button">Show these locals</button></div>
+  </details>`).join('') : '<span class="muted">No function is active.</span>';
+  tels.callStackBox.querySelectorAll('.select-frame').forEach((button) => button.addEventListener('click', () => {
+    tstate.selectedFrameId = button.closest('.call-frame').dataset.frameId;
+    renderStep();
+  }));
 
   const outputs = tstate.steps.slice(0, tstate.stepIndex + 1).filter((s) => s.type === 'write').map((s) => s.frame.outputValue);
   tels.outputBox.innerHTML = outputs.length
@@ -515,19 +643,25 @@ tels.speedSlider.addEventListener('input', () => tracerPlayback.setSpeed(tels.sp
 
 function selectTab(which) {
   const ops = which === 'ops';
+  const recurrence = which === 'recurrence';
   tels.tabOps.classList.toggle('active', ops);
-  tels.tabTrace.classList.toggle('active', !ops);
+  tels.tabRecurrence.classList.toggle('active', recurrence);
+  tels.tabTrace.classList.toggle('active', !ops && !recurrence);
   tels.tabOps.setAttribute('aria-selected', String(ops));
-  tels.tabTrace.setAttribute('aria-selected', String(!ops));
+  tels.tabRecurrence.setAttribute('aria-selected', String(recurrence));
+  tels.tabTrace.setAttribute('aria-selected', String(!ops && !recurrence));
   tels.tabOps.tabIndex = ops ? 0 : -1;
-  tels.tabTrace.tabIndex = ops ? -1 : 0;
+  tels.tabRecurrence.tabIndex = recurrence ? 0 : -1;
+  tels.tabTrace.tabIndex = !ops && !recurrence ? 0 : -1;
   tels.panelOps.classList.toggle('hidden', !ops);
-  tels.panelTrace.classList.toggle('hidden', ops);
+  tels.panelRecurrence.classList.toggle('hidden', !recurrence);
+  tels.panelTrace.classList.toggle('hidden', ops || recurrence);
 }
 
 tels.tabTrace.addEventListener('click', () => selectTab('trace'));
 tels.tabOps.addEventListener('click', () => selectTab('ops'));
-[tels.tabTrace, tels.tabOps].forEach((tab, index, tabs) => {
+tels.tabRecurrence.addEventListener('click', () => selectTab('recurrence'));
+[tels.tabTrace, tels.tabOps, tels.tabRecurrence].forEach((tab, index, tabs) => {
   tab.addEventListener('keydown', (event) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
@@ -559,6 +693,29 @@ tels.sweepMax.addEventListener('input', () => {
 });
 
 tels.btnMeasure.addEventListener('click', renderGrowth);
+tels.recurrenceFunctionSelect.addEventListener('change', () => {
+  tstate.recurrenceFunction = tels.recurrenceFunctionSelect.value;
+  tstate.recurrenceMeasure = '';
+  tstate.recurrenceConfirmed = false;
+  tstate.recurrenceBranch = '';
+  tstate.recurrenceCombine = '';
+  renderRecurrence();
+});
+tels.recurrenceMeasureSelect.addEventListener('change', () => {
+  tstate.recurrenceMeasure = tels.recurrenceMeasureSelect.value;
+  tstate.recurrenceConfirmed = false;
+  tstate.recurrenceBranch = '';
+  tstate.recurrenceCombine = '';
+  renderRecurrence();
+});
+tels.btnConfirmRecurrence.addEventListener('click', () => {
+  tstate.recurrenceFunction = tels.recurrenceFunctionSelect.value;
+  tstate.recurrenceMeasure = tels.recurrenceMeasureSelect.value;
+  tstate.recurrenceConfirmed = Boolean(tstate.recurrenceMeasure);
+  tstate.recurrenceBranch = '';
+  tstate.recurrenceCombine = '';
+  renderRecurrence();
+});
 
 // ---------- dialogs ----------
 

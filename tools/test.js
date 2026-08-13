@@ -53,6 +53,9 @@ const countingEngine = load(['interpreter.js', 'playback.js', 'complexity.js', '
 const Counting = countingEngine.get('ITCC47Counting');
 const parseForCounting = countingEngine.get('parsePseudocode');
 const collectForCounting = countingEngine.get('collectSteps');
+const recurrenceEngine = load(['interpreter.js', 'recurrence.js']);
+const Recurrence = recurrenceEngine.get('ITCC47Recurrence');
+const parseForRecurrence = recurrenceEngine.get('parsePseudocode');
 
 function analyseCount(src, inputs, model = 'lecture', inputName = 'n', extra = {}) {
   const ast = parseForCounting(src);
@@ -162,6 +165,124 @@ ok('division by zero is rejected on the correct line', zeroDivision && zeroDivis
 let threw = false;
 try { outputs('WRITE mystery', []); } catch (e) { threw = true; }
 ok('unassigned variable is an error', threw);
+
+// ---------- recursive functions and call frames ----------
+
+section('recursive functions and call frames');
+
+const FACTORIAL = `FUNCTION Factorial(n)
+ IF n <= 1 THEN
+  RETURN 1
+ ENDIF
+ CALL Factorial(n - 1) INTO smaller
+ RETURN n * smaller
+ENDFUNCTION
+CALL Factorial(5) INTO answer
+WRITE answer`;
+ok('parser returns a Program root with hoisted functions', (() => {
+  const ast = parse(FACTORIAL);
+  return ast.type === 'Program' && ast.functions.length === 1 && ast.body[0].type === 'Call';
+})());
+ok('forward recursive call returns a value', eq(tryOutputs(FACTORIAL, []), [120]));
+ok('CALL without INTO may ignore a return value', eq(tryOutputs('FUNCTION F(x)\n RETURN x\nENDFUNCTION\nCALL F(7)\nWRITE 1', []), [1]));
+ok('LENGTH accepts arrays', eq(tryOutputs('values <- [1, 2, 3]\nWRITE LENGTH(values)', []), [3]));
+let lengthError = null;
+try { outputs('WRITE LENGTH(9)', []); } catch (e) { lengthError = e; }
+ok('LENGTH rejects scalars with a friendly diagnostic', lengthError && lengthError.code === 'E_LENGTH_TYPE');
+ok('array parameters mutate the caller by reference', eq(tryOutputs(`FUNCTION Change(values)
+ values[0] <- 9
+ENDFUNCTION
+a <- [1, 2]
+CALL Change(a)
+WRITE a[0]`, []), [9]));
+ok('rebinding an array parameter remains local', eq(tryOutputs(`FUNCTION Rebind(values)
+ values <- [9]
+ENDFUNCTION
+a <- [1, 2]
+CALL Rebind(a)
+WRITE a[0]`, []), [1]));
+ok('scalar parameters are passed by value', eq(tryOutputs('FUNCTION Change(x)\n x <- 9\nENDFUNCTION\nx <- 1\nCALL Change(x)\nWRITE x', []), [1]));
+ok('GLOBAL permits explicit caller-visible mutation', eq(tryOutputs('FUNCTION Inc()\n GLOBAL count\n count <- count + 1\nENDFUNCTION\ncount <- 4\nCALL Inc()\nWRITE count', []), [5]));
+let localError = null;
+try { outputs('FUNCTION F()\n WRITE x\n x <- 2\nENDFUNCTION\nx <- 1\nCALL F()', []); } catch (e) { localError = e; }
+ok('static locality rejects reading a local before assignment', localError && localError.code === 'E_LOCAL_BEFORE_ASSIGNMENT');
+let missingReturn = null;
+try { outputs('FUNCTION F()\n WRITE 1\nENDFUNCTION\nCALL F() INTO x', []); } catch (e) { missingReturn = e; }
+ok('INTO requires a returned value', missingReturn && missingReturn.code === 'E_MISSING_RETURN_VALUE');
+ok('top-level RETURN is rejected', !parses('RETURN 1'));
+ok('duplicate functions are rejected', !parses('FUNCTION F()\n RETURN 1\nENDFUNCTION\nFUNCTION F()\n RETURN 2\nENDFUNCTION'));
+ok('undefined calls are rejected', !parses('CALL Missing()'));
+ok('arity mismatches are rejected', !parses('FUNCTION F(x)\n RETURN x\nENDFUNCTION\nCALL F()'));
+ok('nested function definitions are rejected', !parses('FUNCTION F()\n FUNCTION G()\n  RETURN 1\n ENDFUNCTION\n RETURN 1\nENDFUNCTION'));
+let misplacedGlobal = null;
+try { parse('FUNCTION F()\n WRITE count\n GLOBAL count\nENDFUNCTION'); } catch (e) { misplacedGlobal = e; }
+ok('GLOBAL must precede first use', misplacedGlobal && misplacedGlobal.code === 'E_MISPLACED_GLOBAL');
+
+const functionRun = collectForCounting(parseForCounting(FACTORIAL), []);
+ok('call and return timeline events are emitted', functionRun.steps.some((step) => step.type === 'call') && functionRun.steps.some((step) => step.type === 'return'));
+ok('timeline frames contain immutable-style call-stack snapshots', functionRun.steps.some((step) => step.frame.callStack.length >= 4 && step.frame.activeFrameId));
+ok('INTO storage is exposed separately for Full Control', functionRun.steps.some((step) => step.type === 'call-store' && step.metrics.cost === 0 && step.metrics.controlCost > 0));
+ok('Lecture charges one operation for CALL', functionRun.steps.filter((step) => step.type === 'call').every((step) => step.metrics.cost === 1));
+
+// ---------- guided recurrence analysis ----------
+
+section('guided recurrence analysis');
+function recurrenceOf(source, name, measure, combineBound = 'constant', extra = {}) {
+  return Recurrence.analyse({ program: parseForRecurrence(source), functionName: name, measure, combineBound, ...extra });
+}
+const factorialRecurrence = recurrenceOf(FACTORIAL, 'Factorial', 'n');
+ok('linear recursion is recognized', factorialRecurrence.family === 'linear-recursion' && factorialRecurrence.bigO === 'O(n)');
+const BINARY = `FUNCTION Search(values, target, low, high)
+ IF low >= high THEN
+  RETURN low
+ ENDIF
+ mid <- (low + high) / 2
+ IF values[mid] < target THEN
+  CALL Search(values, target, mid + 1, high) INTO result
+ ELSE
+  CALL Search(values, target, low, mid) INTO result
+ ENDIF
+ RETURN result
+ENDFUNCTION`;
+const binaryAst = parseForRecurrence(BINARY);
+const binaryInitial = Recurrence.analyse({ program: binaryAst, functionName: 'Search', measure: 'high-low' });
+ok('branch-shaped recursion requests a visible worst-case choice', binaryInitial.requiredAssumptions.some((item) => item.kind === 'worst-case-branch'));
+const chosenBranch = binaryInitial.requiredAssumptions.find((item) => item.kind === 'worst-case-branch').candidates[0].value;
+const binaryRecurrence = Recurrence.analyse({ program: binaryAst, functionName: 'Search', measure: 'high-low', combineBound: 'constant', branchSelection: chosenBranch });
+ok('halving recursion derives logarithmic time and depth', binaryRecurrence.family === 'binary-halving' && binaryRecurrence.bigO === 'O(log n)' && binaryRecurrence.stackSpace === 'O(log n)');
+const FIB = `FUNCTION Fib(n)
+ IF n <= 1 THEN
+  RETURN n
+ ENDIF
+ CALL Fib(n - 1) INTO a
+ CALL Fib(n - 2) INTO b
+ RETURN a + b
+ENDFUNCTION`;
+ok('Fibonacci-style recursion gets an exponential upper bound', recurrenceOf(FIB, 'Fib', 'n').family === 'fibonacci');
+const SUBSETS = `FUNCTION Enumerate(n)
+ IF n <= 0 THEN
+  RETURN 1
+ ENDIF
+ CALL Enumerate(n - 1) INTO without
+ CALL Enumerate(n - 1) INTO with_item
+ RETURN without + with_item
+ENDFUNCTION`;
+ok('two T(n - 1) calls are recognized as subset enumeration', recurrenceOf(SUBSETS, 'Enumerate', 'n').family === 'binary-enumeration');
+const MUTUAL = `FUNCTION A(n)
+ IF n <= 0 THEN
+  RETURN 0
+ ENDIF
+ CALL B(n - 1) INTO x
+ RETURN x
+ENDFUNCTION
+FUNCTION B(n)
+ IF n <= 0 THEN
+  RETURN 0
+ ENDIF
+ CALL A(n - 1) INTO x
+ RETURN x
+ENDFUNCTION`;
+ok('mutual recursion is diagnosed as unsupported for symbolic solving', recurrenceOf(MUTUAL, 'A', 'n').diagnostics.some((item) => item.code === 'W_MUTUAL_RECURRENCE'));
 
 // ---------- exact symbolic operation counting ----------
 

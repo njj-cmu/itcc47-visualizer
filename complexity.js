@@ -36,10 +36,19 @@ function collectSteps(ast, inputs, maxSteps = MAX_STEPS) {
     message: step.description,
     frame: Object.freeze({
       vars: step.vars,
+      globals: step.globals,
       outputValue: step.outputValue,
       loopLine: step.loopLine,
       loopIterations: step.loopIterations,
       iteration: step.iteration,
+      callStack: step.callStack,
+      activeFrameId: step.activeFrameId,
+      functionName: step.functionName,
+      callSite: step.callSite,
+      callDepth: step.callDepth,
+      arguments: step.arguments,
+      returnedValue: step.returnedValue,
+      returnTarget: step.returnTarget,
     }),
     metrics: { cost: step.cost || 0, controlCost: step.controlCost || 0 },
     source: { line: step.line, code: step.code },
@@ -101,7 +110,7 @@ function loopDiagnostics(ast, steps, sourceLines) {
         if (s.defaultBlock) findLoops(s.defaultBlock);
       }
     });
-  })(ast);
+  })(ast && ast.type === 'Program' ? ast.body : ast);
 
   loopLines.forEach((loop) => {
     if (loop.type === 'While') {
@@ -145,7 +154,7 @@ function findReadTargets(ast) {
         if (s.defaultBlock) walk(s.defaultBlock);
       }
     });
-  })(ast);
+  })(ast && ast.type === 'Program' ? ast.body : ast);
   return found;
 }
 

@@ -35,11 +35,23 @@ function collectSteps(ast, inputs, maxSteps = MAX_STEPS) {
     type: step.kind || 'exec',
     message: step.description,
     frame: Object.freeze({
+      kind: 'pseudocode',
       vars: step.vars,
+      globals: step.globals,
+      heap: step.heap,
+      pointers: step.pointers,
       outputValue: step.outputValue,
       loopLine: step.loopLine,
       loopIterations: step.loopIterations,
       iteration: step.iteration,
+      callStack: step.callStack,
+      activeFrameId: step.activeFrameId,
+      functionName: step.functionName,
+      callSite: step.callSite,
+      callDepth: step.callDepth,
+      arguments: step.arguments,
+      returnedValue: step.returnedValue,
+      returnTarget: step.returnTarget,
     }),
     metrics: { cost: step.cost || 0, controlCost: step.controlCost || 0 },
     source: { line: step.line, code: step.code },
@@ -101,7 +113,7 @@ function loopDiagnostics(ast, steps, sourceLines) {
         if (s.defaultBlock) findLoops(s.defaultBlock);
       }
     });
-  })(ast);
+  })(ast && ast.type === 'Program' ? ast.body : ast);
 
   loopLines.forEach((loop) => {
     if (loop.type === 'While') {
@@ -145,7 +157,7 @@ function findReadTargets(ast) {
         if (s.defaultBlock) walk(s.defaultBlock);
       }
     });
-  })(ast);
+  })(ast && ast.type === 'Program' ? ast.body : ast);
   return found;
 }
 
@@ -154,7 +166,7 @@ function findReadTargets(ast) {
  * Later READs reuse the remaining original inputs, cycling if the program asks
  * for more than were supplied.
  */
-function sweep(ast, baseInputs, inputIndex, sizes, includeControl) {
+function sweep(ast, baseInputs, inputIndex, sizes, includeControl, sourceLines) {
   const points = [];
   const filler = baseInputs.filter((_, i) => i !== inputIndex);
 
@@ -170,7 +182,16 @@ function sweep(ast, baseInputs, inputIndex, sizes, includeControl) {
 
     const { steps, truncated, error } = collectSteps(ast, inputs, 60000);
     if (error) return { points, error: error.message || String(error) };
-    const total = steps.reduce((s, st) => s + st.metrics.cost + (includeControl ? st.metrics.controlCost : 0), 0);
+    const total = includeControl && typeof ITCC47Counting !== 'undefined'
+      ? ITCC47Counting.analyse({
+        ast,
+        steps,
+        sourceLines: sourceLines || [],
+        inputs,
+        model: 'full',
+        inputName: (findReadTargets(ast)[inputIndex] || {}).name,
+      }).actualTotal
+      : steps.reduce((s, st) => s + st.metrics.cost, 0);
     points.push({ n, total, truncated });
     if (truncated) break;
   }

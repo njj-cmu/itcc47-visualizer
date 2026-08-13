@@ -50,6 +50,32 @@ Content keeps stable activity/problem IDs and an explicit `contentVersion`.
 Changing the meaning of an activity or its test contract requires incrementing
 that version.
 
+## Symbolic operation counting
+
+`symbolic-counting.js` is another framework-neutral engine. Its versioned v2
+contract exposes exact `Rational` values and immutable `SymbolicExpr` nodes for
+rationals, symbols, addition, multiplication, powers, sums, floors, ceilings,
+maximums, and unknown expressions. `CountAnalysis` includes primary factored
+and secondary expanded forms, selected dimensions, domains, assumptions,
+worst-case choices, tight bounds, derivation steps, and compatibility aliases
+(`symbolicTotal` and `growthClass`).
+
+Release A proves straight-line statements, multivariable independent loops,
+dependent affine bounds, and closed forms whose loop-variable summands have
+degree at most two. It preserves exact fractions. Non-unit `STEP` and flooring
+bounds retain a structural max/floor expression when polynomial simplification
+would be unsound. Unsupported nonlinear bounds, data-dependent loops, and
+loop-altering `BREAK` produce diagnostics rather than invented formulas.
+
+Branches expose candidate paths and require a session-only worst-case choice.
+Symbol dimensions are also confirmed explicitly and reset with code changes;
+neither choice is stored as authoritative evidence.
+
+The Lecture model charges no operations to a `FOR` header. Full Control adds
+separate setup, condition-check, and increment rows; it never averages unequal
+control events into a misleading unit cost. The measured-growth sweep remains
+separate evidence and is not combined with the symbolic proof.
+
 ## Incremental React migration
 
 React should first replace one page shell while importing these unchanged
@@ -57,3 +83,50 @@ engines. Algorithm generation, parsing, evaluation, and playback remain outside
 components. Once the contract works for that feature, other shells can migrate
 without rewriting course behavior. Authentication belongs only in the hosted
 portal, not in the static practice build.
+
+## Functions, calls, and recurrences
+
+The parser root is `Program { functions, body }`. Top-level function definitions
+are hoisted, while `CALL` remains a statement so user-defined functions cannot
+be hidden inside expressions. The runtime keeps explicit logical call frames
+with stable IDs, arguments, locals, call sites, depths, and return destinations.
+Timeline frames receive immutable call-stack snapshots and an active-frame ID,
+allowing the current vanilla shell and a future React shell to render the same
+trace without consulting interpreter internals.
+
+Function scope follows the course's Python-oriented model: scalar arguments are
+values, arrays retain their reference, assigned names are statically local, and
+global mutation must be declared before first use. `STOP` terminates the whole
+program; `RETURN` exits only the active frame. Runtime depth is capped at 128,
+and exceeding it reports a probable missing or ineffective base case.
+
+`recurrence.js` exposes the versioned, framework-neutral `ITCC47Recurrence`
+contract. Analysis is deliberately guided: a student confirms the problem-size
+measure, chooses a visible worst-case recursive branch when necessary, and
+bounds unproved combine work. It reports the recurrence before the solution,
+then Big-O, tight Theta only when justified, recursion depth, and call-stack
+space. Actual calls from the current run remain separate evidence. Mutual
+recursion can execute but is explicitly unsupported by the symbolic solver.
+General graph symbols and assumptions remain reserved for later modules; no
+graph-specific representation is inferred here.
+
+## Singly linked node references
+
+The runtime value model includes `NULL` and opaque references created by
+`NEW NODE(value)`. A node has exactly `value` and `next` fields in this release;
+field access, field assignment, aliasing, and identity comparison work in
+globals, arrays, parameters, nested calls, and recursive calls. Invalid fields,
+scalar links, and dereferencing `NULL` produce explicit diagnostics.
+
+Heap ownership is deliberately separate from lexical call frames. The heap
+assigns deterministic identities such as `node:1`, while each timeline frame
+captures both the visible references in the active scopes and an immutable heap
+snapshot. This allows recursive functions to share node identity without
+moving heap objects into local environments.
+
+The activity catalog adapts those pseudocode frames into the shared
+`linked-list` renderer contract (`nodes`, `links`, named pointers, detached
+nodes, and highlighted edges). The Pseudocode Lab consumes the same curated
+source through an activity query parameter. Symbolic counting reports node
+allocation or field operations as unsupported and leaves the richer algebra
+engine intact; linked-list teaching metrics remain separate evidence.

@@ -19,5 +19,6 @@ desktop.ini
 setup/report.html
 
 node_modules/
+.visualizer-build/
 playwright-report/
 test-results/

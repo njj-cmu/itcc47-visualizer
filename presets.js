@@ -125,6 +125,41 @@ ENDFOR
 WRITE pairs`,
   },
   {
+    name: 'Counting: dependent pair loop — O(n²)',
+    inputs: '5',
+    code: `READ n
+count <- 0
+FOR i <- 1 TO n - 1 DO
+    FOR j <- i + 1 TO n DO
+        count <- count + 1
+    ENDFOR
+ENDFOR
+WRITE count`,
+  },
+  {
+    name: 'Counting: n by m grid — O(nm)',
+    inputs: '3, 4',
+    code: `READ n
+READ m
+visits <- 0
+FOR row <- 1 TO n DO
+    FOR column <- 1 TO m DO
+        visits <- visits + 1
+    ENDFOR
+ENDFOR
+WRITE visits`,
+  },
+  {
+    name: 'Loop: DOWNTO with STEP',
+    inputs: '9',
+    code: `READ n
+count <- 0
+FOR i <- n DOWNTO 1 STEP 2 DO
+    count <- count + 1
+ENDFOR
+WRITE count`,
+  },
+  {
     name: 'Counting: repeated halving — O(log n)',
     inputs: '16',
     code: `READ n
@@ -167,5 +202,54 @@ WHILE low <= high DO
     ENDIF
 ENDWHILE
 WRITE "NOT FOUND"`,
+  },
+  {
+    name: 'Recursive Lower Bound — O(log n)',
+    inputs: '',
+    code: `FUNCTION LowerBound(values, target, low, high)
+    IF low >= high THEN
+        RETURN low
+    ENDIF
+    mid <- (low + high) / 2
+    IF values[mid] < target THEN
+        CALL LowerBound(values, target, mid + 1, high) INTO answer
+    ELSE
+        CALL LowerBound(values, target, low, mid) INTO answer
+    ENDIF
+    RETURN answer
+ENDFUNCTION
+
+values <- [3, 8, 15, 22, 34, 41]
+CALL LowerBound(values, 20, 0, LENGTH(values)) INTO position
+WRITE position`,
+  },
+  {
+    name: 'Recursive Factorial — O(n)',
+    inputs: '5',
+    code: `FUNCTION Factorial(n)
+    IF n <= 1 THEN
+        RETURN 1
+    ENDIF
+    CALL Factorial(n - 1) INTO smaller
+    result <- n * smaller
+    RETURN result
+ENDFUNCTION
+
+READ n
+CALL Factorial(n) INTO answer
+WRITE answer`,
+  },
+  {
+    name: 'Array passed by reference',
+    inputs: '',
+    code: `FUNCTION ReplaceFirst(values, replacement)
+    values[0] <- replacement
+    RETURN values
+ENDFUNCTION
+
+numbers <- [4, 8, 15]
+CALL ReplaceFirst(numbers, 99) INTO same_numbers
+WRITE numbers[0]
+WRITE LENGTH(same_numbers)`,
   },
 ];

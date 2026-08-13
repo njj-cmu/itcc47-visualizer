@@ -23,8 +23,13 @@
 
 <div class="layout layout-2col">
 
+  <div class="mobile-work-tabs" role="tablist" aria-label="Tracer workspace">
+    <button id="mobile-tab-code" class="tab active" type="button" role="tab" aria-selected="true" aria-controls="tracer-stage">Code &amp; Run</button>
+    <button id="mobile-tab-results" class="tab" type="button" role="tab" aria-selected="false" aria-controls="tracer-results" tabindex="-1">Results</button>
+  </div>
+
   <!-- EDITOR COLUMN -->
-  <main class="stage">
+  <main id="tracer-stage" class="stage" role="tabpanel" aria-labelledby="mobile-tab-code">
     <div class="card editor-card">
       <div class="editor-toolbar">
         <button id="btn-examples" class="btn btn-toolbar btn-load" data-icon="example">Load Example</button>
@@ -71,6 +76,10 @@
           <h2 class="panel-title">Variables</h2>
           <div id="vars-box" class="vars-box muted">Run the pseudocode to see variable state.</div>
         </div>
+        <div class="state-panel call-stack-panel">
+          <h2 class="panel-title">Call Stack</h2>
+          <div id="call-stack-box" class="call-stack-box muted">No function is active.</div>
+        </div>
         <div class="state-panel">
           <h2 class="panel-title">Output</h2>
           <div id="output-box" class="vars-box muted">(no output yet)</div>
@@ -80,10 +89,11 @@
   </main>
 
   <!-- TRACE TABLE / OPERATION COUNTS -->
-  <aside class="trace-panel">
+  <aside id="tracer-results" class="trace-panel" role="tabpanel" aria-labelledby="mobile-tab-results">
     <div class="tabs" role="tablist" aria-label="Tracer details">
       <button id="tab-trace" class="tab active" role="tab" aria-selected="true" aria-controls="panel-trace">Trace Table</button>
       <button id="tab-ops" class="tab" role="tab" aria-selected="false" aria-controls="panel-ops" tabindex="-1">Operations</button>
+      <button id="tab-recurrence" class="tab" role="tab" aria-selected="false" aria-controls="panel-recurrence" tabindex="-1">Recurrence</button>
     </div>
 
     <div id="panel-trace" role="tabpanel" aria-labelledby="tab-trace">
@@ -99,51 +109,144 @@
       <div id="ops-empty" class="muted field-note">Run the pseudocode to count operations.</div>
 
       <div id="ops-content" class="hidden">
-        <div class="ops-total">
-          <span class="ops-total-label">T(n) for this input</span>
-          <strong id="ops-total-value">0</strong>
+        <div class="ops-toolbar">
+          <fieldset class="ops-fieldset">
+            <legend>View</legend>
+            <div class="segmented" role="group" aria-label="Operation count view">
+              <button id="ops-view-actual" class="segment active" type="button" aria-pressed="true">Actual</button>
+              <button id="ops-view-symbolic" class="segment" type="button" aria-pressed="false">Symbolic</button>
+            </div>
+          </fieldset>
+          <fieldset class="ops-fieldset">
+            <legend>Counting model</legend>
+            <div class="segmented">
+              <label class="segment"><input type="radio" name="count-model" value="lecture" checked><span>Lecture</span></label>
+              <label class="segment"><input type="radio" name="count-model" value="full"><span>Full Control</span></label>
+            </div>
+          </fieldset>
         </div>
 
-        <label class="checkline">
-          <input type="checkbox" id="opt-control">
-          <span>Count loop control (FOR headers)</span>
-        </label>
-        <p class="muted field-note" id="control-note">Off matches the lecture, where T(n) = 7n + 6 charges nothing for the FOR header.</p>
+        <section id="ops-symbol-picker" class="ops-symbol-picker hidden" aria-labelledby="ops-symbol-title">
+          <div>
+            <h3 id="ops-symbol-title">Symbolic dimensions</h3>
+            <p>Choose which <code>READ</code> values represent input size. Suggested values come from loop bounds; confirm them before analysis.</p>
+          </div>
+          <div id="ops-symbol-options" class="ops-symbol-options"></div>
+          <div class="ops-symbol-actions">
+            <span id="ops-symbol-status" class="ops-symbol-status" role="status">Not confirmed</span>
+            <button id="btn-confirm-symbols" class="btn btn-primary" type="button">Confirm dimensions</button>
+          </div>
+        </section>
 
-        <div class="trace-table-wrap ops-table-wrap" tabindex="0" aria-label="Operation counts table">
+        <div id="ops-assumptions" class="ops-assumptions hidden" aria-live="polite"></div>
+
+        <section id="ops-summary" class="ops-summary" aria-live="polite">
+          <div class="ops-formula">
+            <span id="ops-total-label">Actual operations</span>
+            <strong id="ops-total-value">0</strong>
+          </div>
+          <div id="ops-symbolic-facts" class="ops-symbolic-facts hidden">
+            <span>Dominant <strong id="ops-dominant">—</strong></span>
+            <span>Growth <strong id="ops-growth">—</strong></span>
+            <span>Tight <strong id="ops-tight">—</strong></span>
+            <span id="ops-confidence" class="ops-confidence">—</span>
+          </div>
+          <p id="ops-domains" class="ops-domains hidden"></p>
+        </section>
+
+        <div id="ops-diagnostics" class="ops-diagnostics hidden" role="status" aria-live="polite"></div>
+
+        <div class="trace-table-wrap ops-table-wrap ops-derivation-wrap" tabindex="0" aria-label="Operation counts table">
           <table class="trace-table">
-            <thead><tr><th>Line</th><th>Statement</th><th>Each</th><th>Runs</th><th>Total</th></tr></thead>
+            <thead><tr><th>Line</th><th>Statement</th><th id="ops-runs-heading">Actual executions</th><th>Unit cost</th><th>Contribution</th></tr></thead>
             <tbody id="ops-body"></tbody>
           </table>
         </div>
 
-        <div id="loop-notes"></div>
+        <div id="ops-derivation" class="ops-derivation" aria-live="polite"></div>
 
-        <h3 class="panel-title ops-section">Growth</h3>
-        <p class="muted field-note">Re-runs the algorithm at increasing input sizes and measures the real count.</p>
+        <details id="ops-algebra" class="growth-disclosure hidden">
+          <summary>Show algebra</summary>
+          <div class="growth-content"><p id="ops-expanded" class="ops-expanded"></p></div>
+        </details>
 
-        <label class="field-label" for="sweep-input">Which input is n?</label>
-        <select id="sweep-input" class="text-input"></select>
+        <div id="loop-notes" class="loop-explanations"></div>
 
-        <label class="field-label" for="sweep-max">Test n up to <span id="sweep-max-value">12</span></label>
-        <input type="range" id="sweep-max" min="4" max="30" value="12" class="slider">
-
-        <button id="btn-measure" class="btn btn-primary btn-wide">Measure growth</button>
-
-        <div id="growth-result" class="hidden">
-          <div class="growth-verdict">
-            <span class="growth-label" id="growth-label">—</span>
-            <span class="growth-detail muted" id="growth-detail"></span>
-          </div>
-          <div id="growth-chart" class="growth-chart"></div>
-          <div class="trace-table-wrap ops-table-wrap" tabindex="0" aria-label="Growth measurements table">
-            <table class="trace-table">
-              <thead><tr><th>n</th><th>Operations</th><th>Ratio</th></tr></thead>
-              <tbody id="growth-body"></tbody>
-            </table>
-          </div>
-          <p class="muted field-note">Measured over the range tested, not a proof. Growth beyond it may differ.</p>
+        <div class="ops-input-row ops-measure-input">
+          <label for="sweep-input">Measurement input</label>
+          <select id="sweep-input" class="text-input"></select>
         </div>
+
+        <details class="growth-disclosure">
+          <summary>Measured growth <span>(experimental)</span></summary>
+          <div class="growth-content">
+            <p class="muted field-note">Re-runs the algorithm at increasing input sizes. This evidence is separate from the exact symbolic formula.</p>
+
+            <label class="field-label" for="sweep-max">Test n up to <span id="sweep-max-value">12</span></label>
+            <input type="range" id="sweep-max" min="4" max="30" value="12" class="slider">
+
+            <button id="btn-measure" class="btn btn-primary btn-wide">Measure growth</button>
+
+            <div id="growth-result" class="hidden">
+              <div class="growth-verdict">
+                <span class="growth-label" id="growth-label">—</span>
+                <span class="growth-detail muted" id="growth-detail"></span>
+              </div>
+              <div id="growth-chart" class="growth-chart"></div>
+              <div class="trace-table-wrap ops-table-wrap" tabindex="0" aria-label="Growth measurements table">
+                <table class="trace-table">
+                  <thead><tr><th>n</th><th>Operations</th><th>Ratio</th></tr></thead>
+                  <tbody id="growth-body"></tbody>
+                </table>
+              </div>
+              <p class="muted field-note">Measured over the range tested, not a proof. Growth beyond it may differ.</p>
+            </div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div id="panel-recurrence" class="hidden recurrence-panel" role="tabpanel" aria-labelledby="tab-recurrence">
+      <div id="recurrence-empty" class="recurrence-empty">
+        <strong>Trace a recursive function first.</strong>
+        <p>Load a recursive example or write a <code>FUNCTION</code> and <code>CALL</code> it. This guide keeps the current run separate from the worst-case recurrence.</p>
+      </div>
+      <div id="recurrence-content" class="hidden">
+        <section class="recurrence-setup" aria-labelledby="recurrence-setup-title">
+          <div>
+            <span class="eyebrow">Guided worst-case analysis</span>
+            <h2 id="recurrence-setup-title">Describe what shrinks</h2>
+            <p>The analyzer suggests a size measure, but you confirm the meaning used in your lesson.</p>
+          </div>
+          <label class="field-label" for="recurrence-function">Function
+            <select id="recurrence-function" class="text-input"></select>
+          </label>
+          <label class="field-label" for="recurrence-measure">Problem-size measure
+            <select id="recurrence-measure" class="text-input"></select>
+          </label>
+          <button id="btn-confirm-recurrence" class="btn btn-primary" type="button">Confirm size measure</button>
+          <span id="recurrence-confirm-status" class="ops-symbol-status" role="status">Not confirmed</span>
+        </section>
+
+        <div id="recurrence-assumptions" class="ops-assumptions hidden" aria-live="polite"></div>
+
+        <section id="recurrence-result" class="recurrence-result hidden" aria-live="polite">
+          <div class="recurrence-formula-card">
+            <span>Worst-case recurrence</span>
+            <strong id="recurrence-formula">—</strong>
+            <p id="recurrence-confidence"></p>
+          </div>
+          <div class="recurrence-facts">
+            <div><span>Actual calls</span><strong id="recurrence-actual-calls">0</strong></div>
+            <div><span>Current depth</span><strong id="recurrence-actual-depth">0</strong></div>
+            <div><span>Big-O</span><strong id="recurrence-big-o">—</strong></div>
+            <div><span>Tight bound</span><strong id="recurrence-theta">—</strong></div>
+            <div><span>Stack space</span><strong id="recurrence-space">—</strong></div>
+          </div>
+          <div id="recurrence-derivation" class="ops-derivation"></div>
+          <p class="recurrence-storage-note">This stack-space result covers call frames only. Non-stack storage such as merge buffers is not inferred unless an explicit bound supports it.</p>
+        </section>
+        <div id="recurrence-diagnostics" class="ops-diagnostics hidden" role="status" aria-live="polite"></div>
       </div>
     </div>
   </aside>
@@ -197,6 +300,10 @@ ENDIF</pre>
     statement
 ENDFOR
 
+FOR i &lt;- n DOWNTO 1 STEP 2 DO
+    statement
+ENDFOR
+
 FOR EACH item IN list DO
     statement
 ENDFOR
@@ -204,6 +311,7 @@ ENDFOR
 WHILE condition DO
     statement
 ENDWHILE</pre>
+      <p><code>STEP</code> must be a positive whole number. Use <code>TO</code> or <code>DOWNTO</code> to choose direction.</p>
     </section>
 
     <section class="grammar-card">
@@ -231,9 +339,32 @@ AND   OR   NOT
 
     <section class="grammar-card">
       <h3>Stopping early</h3>
-      <pre>BREAK     leave the loop
-RETURN    leave with a value
-STOP      end the algorithm</pre>
+      <pre>BREAK         leave the loop
+RETURN value  leave a function
+STOP          end the program</pre>
+    </section>
+
+    <section class="grammar-card">
+      <h3>Functions and recursion</h3>
+      <pre>FUNCTION LowerBound(values, target, low, high)
+    RETURN low
+ENDFUNCTION
+
+CALL LowerBound(values, target, 0, LENGTH(values)) INTO answer
+GLOBAL comparisons</pre>
+      <p>Scalars are passed by value and arrays by reference. Assigned names are local unless declared <code>GLOBAL</code>.</p>
+    </section>
+
+    <section class="grammar-card">
+      <h3>Singly linked nodes</h3>
+      <pre>head &lt;- NEW NODE(18)
+head.next &lt;- NEW NODE(7)
+current &lt;- head
+WHILE current &lt;&gt; NULL DO
+    WRITE current.value
+    current &lt;- current.next
+ENDWHILE</pre>
+      <p>Nodes expose <code>value</code> and <code>next</code>. References compare by identity; check against <code>NULL</code> before reading a field.</p>
     </section>
   </div>
 
@@ -251,8 +382,12 @@ STOP      end the algorithm</pre>
 <script src="nav.js"></script>
 <script src="editor-tools.js"></script>
 <script src="interpreter.js"></script>
-<script src="complexity.js"></script>
 <script src="playback.js"></script>
+<script src="complexity.js"></script>
+<script src="algorithms.js"></script>
+<script src="activity-catalog.js"></script>
+<script src="symbolic-counting.js"></script>
+<script src="recurrence.js"></script>
 <script src="presets.js"></script>
 <script src="tracer-app.js"></script>
 <script src="sw-register.js" defer></script>

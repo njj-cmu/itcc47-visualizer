@@ -1,11 +1,13 @@
 const { defineConfig, devices } = require('@playwright/test');
 
+const testPort = Number(process.env.ITCC47_TEST_PORT || 4173);
+
 module.exports = defineConfig({
   testDir: './tests',
   fullyParallel: true,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: `http://127.0.0.1:${testPort}`,
     browserName: 'chromium',
     channel: process.env.CI ? undefined : 'msedge',
     trace: 'retain-on-failure',
@@ -17,7 +19,8 @@ module.exports = defineConfig({
   ],
   webServer: {
     command: 'node tools/serve.js',
-    port: 4173,
+    port: testPort,
+    env: { PORT: String(testPort) },
     reuseExistingServer: !process.env.CI,
   },
 });

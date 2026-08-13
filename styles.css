@@ -979,19 +979,71 @@ html, body {
 
 .ops-input-row .text-input { max-width: 260px; }
 
+.ops-symbol-picker {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(260px, 1.4fr) auto;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+.ops-symbol-picker h3 { margin: 0 0 3px; font-size: 0.9rem; }
+.ops-symbol-picker p { margin: 0; color: var(--muted); font-size: 0.7rem; line-height: 1.4; }
+.ops-symbol-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.symbol-choice { cursor: pointer; }
+.symbol-choice input { position: absolute; opacity: 0; }
+.symbol-choice span {
+  display: flex;
+  min-width: 54px;
+  min-height: 42px;
+  padding: 6px 9px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--muted);
+}
+.symbol-choice small { margin-top: 2px; font-size: 0.55rem; color: #72a7f7; }
+.symbol-choice input:checked + span { border-color: var(--accent); background: var(--accent-dim); color: #fff; }
+.symbol-choice input:focus-visible + span { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.ops-symbol-actions { display: flex; flex-direction: column; align-items: stretch; gap: 7px; }
+.ops-symbol-status { color: #f6c65b; font-size: 0.7rem; text-align: center; }
+.ops-symbol-status.confirmed { color: #65d978; }
+.ops-assumptions { margin-bottom: 10px; }
+.assumption-fieldset { border: 1px solid #b37a1c; background: #2e2210; padding: 12px; }
+.assumption-fieldset legend { padding: 0 6px; color: #f2b84b; font-weight: 700; }
+.assumption-fieldset label { display: inline-flex; gap: 6px; align-items: center; margin: 4px 14px 4px 0; cursor: pointer; }
+.assumption-fieldset input { accent-color: var(--accent); }
+.assumption-fieldset p { margin: 7px 0 0; color: var(--muted); font-size: 0.7rem; }
+.ops-domains { flex-basis: 100%; margin: -6px 0 0; color: var(--muted); font-size: 0.66rem; text-align: right; }
+.ops-derivation { margin-top: 10px; }
+.ops-derivation h3 { margin: 0; padding: 9px 12px; border: 1px solid #b37a1c; border-bottom: 0; color: #72a7f7; font-size: 0.84rem; }
+.ops-derivation ol { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; border: 1px solid #b37a1c; }
+.ops-derivation li { min-width: 0; padding: 11px; border-right: 1px solid var(--border); }
+.ops-derivation li:last-child { border-right: 0; }
+.ops-derivation li span { display: block; min-height: 2.6em; color: var(--muted); font-size: 0.66rem; }
+.ops-derivation li code { display: block; margin-top: 6px; color: #f2b84b; white-space: normal; overflow-wrap: anywhere; font-size: 0.72rem; }
+.ops-expanded { margin: 0; color: #f2b84b; font: 700 0.9rem/1.5 "SFMono-Regular", Consolas, monospace; }
+.ops-measure-input { margin-top: 12px; }
+
 .ops-summary {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 14px 16px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(240px, 1.2fr) minmax(280px, 1fr);
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 10px;
 }
 
-.ops-formula { display: flex; flex-direction: column; gap: 4px; }
+.ops-formula { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
 .ops-formula > span { color: var(--muted); font-size: 0.72rem; }
 .ops-formula > strong {
   font: 700 1.45rem/1.2 "SFMono-Regular", Consolas, monospace;
@@ -1227,15 +1279,22 @@ html, body {
     background: var(--panel);
   }
   .mobile-work-tabs .tab { flex: 1; }
+  #tracer-stage.mobile-panel-hidden,
+  #tracer-results.mobile-panel-hidden { display: none !important; }
   .layout-2col > .mobile-panel-hidden { display: none !important; }
   .work-panel.mobile-results .editor-card { display: none; }
   .work-panel.mobile-code .results-dock { display: none; }
 
   .ops-toolbar { grid-template-columns: 1fr; gap: 10px; }
+  .ops-symbol-picker { grid-template-columns: 1fr; }
+  .ops-symbol-options { display: grid; grid-template-columns: repeat(3, 1fr); }
+  .ops-symbol-actions { align-items: stretch; }
+  .ops-symbol-actions .btn { min-height: 46px; }
   .segment { min-height: 48px; font-size: 0.88rem; }
   .ops-input-row { align-items: stretch; flex-direction: column; gap: 6px; }
   .ops-input-row .text-input { max-width: none; min-height: 44px; }
   .ops-summary { align-items: flex-start; flex-direction: column; }
+  .ops-summary { display: flex; }
   .ops-formula > strong { font-size: 1.3rem; }
   .ops-symbolic-facts { width: 100%; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
   .ops-confidence { flex-basis: 100%; max-width: none; }
@@ -1249,7 +1308,7 @@ html, body {
   .ops-derivation-wrap .trace-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .ops-derivation-wrap .trace-table tr {
     display: grid;
-    grid-template-columns: 42px 1fr repeat(3, minmax(54px, auto));
+    grid-template-columns: 38px minmax(110px, 1fr) repeat(3, minmax(54px, auto));
     align-items: center;
     margin-bottom: 8px;
     border: 1px solid var(--border);
@@ -1269,9 +1328,14 @@ html, body {
     font: 0.56rem/1 sans-serif;
     text-transform: uppercase;
   }
-  .ops-derivation-wrap .trace-table td:nth-child(3)::before { content: "Cost"; }
-  .ops-derivation-wrap .trace-table td:nth-child(4)::before { content: "Runs"; }
+  .ops-derivation-wrap .trace-table td:nth-child(3)::before { content: "Executions"; }
+  .ops-derivation-wrap .trace-table td:nth-child(4)::before { content: "Unit cost"; }
   .ops-derivation-wrap .trace-table td:nth-child(5)::before { content: "Total"; }
+  .ops-derivation ol { grid-template-columns: 1fr; }
+  .ops-derivation li { display: grid; grid-template-columns: minmax(110px, .7fr) 1fr; gap: 10px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .ops-derivation li:last-child { border-bottom: 0; }
+  .ops-derivation li span { min-height: 0; }
+  .ops-derivation li code { margin: 0; }
   .loop-explanation { padding: 0 10px; }
   .loop-explanation summary span { float: none; display: block; margin-top: 2px; }
   .loop-explanation dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }

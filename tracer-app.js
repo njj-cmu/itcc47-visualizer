@@ -6,6 +6,10 @@ const tstate = {
   running: false,
   sourceLines: [],
   operationsView: 'actual',
+  symbolsConfirmed: false,
+  symbolSelection: {},
+  symbolSignature: '',
+  branchSelections: {},
 };
 
 const tels = {
@@ -37,13 +41,23 @@ const tels = {
   opsViewSymbolic: document.getElementById('ops-view-symbolic'),
   opsDominant: document.getElementById('ops-dominant'),
   opsGrowth: document.getElementById('ops-growth'),
+  opsTight: document.getElementById('ops-tight'),
   opsConfidence: document.getElementById('ops-confidence'),
   opsSymbolicFacts: document.getElementById('ops-symbolic-facts'),
+  opsDomains: document.getElementById('ops-domains'),
   opsDiagnostics: document.getElementById('ops-diagnostics'),
   opsRunsHeading: document.getElementById('ops-runs-heading'),
   opsBody: document.getElementById('ops-body'),
   countModels: [...document.querySelectorAll('input[name="count-model"]')],
   loopNotes: document.getElementById('loop-notes'),
+  symbolPicker: document.getElementById('ops-symbol-picker'),
+  symbolOptions: document.getElementById('ops-symbol-options'),
+  symbolStatus: document.getElementById('ops-symbol-status'),
+  btnConfirmSymbols: document.getElementById('btn-confirm-symbols'),
+  assumptions: document.getElementById('ops-assumptions'),
+  derivation: document.getElementById('ops-derivation'),
+  algebra: document.getElementById('ops-algebra'),
+  expanded: document.getElementById('ops-expanded'),
   sweepInput: document.getElementById('sweep-input'),
   sweepMax: document.getElementById('sweep-max'),
   sweepMaxValue: document.getElementById('sweep-max-value'),
@@ -57,6 +71,10 @@ const tels = {
   btnGrammar: document.getElementById('btn-grammar'),
   dlgExamples: document.getElementById('dlg-examples'),
   dlgGrammar: document.getElementById('dlg-grammar'),
+  mobileTabCode: document.getElementById('mobile-tab-code'),
+  mobileTabResults: document.getElementById('mobile-tab-results'),
+  stage: document.getElementById('tracer-stage'),
+  results: document.getElementById('tracer-results'),
 };
 
 const tracerPlayback = ITCC47Playback.createController({
@@ -166,6 +184,10 @@ function runCode() {
   tstate.running = true;
   tstate.ast = ast;
   tstate.inputs = inputs;
+  tstate.symbolsConfirmed = false;
+  tstate.symbolSelection = {};
+  tstate.symbolSignature = '';
+  tstate.branchSelections = {};
 
   buildCodeView(source);
   tels.codeBox.classList.add('hidden');
@@ -180,6 +202,7 @@ function runCode() {
   buildTraceTable();
   renderOperations();
   tracerPlayback.load(steps);
+  selectMobileWorkspace('results');
 }
 
 // ---------- operation counting ----------
@@ -194,6 +217,25 @@ function renderOperations() {
   tels.opsContent.classList.remove('hidden');
 
   const reads = findReadTargets(tstate.ast);
+  const suggestions = ITCC47Counting.suggestSymbols(tstate.ast);
+  const signature = suggestions.map((item) => `${item.name}:${item.line}:${item.suggested}`).join('|');
+  if (signature !== tstate.symbolSignature) {
+    tstate.symbolSignature = signature;
+    tstate.symbolSelection = Object.fromEntries(suggestions.map((item) => [item.name, item.suggested]));
+    tstate.symbolsConfirmed = false;
+  }
+  tels.symbolOptions.innerHTML = suggestions.length
+    ? suggestions.map((item) => `<label class="symbol-choice${item.suggested ? ' suggested' : ''}">
+      <input type="checkbox" value="${escapeHtml(item.name)}"${tstate.symbolSelection[item.name] ? ' checked' : ''}>
+      <span><code>${escapeHtml(item.name)}</code>${item.suggested ? '<small>used in a bound</small>' : ''}</span>
+    </label>`).join('')
+    : '<span class="muted">This program has no top-level READ values.</span>';
+  tels.symbolOptions.querySelectorAll('input').forEach((input) => input.addEventListener('change', () => {
+    tstate.symbolSelection[input.value] = input.checked;
+    tstate.symbolsConfirmed = false;
+    tstate.branchSelections = {};
+    renderOperations();
+  }));
   const previousInput = tels.sweepInput.value;
   tels.sweepInput.innerHTML = reads.length
     ? reads.map((read, index) => `<option value="${index}">${escapeHtml(read.name)} — input ${index + 1}, line ${read.line}</option>`).join('')
@@ -204,6 +246,8 @@ function renderOperations() {
   const model = (tels.countModels.find((radio) => radio.checked) || {}).value || 'lecture';
   const selectedIndex = Number(tels.sweepInput.value);
   const selectedRead = reads[selectedIndex] || reads[0];
+  const symbols = suggestions.filter((item) => tstate.symbolSelection[item.name])
+    .map((item) => ({ name: item.name, symbol: item.name }));
   const analysis = ITCC47Counting.analyse({
     ast: tstate.ast,
     steps: tstate.steps,
@@ -211,6 +255,9 @@ function renderOperations() {
     inputs: tstate.inputs,
     model,
     inputName: selectedRead ? selectedRead.name : 'n',
+    symbols,
+    symbolsConfirmed: tstate.symbolsConfirmed,
+    branchSelections: tstate.branchSelections,
   });
   tstate.countAnalysis = analysis;
 
@@ -220,28 +267,57 @@ function renderOperations() {
   tels.opsViewActual.setAttribute('aria-pressed', String(!symbolic));
   tels.opsViewSymbolic.setAttribute('aria-pressed', String(symbolic));
   tels.opsSymbolicFacts.classList.toggle('hidden', !symbolic);
-  tels.opsRunsHeading.textContent = symbolic ? 'Symbolic runs' : 'Actual runs';
+  tels.symbolPicker.classList.toggle('hidden', !symbolic);
+  tels.symbolStatus.textContent = tstate.symbolsConfirmed
+    ? `Confirmed: ${symbols.map((item) => item.symbol).join(', ') || 'no dimensions'}`
+    : 'Not confirmed';
+  tels.symbolStatus.classList.toggle('confirmed', tstate.symbolsConfirmed);
+  tels.opsRunsHeading.textContent = symbolic ? 'Executions' : 'Actual executions';
   tels.opsTotalLabel.textContent = symbolic ? 'Exact formula' : `Actual operations${selectedRead ? ` for ${selectedRead.name} = ${tstate.inputs[selectedIndex]}` : ''}`;
   tels.opsTotal.textContent = symbolic
-    ? (analysis.symbolicTotal ? `T(n) = ${analysis.symbolicTotal}` : 'Formula unavailable')
+    ? (!tstate.symbolsConfirmed ? 'Confirm dimensions to analyse'
+      : (analysis.symbolicTotal ? `T(${analysis.symbols.map((item) => item.symbol).join(', ')}) = ${analysis.factoredForm}` : 'Formula unavailable'))
     : analysis.actualTotal.toLocaleString();
   tels.opsDominant.textContent = analysis.dominantTerm || '—';
   tels.opsGrowth.textContent = analysis.growthClass || '—';
-  tels.opsConfidence.textContent = analysis.confidence === 'exact' ? 'Exact for supported FOR loops' : 'Cannot prove this control flow yet';
+  tels.opsTight.textContent = analysis.tightBound || '—';
+  tels.opsConfidence.textContent = analysis.confidence === 'exact' ? 'High confidence'
+    : analysis.confidence === 'assumption-based' ? 'Based on your worst-case assumption' : 'Cannot prove this control flow yet';
   tels.opsConfidence.classList.toggle('unsupported', analysis.confidence !== 'exact');
+  const domainText = analysis.inferredDomains.map((domain) => domain.expression).join(', ');
+  tels.opsDomains.textContent = domainText ? `Assumes integer ${domainText}` : '';
+  tels.opsDomains.classList.toggle('hidden', !symbolic || !domainText);
 
-  const rows = symbolic ? analysis.rows : analysis.actualRows;
+  tels.assumptions.innerHTML = symbolic && tstate.symbolsConfirmed && analysis.requiredAssumptions.length
+    ? analysis.requiredAssumptions.map((assumption) => `<fieldset class="assumption-fieldset">
+      <legend>${escapeHtml(assumption.prompt)}</legend>
+      ${assumption.candidates.map((candidate) => `<label><input type="radio" name="${escapeHtml(assumption.id)}" value="${candidate.value}"> <span>${escapeHtml(candidate.label)}</span></label>`).join('')}
+      <p>Choose the path you are treating as worst case. This choice resets when code changes.</p>
+    </fieldset>`).join('') : '';
+  tels.assumptions.classList.toggle('hidden', !tels.assumptions.innerHTML);
+  tels.assumptions.querySelectorAll('input[type="radio"]').forEach((radio) => radio.addEventListener('change', () => {
+    const line = radio.name.split(':')[1];
+    tstate.branchSelections[line] = Number(radio.value);
+    renderOperations();
+  }));
+
+  const rows = symbolic && tstate.symbolsConfirmed ? analysis.rows : symbolic ? [] : analysis.actualRows;
   tels.opsBody.innerHTML = rows.length ? rows.map((row) => {
     const runs = symbolic ? (row.symbolicRuns === null ? '—' : row.symbolicRuns) : row.actualRuns;
     const contribution = symbolic ? (row.contribution === null ? '—' : row.contribution) : row.actualContribution;
     return `<tr class="ops-row${row.confidence === 'unsupported' ? ' ops-row-unsupported' : ''}" tabindex="0" data-source-line="${row.line}" data-loop-lines="${row.enclosingLoops.map((loop) => `${loop.line}:${loop.endLine}`).join(',')}">
       <td>${row.line}</td><td><code>${escapeHtml(row.statement)}</code>${row.kind === 'loop-control' ? '<span class="ops-row-kind">loop control</span>' : ''}</td>
-      <td>${row.unitCost}</td><td>${escapeHtml(runs)}</td><td><strong>${escapeHtml(contribution)}</strong></td></tr>`;
+      <td>${escapeHtml(runs)}</td><td>${row.unitCost}</td><td><strong>${escapeHtml(contribution)}</strong></td></tr>`;
   }).join('') : '<tr><td colspan="5" class="muted">No countable operations were recorded.</td></tr>';
 
   tels.opsDiagnostics.innerHTML = analysis.diagnostics.map((item) =>
     `<div class="ops-diagnostic"><strong>Line ${item.line}:</strong> ${escapeHtml(item.message)} <span>${escapeHtml(item.suggestion || '')}</span></div>`).join('');
-  tels.opsDiagnostics.classList.toggle('hidden', analysis.diagnostics.length === 0 || !symbolic);
+  tels.opsDiagnostics.classList.toggle('hidden', analysis.diagnostics.length === 0 || !symbolic || !tstate.symbolsConfirmed);
+
+  tels.derivation.innerHTML = symbolic && tstate.symbolsConfirmed && analysis.derivation.length
+    ? `<h3>How was this derived?</h3><ol>${analysis.derivation.map((step) => `<li><span>${escapeHtml(step.title)}</span><code>${escapeHtml(step.expression)}</code></li>`).join('')}</ol>` : '';
+  tels.algebra.classList.toggle('hidden', !symbolic || !tstate.symbolsConfirmed || !analysis.expandedForm || analysis.expandedForm === analysis.factoredForm);
+  tels.expanded.textContent = analysis.expandedForm ? `Expanded: ${analysis.expandedForm}` : '';
 
   tels.loopNotes.innerHTML = symbolic && analysis.loops.length ? analysis.loops.map((loop, index) => `<details class="loop-explanation"${index === 0 ? ' open' : ''}>
     <summary>Why ${escapeHtml(loop.totalSymbolicIterations || 'an unknown number of')} executions? <span>Line ${loop.line}</span></summary>
@@ -338,6 +414,19 @@ function exitRunMode() {
   tels.opsContent.classList.add('hidden');
   tels.growthResult.classList.add('hidden');
   clearError();
+  selectMobileWorkspace('code');
+}
+
+function selectMobileWorkspace(which) {
+  const results = which === 'results';
+  tels.mobileTabCode.classList.toggle('active', !results);
+  tels.mobileTabResults.classList.toggle('active', results);
+  tels.mobileTabCode.setAttribute('aria-selected', String(!results));
+  tels.mobileTabResults.setAttribute('aria-selected', String(results));
+  tels.mobileTabCode.tabIndex = results ? -1 : 0;
+  tels.mobileTabResults.tabIndex = results ? 0 : -1;
+  tels.stage.classList.toggle('mobile-panel-hidden', results);
+  tels.results.classList.toggle('mobile-panel-hidden', !results);
 }
 
 // ---------- trace table ----------
@@ -407,6 +496,18 @@ tels.btnPlay.addEventListener('click', () => tracerPlayback.toggle());
 tels.btnStep.addEventListener('click', () => {
   tracerPlayback.step(1);
 });
+tels.mobileTabCode.addEventListener('click', () => selectMobileWorkspace('code'));
+tels.mobileTabResults.addEventListener('click', () => selectMobileWorkspace('results'));
+[tels.mobileTabCode, tels.mobileTabResults].forEach((tab, index, tabs) => tab.addEventListener('keydown', (event) => {
+  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  event.preventDefault();
+  let next = index;
+  if (event.key === 'ArrowLeft') next = (index - 1 + tabs.length) % tabs.length;
+  if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+  if (event.key === 'Home') next = 0;
+  if (event.key === 'End') next = tabs.length - 1;
+  tabs[next].click(); tabs[next].focus();
+}));
 tels.stepSlider.addEventListener('input', () => {
   tracerPlayback.seek(Number(tels.stepSlider.value));
 });
@@ -442,6 +543,11 @@ tels.tabOps.addEventListener('click', () => selectTab('ops'));
 
 tels.opsViewActual.addEventListener('click', () => { tstate.operationsView = 'actual'; renderOperations(); });
 tels.opsViewSymbolic.addEventListener('click', () => { tstate.operationsView = 'symbolic'; renderOperations(); });
+tels.btnConfirmSymbols.addEventListener('click', () => {
+  tstate.symbolsConfirmed = true;
+  tstate.branchSelections = {};
+  renderOperations();
+});
 tels.countModels.forEach((radio) => radio.addEventListener('change', () => {
   renderOperations();
   if (!tels.growthResult.classList.contains('hidden')) renderGrowth();

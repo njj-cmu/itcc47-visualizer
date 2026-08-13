@@ -39,7 +39,7 @@ test('Explore the Tools performs a guided transition and moves focus', async ({ 
 
 test('sorting can step, play, pause, and scrub backward', async ({ page }) => {
   await page.goto('/visualizer.html');
-  await page.getByRole('button', { name: 'Step' }).click();
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(page.locator('#step-slider')).toHaveValue('1');
   await page.getByRole('button', { name: 'Play' }).click();
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
@@ -85,6 +85,7 @@ test('tracer explains exact symbolic FOR-loop counts and explicit control costs'
 
   await expect(page.locator('#ops-total-value')).toHaveText('30');
   await page.getByRole('button', { name: 'Symbolic' }).click();
+  await page.getByRole('button', { name: 'Confirm dimensions' }).click();
   await expect(page.locator('#ops-total-value')).toHaveText('T(n) = 4n + 6');
   await expect(page.locator('#ops-growth')).toHaveText('O(n)');
   await expect(page.locator('.loop-explanation').first()).toContainText('= n iterations');
@@ -108,6 +109,7 @@ test('symbolic operation counting is touch-readable without horizontal page over
   await page.getByRole('button', { name: /run/i }).click();
   await page.getByRole('tab', { name: /operations/i }).click();
   await page.getByRole('button', { name: 'Symbolic' }).click();
+  await page.getByRole('button', { name: 'Confirm dimensions' }).click();
   await expect(page.locator('#ops-total-value')).toHaveText('T(n) = 4n² + 6');
   await expect(page.locator('.loop-explanation').first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
@@ -179,7 +181,7 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
     await expect(page.locator('body')).toBeVisible();
   }
   await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}`);
-  await page.getByRole('button', { name: 'Step' }).click();
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(page.locator('#step-slider')).toHaveValue('1');
 
   await page.goto(`file:///${path.resolve(__dirname, '..', 'tracer.html').replace(/\\/g, '/')}`);
@@ -188,6 +190,7 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
   await page.getByRole('button', { name: /run/i }).click();
   await page.getByRole('tab', { name: /operations/i }).click();
   await page.getByRole('button', { name: 'Symbolic' }).click();
+  await page.getByRole('button', { name: 'Confirm dimensions' }).click();
   await expect(page.locator('#ops-total-value')).toHaveText('T(n) = 4n + 6');
 });
 

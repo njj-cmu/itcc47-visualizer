@@ -1,14 +1,15 @@
 {
-  "name": "itcc47-visualizer",
+  "name": "bsit-learning-lab",
   "private": true,
   "version": "1.0.0",
-  "description": "Dependency-free ITCC47 practice tools with development-only browser checks.",
+  "description": "Local-first BSIT learning tools for ITCC45 and ITCC47.",
   "scripts": {
     "build:visualizer": "vite build --config vite.visualizer.config.js && node tools/publish-visualizer.js",
     "test:unit": "node tools/test.js",
     "test:e2e": "playwright test tests/e2e.spec.js",
     "test:a11y": "playwright test tests/a11y.spec.js",
-    "check": "npm run build:visualizer && npm run test:unit && npm run test:e2e && npm run test:a11y"
+    "test:python": "node tools/test-python-examples.js",
+    "check": "npm run build:visualizer && npm run test:unit && npm run test:python && npm run test:e2e && npm run test:a11y"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

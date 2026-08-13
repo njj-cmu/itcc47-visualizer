@@ -16,6 +16,10 @@ jobs:
         with:
           node-version: '20'
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
       # tools/test.js deliberately does not need problems.hidden.json, which is
       # gitignored and exists only on the instructor's machine. It checks the
       # interpreter, the shipped presets, and the integrity of the generated

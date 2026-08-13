@@ -1,4 +1,33 @@
-# ITCC47 practice architecture
+# BSIT Learning Lab architecture
+
+## Multi-course shell
+
+`BSITLearningLab` is the versioned registry for course metadata and activity
+catalogs. A course declares a stable ID, code, title, home route, accent, and
+navigation. Activities add `courseId`, `topicId`, language, source, renderer,
+evidence views, inputs, and a deterministic `run()` contract. Direct ITCC47
+routes remain stable while `index.html` is the neutral subject chooser.
+
+`BSITPlayback` and `BSITVisualizerRegistry` are the course-neutral names for
+the shared timeline and renderer contracts. `ITCC47Playback`,
+`ITCC47VisualizerRegistry`, and `ITCC47Activities` remain compatibility APIs so
+the existing pseudocode and algorithm tools do not require a flag-day rename.
+
+## Guided Python object model
+
+ITCC45 is a deterministic simulator, not a general Python interpreter. Its
+displayed programs are executed in CI on the supported Python 3.9 floor, while
+the browser consumes curated event timelines. This keeps `file://` and offline
+operation small and predictable without shipping Pyodide.
+
+The `object-model` render frame contains class definitions and bases, object
+identities and field state, name-to-object references, an optional active call
+with call-frame and class lookup path, and accumulated output. Identities such
+as `student:1` are stable teaching labels, never fake memory addresses.
+
+Structured ITCC45 practice stores only `{ contentVersion, solvedIds }` under the
+versioned `itcc45.practice:v1` key. It is optional local feedback and cannot be
+treated as a grade or submission.
 
 ## Trust boundary: two separate shells
 

@@ -38,3 +38,6 @@ const ITCC47VisualizerRegistry = (() => {
   return Object.freeze({ registerRenderer, registerLazyRenderer, resolveRenderer,
     registerEvidenceView, getEvidenceView, rendererDomains, evidenceIds });
 })();
+
+/* Course-neutral name; the legacy global remains available to existing tools. */
+const BSITVisualizerRegistry = ITCC47VisualizerRegistry;

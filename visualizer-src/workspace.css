@@ -288,7 +288,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .array-index::before { content: '['; }.array-index::after { content: ']'; }
 .array-marker { position: absolute; right: 0; bottom: calc(100% + 7px); left: 0; color: #f6c45e; font: 650 .58rem ui-monospace, monospace; text-transform: uppercase; }
 .array-held-value { position: absolute; top: 5px; left: calc((var(--held-column) - .5) * (100% / var(--array-count))); z-index: 5; display: grid; place-items: center; width: 34px; height: 30px; transform: translateX(-50%); border: 1px solid #6fa8ff; border-radius: 8px; color: #eff6ff; background: linear-gradient(145deg, #245ca8, #183966); box-shadow: 0 6px 18px rgba(35, 95, 180, .32); font: 750 .78rem/1 ui-monospace, monospace; }
-.array-connector { position: absolute; right: 0; bottom: 5px; left: 0; height: 43px; color: var(--vw-amber); }
+.array-connector { position: absolute; right: 0; bottom: -18px; left: 0; height: 43px; color: var(--vw-amber); }
 .array-connector svg { width: 100%; height: 100%; overflow: visible; }
 .array-connector path { fill: none; stroke: currentColor; stroke-width: .45; vector-effect: non-scaling-stroke; }
 .array-connector span { position: absolute; top: 2px; transform: translateX(-50%); padding: 3px 7px; border: 1px solid #7d5d1b; border-radius: 999px; color: #f8d78e; background: #3b2c12; font: 650 .58rem ui-monospace, monospace; white-space: nowrap; }

@@ -133,7 +133,7 @@ const ArrayRenderer = memo(function ArrayRenderer({ frame, event, motionMode, du
               initial={entersFromOutside ? { opacity: 0, scale: .72, y: -12 } : false}
               animate={{ opacity: 1, scale: 1, y: lifted ? -10 : 0, zIndex: isMoving ? 4 : 1 }} exit={{ opacity: 0, scale: .72, y: 10 }}
               transition={{ layout: { duration, ease: [0.22, 0.75, 0.28, 1] }, opacity: { duration: Math.min(duration, .18) } }}
-              onLayoutAnimationComplete={() => onEntityComplete(entity.id)} onAnimationComplete={() => onEntityComplete(entity.id)}>
+              onLayoutAnimationComplete={() => onEntityComplete(entity.id)}>
               <span className="array-value">{entity.value}</span>
             </m.div> : <span className="array-hole" aria-hidden="true">&mdash;</span>}</AnimatePresence>
           </div>

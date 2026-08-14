@@ -22,8 +22,16 @@ operation small and predictable without shipping Pyodide.
 
 The `object-model` render frame contains class definitions and bases, object
 identities and field state, name-to-object references, an optional active call
-with call-frame and class lookup path, and accumulated output. Identities such
-as `student:1` are stable teaching labels, never fake memory addresses.
+with call-frame and class lookup path, accumulated output, and optional semantic
+concept annotations. Timeline events may use the existing `segment` field to
+label an Attempt/Repair contrast. Identities such as `student:1` are stable
+teaching labels, never fake memory addresses.
+
+ITCC45 activities also declare backward-compatible teaching metadata:
+`context`, `exampleOrder`, `learningGoal`, and `misconceptionIds`. The topics
+page groups activities by `topicId`; these fields affect discovery and labels,
+not playback or renderer selection. The six original activity IDs remain the
+stable primary or compatibility entries for their topics.
 
 Structured ITCC45 practice stores only `{ contentVersion, solvedIds }` under the
 versioned `itcc45.practice:v1` key. It is optional local feedback and cannot be
@@ -132,6 +140,24 @@ offline and `file://` use. Full motion follows playback speed; reduced motion
 uses instant relocation with brief emphasis; Off is immediate. The saved
 On/Reduced/Off override is optional, so the default continues to follow the
 operating-system preference.
+
+## Module 4 linear ADTs
+
+`linear-adt-activities.js` owns the ten reviewed Module 4 scenarios: four
+stacks, three queues, and three deques. Each event carries stable entity IDs,
+one or more ordered lanes, optional held values and input tokens, current
+operation metadata, output, metrics, and display-ready teaching annotations.
+Annotations may target only an entity currently present in a lane or a held
+entity in that same frame; the builder rejects stale targets while constructing
+the deterministic timeline.
+
+The React `linear-adt` renderer is shared across all three structures. A stack
+renders its single legal end vertically, queues label front and back around a
+FIFO lane, and deques use the same two end markers without implying arbitrary
+middle access. Multiple lanes support examples such as undo/redo without
+introducing activity-specific renderer branches. The curriculum catalog, direct
+route resolver, activity menu, and source panel all consume the same registered
+activity metadata.
 
 ## Functions, calls, and recurrences
 

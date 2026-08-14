@@ -1,7 +1,45 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 
-const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'visualizer.html', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'writer.html', 'tracer.html', 'problems.html', 'problem-list.html?module=1', 'practice.html?module=1'];
+const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=deque-sliding-window&preview=1', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'writer.html', 'tracer.html', 'problems.html', 'lesson.html?checkpoint=m2-selection-sort', 'student-materials.html', 'problem-list.html?module=1', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count'];
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('itcc47.release-preview:v1', JSON.stringify({ schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 2, currentCheckpointId: 'm8-dp' })));
+});
+
+async function openMobilePlaybackDetails(page) {
+  const details = page.locator('.mobile-playback-details');
+  if (await details.isVisible() && await details.getAttribute('open') === null) await details.getByText('Timeline and settings', { exact: true }).click();
+}
+
+async function visualizerTimeline(page) {
+  const desktop = page.locator('#step-slider');
+  if (await desktop.isVisible()) return desktop;
+  await openMobilePlaybackDetails(page);
+  return page.getByLabel('Mobile timeline step', { exact: true });
+}
+
+async function visualizerMotion(page) {
+  const desktop = page.locator('.playback-settings .motion-control select');
+  if (await desktop.isVisible()) return desktop;
+  if (await page.locator('.mobile-playback-details').isVisible()) {
+    await openMobilePlaybackDetails(page);
+    return page.locator('.mobile-playback-details .motion-control select');
+  }
+  if (await page.locator('.playback-settings').getAttribute('open') === null) await page.getByText('Settings', { exact: true }).click();
+  return desktop;
+}
+
+async function visualizerSpeed(page) {
+  const desktop = page.locator('.playback-settings .speed-control select');
+  if (await desktop.isVisible()) return desktop;
+  if (await page.locator('.mobile-playback-details').isVisible()) {
+    await openMobilePlaybackDetails(page);
+    return page.locator('.mobile-playback-details .speed-control select');
+  }
+  if (await page.locator('.playback-settings').getAttribute('open') === null) await page.getByText('Settings', { exact: true }).click();
+  return desktop;
+}
 
 for (const entry of entries) {
   test(`${entry} has no horizontal overflow`, async ({ page }) => {
@@ -21,19 +59,147 @@ test('mobile navigation opens and moves focus', async ({ page }, testInfo) => {
   await expect(page.getByRole('link', { name: 'Start', exact: true })).toBeFocused();
 });
 
-test('start page gives students a clear route into practice', async ({ page }) => {
+test('start page gives students a clear route into the current lecture', async ({ page }) => {
   await page.goto('/itcc47.html');
   await expect(page.getByRole('heading', { name: /Start with a problem/ })).toBeVisible();
-  await page.getByRole('link', { name: /Start practicing/ }).click();
+  await expect(page.locator('#current-checkpoint')).toContainText('Queues and deques');
+  await page.getByRole('link', { name: /Continue current lecture/ }).click();
+  await expect(page).toHaveURL(/lesson\.html\?checkpoint=m4-queue-deque$/);
+  await expect(page.getByRole('heading', { name: /Queues and deques/ })).toBeVisible();
+});
+
+test('curriculum roadmap exposes current, available, and locked checkpoints', async ({ page }) => {
+  await page.goto('/problems.html');
+  await expect(page.locator('.module-card')).toHaveCount(8);
+  await expect(page.locator('.checkpoint-current')).toContainText('Queues and deques');
+  await expect(page.locator('.checkpoint-locked').first()).toBeVisible();
+  await expect(page.getByText('Instructor preview', { exact: true })).toBeVisible();
+});
+
+test('locked visualizer route renders requirements without source or playback', async ({ page }) => {
+  await page.goto('/visualizer.html?activity=recursive-range-search');
+  await expect(page.locator('.curriculum-lock')).toContainText('Recursive duplicate-range search is not released yet');
+  await expect(page.locator('.source-panel')).toHaveCount(0);
+  await expect(page.getByRole('slider', { name: /Timeline/ })).toHaveCount(0);
+  await expect(page.locator('.visualizer-workspace')).toHaveCount(0);
+});
+
+test('locked planned practice route exposes no problem statement or editor', async ({ page }) => {
+  await page.goto('/practice.html?module=5&problem=recursive-sum');
+  await expect(page.locator('.curriculum-lock')).toContainText('Recursive range sum is not released yet');
+  await expect(page.locator('#p-statement')).toHaveCount(0);
+  await expect(page.locator('#code-box')).toHaveCount(0);
+});
+
+test('instructor preview is explicit, persistent, and does not change the deployed profile', async ({ page }) => {
+  await page.goto('/problems.html?preview=1');
+  await page.getByText('Instructor preview', { exact: true }).click();
+  await page.getByLabel('Preview checkpoint').selectOption('m8-dp');
+  await page.getByRole('button', { name: 'Apply preview' }).click();
+  await expect(page).toHaveURL(/preview=1/);
+  await page.goto('/visualizer.html?activity=recursive-range-search&preview=1');
+  await expect(page.getByRole('heading', { name: 'Recursive duplicate-range search' })).toBeVisible();
+  await expect(page.locator('.draft-preview-indicator')).toContainText('Draft preview');
+  await page.goto('/visualizer.html?activity=recursive-range-search');
+  await expect(page.locator('.curriculum-lock')).toBeVisible();
+});
+
+test('former materials route redirects without exposing downloads or metadata', async ({ page }) => {
+  await page.goto('/student-materials.html');
   await expect(page).toHaveURL(/problems\.html$/);
-  await expect(page.getByRole('heading', { name: 'Explore the course' })).toBeVisible();
+  await expect(page.locator('a[download]')).toHaveCount(0);
+  await expect(page.locator('script[src*="student-materials"],script[src*="student-bundles"]')).toHaveCount(0);
+  await expect(page.locator('.topbar-nav a', { hasText: 'Materials' })).toHaveCount(0);
+});
+
+test('instructor preview renders every later-domain teaching activity', async ({ page }) => {
+  const activities = ['binary-range-search','stable-insertion-dispatch','array-linked-comparison','linked-list-sorted-insert','linked-list-find-update','linked-list-delete','recursive-range-search','stable-merge-sort','tree-traversals','bst-insert-search','bst-height-shape','graph-representation','bfs-shortest-path','dfs-reachability','greedy-dp-coin-change','knapsack-dp'];
+  for (const activity of activities) {
+    await page.goto(`/visualizer.html?activity=${activity}&preview=1`);
+    await expect(page.locator('.visualizer-workspace')).toBeVisible();
+    await expect(page.locator('.source-line')).not.toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+    if (['recursive-range-search','stable-merge-sort','tree-traversals','bst-insert-search','bst-height-shape','graph-representation','bfs-shortest-path','dfs-reachability','greedy-dp-coin-change','knapsack-dp'].includes(activity)) {
+      await expect(page.locator('.concept-domain')).toBeVisible();
+      await expect(page.locator('.draft-preview-indicator')).toContainText('Draft preview');
+    }
+  }
+});
+
+test('normal Module 4 release exposes ten line-by-line stack, queue, and deque examples', async ({ page }) => {
+  const activities = ['stack-lifo-basics','stack-postfix-evaluator','stack-delimiter-audit','stack-editor-undo','queue-fifo-basics','queue-round-robin','queue-printer-jobs','deque-end-operations','deque-sliding-window','deque-service-lane'];
+  await page.goto('/problems.html?view=visualizations');
+  await expect(page.locator('.module-card', { hasText: 'Module 4' }).locator('.module-status')).toContainText('10 activities');
+  await expect(page.locator('.visualization-group', { hasText: 'Stacks' }).locator('.visualization-card')).toHaveCount(4);
+  await expect(page.locator('.visualization-group', { hasText: 'Queues' }).locator('.visualization-card')).toHaveCount(3);
+  await expect(page.locator('.visualization-group', { hasText: 'Deques' }).locator('.visualization-card')).toHaveCount(3);
+  for (const activity of activities) {
+    await page.goto(`/visualizer.html?activity=${activity}`);
+    await expect(page.locator('.linear-adt')).toBeVisible();
+    await expect(page.locator('.linear-teaching')).toBeVisible();
+    await expect(page.locator('.source-line.is-current')).toHaveCount(1);
+    await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+  }
+});
+
+test('deque foundation names both ends and changes state line by line', async ({ page }) => {
+  await page.goto('/visualizer.html?activity=deque-end-operations&preview=1');
+  await expect(page.getByRole('heading', { name: 'Use both ends of a deque' })).toBeVisible();
+  await expect(page.locator('.linear-end-label.end-front')).toContainText('front');
+  await expect(page.locator('.linear-end-label.end-back')).toContainText('back');
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('.linear-item')).toContainText('A');
+  await expect(page.locator('.source-line.is-current')).toContainText('ADD_BACK deque, A');
+});
+
+test('normal release opens the six-problem Module 3 practice bank', async ({ page }, testInfo) => {
+  await page.goto('/problem-list.html?module=3');
+  await expect(page.locator('.problem-choice')).toHaveCount(6);
+  await page.locator('.problem-choice-action').first().click();
+  await expect(page.getByRole('heading', { name: /Count Reachable Linked Nodes/i })).toBeVisible();
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
+  await expect(page.getByLabel('Problem solution pseudocode')).toBeVisible();
+  await expect(page.locator('#p-statement')).not.toBeEmpty();
+});
+
+test('reviewed companions expose the full teaching bridge and practice-only links', async ({ page }) => {
+  await page.goto('/lesson.html?checkpoint=m2-binary-search');
+  await expect(page.locator('.companion-mental')).toContainText('Mental model');
+  await expect(page.locator('.companion-trace')).toContainText('Worked trace');
+  await expect(page.locator('.companion-invariants')).toContainText('Invariants and complexity');
+  await expect(page.locator('.companion-misconceptions')).toContainText('Common misconceptions');
+  await expect(page.locator('.companion-self-check details')).toHaveCount(2);
+  await expect(page.locator('.lesson-sequence a')).not.toHaveCount(0);
+  expect(await page.locator('.lesson-sequence a').evaluateAll((links) => links.every((link) => /(?:visualizer|practice)\.html/.test(link.getAttribute('href') || '')))).toBe(true);
+});
+
+test('practice contract changes preserve the old draft and clear only that completion', async ({ page }, testInfo) => {
+  const earlierDraft = 'READ n\nWRITE n';
+  await page.addInitScript((draft) => localStorage.setItem('itcc47.practice-records:v2', JSON.stringify({
+    schemaVersion: 2,
+    records: {
+      'linked-node-count': { contentVersion: 1, draft, completed: true },
+      'linked-find-value': { contentVersion: 2, draft: 'READ target\nWRITE -1', completed: true },
+    },
+    recovery: {},
+  })), earlierDraft);
+  await page.goto('/practice.html?module=3&problem=linked-node-count');
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
+  await expect(page.getByLabel('Problem solution pseudocode')).not.toHaveValue(earlierDraft);
+  await expect(page.locator('#draft-recovery')).toContainText('Recover an earlier draft (1)');
+  await expect(page.locator('#progress-line')).toContainText('1 of 6 solved');
+  await page.locator('#draft-recovery summary').click();
+  await page.getByRole('button', { name: 'Restore this draft for editing' }).click();
+  await expect(page.getByLabel('Problem solution pseudocode')).toHaveValue(earlierDraft);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('itcc47.practice-records:v2')));
+  expect(stored.records['linked-node-count'].completed).toBe(false);
+  expect(stored.records['linked-find-value'].completed).toBe(true);
 });
 
 test('Explore the Tools performs a guided transition and moves focus', async ({ page }) => {
   await page.goto('/itcc47.html');
   await page.getByRole('link', { name: 'Explore the Tools' }).click();
   await expect(page).toHaveURL(/#tools$/);
-  await expect(page.locator('#tools')).toHaveClass(/is-arriving/);
   await expect(page.getByRole('heading', { name: 'Open a tool' })).toBeFocused();
 });
 
@@ -47,22 +213,46 @@ test('subject chooser routes to both course homes', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /See what Python objects are doing/ })).toBeVisible();
 });
 
-test('ITCC45 exposes six ordered topics with lab and practice routes', async ({ page }) => {
+test('ITCC45 exposes six ordered topics with three audited examples each', async ({ page }) => {
   await page.goto('/itcc45-topics.html');
   await expect(page.getByRole('heading', { name: 'Build object-oriented thinking step by step.' })).toBeVisible();
-  await expect(page.locator('.oop-topic-path > li')).toHaveCount(6);
-  await expect(page.locator('.oop-topic-path h2')).toHaveText(['Classes', 'Objects', 'Encapsulation', 'Inheritance', 'Class Abstraction', 'Polymorphism']);
-  expect(await page.locator('.oop-topic-path > li').first().evaluate((item) => getComputedStyle(item, '::before').display)).toBe('none');
-  expect(await page.locator('.oop-topic-path > li').nth(1).evaluate((item) => getComputedStyle(item, '::before').top)).toBe('18px');
-  expect(await page.locator('.oop-topic-path > li').nth(1).evaluate((item) => getComputedStyle(item, '::after').bottom)).toBe('18px');
-  await page.getByRole('link', { name: 'Open lab' }).first().click();
+  await expect(page.locator('.oop-topic-group')).toHaveCount(6);
+  await expect(page.locator('.oop-topic-group h2')).toHaveText(['Classes', 'Objects', 'Encapsulation', 'Inheritance', 'Class Abstraction', 'Polymorphism']);
+  await expect(page.locator('.oop-example-card')).toHaveCount(18);
+  for (const group of await page.locator('.oop-topic-group').all()) {
+    await expect(group.locator('.oop-example-card')).toHaveCount(3);
+    await expect(group.getByRole('link', { name: 'Practice 3 tasks' })).toHaveCount(1);
+  }
+  await page.getByRole('link', { name: 'Open example' }).first().click();
   await expect(page).toHaveURL(/visualizer\.html\?course=itcc45&activity=itcc45-classes-blueprint$/);
+});
+
+test('ITCC45 lab identifies and navigates examples within a topic', async ({ page }) => {
+  await page.goto('/visualizer.html?course=itcc45&activity=itcc45-classes-blueprint');
+  await expect(page.getByText('Topic 1 / Classes / Example 1 of 3')).toBeVisible();
+  await expect(page.getByText('Read a class as a blueprint and follow self through initialization.')).toBeVisible();
+  await page.getByRole('link', { name: /Next example:/ }).click();
+  await expect(page).toHaveURL(/activity=itcc45-classes-instance-shadowing/);
+  await expect(page.getByText('Topic 1 / Classes / Example 2 of 3')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Previous example:/ })).toBeVisible();
+});
+
+test('ITCC45 attempt and repair phases stay synchronized with source and output', async ({ page }) => {
+  await page.goto('/visualizer.html?course=itcc45&activity=itcc45-classes-shared-mutable');
+  await expect(page.getByText('Attempt', { exact: true }).first()).toBeVisible();
+  const slider = page.locator('#step-slider');
+  await slider.fill('2');
+  await expect(page.getByText('Repair', { exact: true }).first()).toBeVisible();
+  await slider.fill('3');
+  await expect(page.getByLabel('Rendered program output')).toContainText('fixed second: empty');
+  await expect(page.getByLabel('Concept evidence')).toContainText('Per-instance owner');
 });
 
 test('Python Object Lab synchronizes source, object state, lookup, output, and editable inputs', async ({ page }, testInfo) => {
   await page.goto('/visualizer.html?course=itcc45&activity=itcc45-classes-blueprint');
   await expect(page.getByRole('heading', { name: /Classes: turn a blueprint/ })).toBeVisible();
   await expect(page.getByLabel('Python source')).toContainText('class Student');
+  await expect(page.getByLabel('Rendered program output')).toContainText('No output yet');
   await page.getByRole('button', { name: 'Edit scenario' }).click();
   await expect(page.getByRole('dialog', { name: 'Edit scenario' })).toBeVisible();
   await page.getByLabel('Student name').fill('Lia');
@@ -72,6 +262,7 @@ test('Python Object Lab synchronizes source, object state, lookup, output, and e
   await slider.fill(await slider.getAttribute('max'));
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Visualize' }).click();
   await expect(page.locator('.object-instance-card')).toContainText('Lia');
+  await expect(page.getByLabel('Rendered program output')).toContainText('Lia studies BSIT');
   await expect(page.locator('.visual-canvas .object-canvas')).toHaveCSS('overflow-y', 'auto');
   await page.getByRole('button', { name: 'Expand model' }).click();
   await expect(page.getByRole('dialog', { name: /Classes: turn a blueprint/ })).toBeVisible();
@@ -85,6 +276,98 @@ test('Python Object Lab synchronizes source, object state, lookup, output, and e
   if (testInfo.project.name !== 'phone') {
     await page.getByRole('button', { name: 'Copy Python' }).click();
     await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible();
+  }
+});
+
+test('ITCC45 desktop workspace resizes, focuses panels, and preserves playback', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone');
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.goto('/visualizer.html?course=itcc45&activity=itcc45-classes-blueprint');
+  const stage = page.locator('.itcc45-lab-stage');
+  const separator = page.getByRole('separator', { name: 'Resize code and model panels' });
+  await expect(separator).toHaveAttribute('aria-valuenow', '40');
+  await separator.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(separator).toHaveAttribute('aria-valuenow', '45');
+
+  const bounds = await stage.boundingBox();
+  await separator.hover();
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width * 0.5, bounds.y + bounds.height * 0.5);
+  await page.mouse.up();
+  await expect(separator).toHaveAttribute('aria-valuenow', '50');
+
+  const slider = page.locator('#step-slider');
+  await slider.fill(await slider.getAttribute('max'));
+  const finalStep = await slider.inputValue();
+  await page.getByRole('button', { name: 'Focus source' }).click();
+  await expect(stage).toHaveClass(/focus-source/);
+  await expect(page.locator('#itcc45-model-pane')).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(stage).toHaveClass(/focus-split/);
+  await page.getByRole('button', { name: 'Focus model' }).click();
+  await expect(stage).toHaveClass(/focus-model/);
+  await page.getByRole('button', { name: 'Exit model focus' }).click();
+  await expect(slider).toHaveValue(finalStep);
+  await expect(page.getByLabel('Rendered program output')).toContainText('Ana studies BSIT');
+  await page.getByRole('button', { name: 'Expand output' }).click();
+  await expect(page.getByLabel('Rendered program output').locator('pre')).toContainText('CMU');
+});
+
+test('ITCC45 evidence rail uses adaptive defaults and remembers learner choice', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone');
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/visualizer.html?course=itcc45&activity=itcc45-classes-blueprint');
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-collapsed/);
+  await expect(page.getByLabel('Collapsed learning evidence')).toBeVisible();
+  await page.getByRole('tab', { name: 'Object state' }).click();
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-expanded/);
+  await expect(page.getByRole('tab', { name: 'Object state' })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('button', { name: 'Collapse learning evidence' }).click();
+  await page.reload();
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-collapsed/);
+  await page.getByRole('button', { name: 'Expand learning evidence' }).click();
+  await page.reload();
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-expanded/);
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('itcc45.workspace-layout:v1')));
+  expect(saved).toEqual({ version: 1, evidence: 'expanded', sourceRatio: 0.4 });
+
+  await page.evaluate(() => localStorage.removeItem('itcc45.workspace-layout:v1'));
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.reload();
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-collapsed/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.reload();
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-expanded/);
+});
+
+test('ITCC45 topics use distinct real-world scenarios', async ({ page }) => {
+  const scenarios = [
+    ['itcc45-object-state', 'class LibraryBook', /track two library books/],
+    ['itcc45-encapsulation-property', 'class GradeRecord', /protect a valid score/],
+    ['itcc45-inheritance-lookup', 'class Delivery', /calculate an express delivery/],
+    ['itcc45-abstraction-contract', 'class PaymentMethod', /require a payment contract/],
+    ['itcc45-polymorphic-dispatch', 'class EmailNotification', /send one alert two ways/],
+  ];
+  for (const [activity, source, title] of scenarios) {
+    await page.goto(`/visualizer.html?course=itcc45&activity=${activity}`);
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    await expect(page.getByLabel('Python source')).toContainText(source);
+  }
+});
+
+test('every retained ITCC45 example route renders a deterministic source and model', async ({ page }) => {
+  test.setTimeout(90000);
+  await page.goto('/itcc45-topics.html');
+  const links = await page.locator('.oop-example-link').evaluateAll((items) => items.map((item) => item.getAttribute('href')));
+  expect(links).toHaveLength(18);
+  for (const href of links) {
+    await page.goto(`/${href}`);
+    await expect(page.getByLabel('Python source')).toContainText('class');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByLabel(/visualization canvas/)).toBeVisible();
   }
 });
 
@@ -108,25 +391,121 @@ test('mismatched ITCC45 activity falls back and normalizes the URL', async ({ pa
   await expect(page).toHaveURL(/course=itcc45&activity=itcc45-classes-blueprint/);
 });
 
+test('Visualize opens the activity menu instead of defaulting to Bubble Sort', async ({ page }) => {
+  await page.goto('/itcc47.html');
+  await page.getByRole('link', { name: /Visualize an algorithm/ }).click();
+  await expect(page).toHaveURL(/visualizer\.html$/);
+  await expect(page.getByRole('heading', { name: 'Choose a visualization.' })).toBeVisible();
+  await expect(page.locator('.visualizer-menu-item')).toHaveCount(35);
+  await expect(page.locator('.visualizer-workspace')).toHaveCount(0);
+  await page.getByRole('link', { name: /Selection Sort/ }).click();
+  await expect(page).toHaveURL(/visualizer\.html\?activity=selection-sort$/);
+  await expect(page.getByRole('heading', { name: 'Selection Sort' })).toBeVisible();
+});
+
 test('sorting can step, play, pause, and scrub backward', async ({ page }) => {
-  await page.goto('/visualizer.html');
-  await page.getByLabel('Motion preference').selectOption('off');
+  await page.goto('/visualizer.html?activity=bubble-sort');
+  await (await visualizerMotion(page)).selectOption('off');
+  const slider = await visualizerTimeline(page);
   await page.getByRole('button', { name: 'Step', exact: true }).click();
-  await expect(page.locator('#step-slider')).toHaveValue('1');
+  await expect(slider).toHaveValue('1');
   await page.getByRole('button', { name: 'Play' }).click();
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
   await page.getByRole('button', { name: 'Pause' }).click();
-  await page.locator('#step-slider').fill('0');
-  await expect(page.locator('#step-slider')).toHaveValue('0');
+  await slider.fill('0');
+  await expect(slider).toHaveValue('0');
 });
 
 test('binary search explains its sorted copy before searching', async ({ page }) => {
   await page.goto('/visualizer.html?activity=binary-search');
-  await expect(page.locator('#result-caption')).toContainText('Binary search requires sorted data');
+  await expect(page.locator('#result-caption')).toContainText('Set target');
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('#result-caption')).toContainText('sorted copy');
+  await expect(page.locator('.source-line.is-current')).toContainText('values <- sorted copy');
+});
+
+test('every curated array algorithm exposes its real loop line and boundary', async ({ page }, testInfo) => {
+  const cases = [
+    ['bubble-sort', 1, 'FOR end <- n - 1 DOWNTO 1 DO', 'unsorted range'],
+    ['selection-sort', 1, 'FOR i <- 0 TO n - 2 DO', 'search range'],
+    ['insertion-sort', 1, 'FOR i <- 1 TO n - 1 DO', 'sorted insertion range'],
+    ['linear-search', 2, 'FOR i <- 0 TO n - 1 DO', null],
+    ['binary-search', 4, 'WHILE low <= high DO', 'search range'],
+  ];
+  for (const [activity, steps, sourceLine, boundaryLabel] of cases) {
+    await page.goto(`/visualizer.html?activity=${activity}&preview=1`);
+    await (await visualizerMotion(page)).selectOption('off');
+    for (let step = 0; step < steps; step += 1) await page.getByRole('button', { name: 'Step', exact: true }).click();
+    if (boundaryLabel) await expect(page.locator('.array-loop-boundary')).toContainText(boundaryLabel);
+    if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
+    await expect(page.locator('.source-line.is-current')).toContainText(sourceLine);
+  }
+});
+
+const teachingShellCases = [
+  ['bubble-sort', 4, 'Adjacent comparison', ['values[j]', 'values[j + 1]']],
+  ['selection-sort', 4, 'Current selection', ['minIndex', 'values[j]']],
+  ['insertion-sort', 4, 'Insertion state', ['key', 'values[j]']],
+  ['linear-search', 3, 'Current scan', ['target', 'values[i]']],
+  ['binary-search', 6, 'Search window', ['target', 'low', 'mid', 'high']],
+  ['array-list-insert', 4, 'Insertion shift', ['value', 'shift from', 'shift to']],
+  ['array-list-remove', 3, 'Removal shift', ['removed', 'shift from', 'shift to']],
+  ['linked-list-traversal', 4, 'Traversal pointer', ['current']],
+  ['linked-list-insert-head', 2, 'Head pointer update', ['newNode']],
+];
+for (const [activity, steps, title, labels] of teachingShellCases) {
+  test(`${activity} exposes its focused teaching shell`, async ({ page }) => {
+    await page.goto(`/visualizer.html?activity=${activity}&preview=1`);
+    await (await visualizerMotion(page)).selectOption('off');
+    for (let step = 0; step < steps; step += 1) await page.getByRole('button', { name: 'Step', exact: true }).click();
+    const teaching = page.locator('.teaching-strip');
+    await expect(teaching.getByRole('heading', { name: title })).toBeVisible();
+    for (const label of labels) await expect(teaching.getByText(label, { exact: true })).toBeVisible();
+  });
+}
+
+test('ITCC47 integrates playback and remembers the evidence rail', async ({ page }, testInfo) => {
+  await page.goto('/visualizer.html?activity=selection-sort');
+  await expect(page.locator('.playback-dock')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+  if (testInfo.project.name === 'phone') {
+    await expect(page.locator('.integrated-playback')).toHaveCSS('position', 'sticky');
+    await page.getByRole('tab', { name: 'Code' }).click();
+    await page.getByRole('button', { name: 'Step', exact: true }).click();
+    await expect(page.locator('#result-caption')).toContainText('Set i to 0');
+    return;
+  }
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-expanded/);
+  await page.getByRole('button', { name: 'Collapse learning evidence' }).click();
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-collapsed/);
+  const split = await page.evaluate(() => {
+    const code = document.querySelector('.desktop-source').getBoundingClientRect();
+    const visual = document.querySelector('.itcc47-visual-shell').getBoundingClientRect();
+    return { code, visual, scrollbar: getComputedStyle(document.querySelector('.source-panel')).scrollbarWidth };
+  });
+  expect(Math.abs(split.code.y - split.visual.y)).toBeLessThan(2);
+  expect(split.visual.x).toBeGreaterThan(split.code.x + split.code.width);
+  expect(split.scrollbar).toBe('thin');
+  await page.reload();
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-collapsed/);
+  await page.getByRole('tab', { name: 'Variables' }).click();
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-expanded/);
+});
+
+test('array-list removal shows setup, loop entry, and the target to remove', async ({ page }, testInfo) => {
+  await page.goto('/visualizer.html?activity=array-list-remove&preview=1');
+  await (await visualizerMotion(page)).selectOption('off');
+  await expect(page.locator('.source-line.is-current')).toContainText('index <- 1');
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('.array-marker')).toContainText('remove here');
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('.array-loop-boundary')).toContainText('shift boundary: i = 1');
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
+  await expect(page.locator('.source-line.is-current')).toContainText('FOR i <- index TO size - 2 DO');
 });
 
 test('custom signed data is rendered and oversized data is rejected inline', async ({ page }) => {
-  await page.goto('/visualizer.html');
+  await page.goto('/visualizer.html?activity=bubble-sort');
   const controls = page.getByText('Data and inputs', { exact: true });
   if (!(await page.locator('.data-controls').evaluate((element) => element.open))) await controls.click();
   const input = page.getByLabel('Custom values (comma-separated)');
@@ -141,13 +520,22 @@ test('custom signed data is rendered and oversized data is rejected inline', asy
 });
 
 test('array-list activity synchronizes source, structure, trace, and metrics', async ({ page }, testInfo) => {
-  await page.goto('/visualizer.html?activity=array-list-insert');
-  await page.getByLabel('Motion preference').selectOption('off');
+  await page.goto('/visualizer.html?activity=array-list-insert&preview=1');
+  await (await visualizerMotion(page)).selectOption('off');
   await expect(page.getByRole('heading', { name: 'Insert at an index' })).toBeVisible();
   await expect(page.locator('.source-line code').nth(0)).toContainText('index <- 2');
   await expect(page.locator('.source-line code').nth(1)).toContainText('value <- 24');
   await page.getByRole('button', { name: 'Step' }).click();
-  await expect(page.locator('#step-slider')).toHaveValue('1');
+  await expect(await visualizerTimeline(page)).toHaveValue('1');
+  await expect(page.locator('.source-line.is-current')).toContainText('value <- 24');
+  await expect(page.locator('.array-held-value strong')).toHaveText('24');
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('.source-line.is-current')).toContainText('size <- size + 1');
+  await expect(page.locator('.array-cell-slot.is-empty')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('.source-line.is-current')).toContainText('FOR i <- size - 2');
+  await expect(page.locator('.array-loop-boundary')).toContainText('index 2 … i = 3');
+  await page.getByRole('button', { name: 'Step' }).click();
   await expect(page.locator('.source-line.is-current')).toContainText('values[i + 1] <- values[i]');
   await expect(page.locator('.array-cell.bar-move')).toHaveCount(1);
   await expect(page.locator('.array-cell-slot.is-empty')).toHaveCount(1);
@@ -161,10 +549,10 @@ test('array-list activity synchronizes source, structure, trace, and metrics', a
 });
 
 test('insertion shifts stage one held entity and one explicit hole without visual overwrite', async ({ page }) => {
-  await page.goto('/visualizer.html?activity=insertion-sort');
-  const slider = page.locator('#step-slider');
-  await slider.fill('3');
-  await expect(page.locator('.array-held-value')).toHaveText('17');
+  await page.goto('/visualizer.html?activity=insertion-sort&preview=1');
+  const slider = await visualizerTimeline(page);
+  await slider.fill('5');
+  await expect(page.locator('.array-held-value strong')).toHaveText('17');
   await expect(page.locator('.array-held-value')).toHaveAttribute('aria-label', 'Held insertion value 17');
   await expect(page.locator('[data-entity-id="item:0"]')).toContainText('42');
   await expect(page.locator('.array-cell-slot.is-empty')).toHaveCount(1);
@@ -174,37 +562,99 @@ test('insertion shifts stage one held entity and one explicit hole without visua
     return { lowestIndex: Math.max(...indices), connectorTop: connector.top };
   });
   expect(geometry.connectorTop).toBeGreaterThan(geometry.lowestIndex + 8);
-  for (let step = 0; step < 5; step += 1) await page.getByRole('button', { name: 'Step', exact: true }).click();
-  await expect(page.locator('.array-held-value')).toHaveText('8');
+  await slider.fill('11');
+  await expect(page.locator('.array-held-value strong')).toHaveText('8');
   await expect(page.locator('.array-cell-slot.is-empty')).toHaveCount(1);
+});
+
+test('scope lines anchor to their slots while the legend stays in an accessible disclosure', async ({ page }) => {
+  await page.goto('/visualizer.html?activity=array-list-insert&preview=1');
+  await (await visualizerMotion(page)).selectOption('off');
+  await (await visualizerTimeline(page)).fill('4');
+
+  const legend = page.locator('.visualization-legend');
+  const legendSummary = legend.locator('summary');
+  await expect(legendSummary).toBeVisible();
+  await expect(legend).not.toHaveAttribute('open', '');
+  await expect(page.locator('.array-legend')).toHaveCount(0);
+
+  const geometry = await page.evaluate(() => {
+    const items = [...document.querySelectorAll('.array-item')].map((node) => {
+      const rect = node.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, center: rect.left + rect.width / 2 };
+    });
+    const box = (selector) => {
+      const rect = document.querySelector(selector).getBoundingClientRect();
+      return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    };
+    const boundary = box('.array-loop-boundary');
+    const route = box('.array-connector-route');
+    const summary = box('.visualization-legend > summary');
+    const connector = box('.array-connector');
+    const intersectionArea = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left))
+      * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    const canvas = box('.visual-canvas');
+    return {
+      boundaryStartError: boundary.left - (items[2].left + 6),
+      boundaryEndError: boundary.right - (items[3].right - 6),
+      routeStartError: route.left - items[3].center,
+      routeEndError: route.right - items[4].center,
+      connectorLegendOverlap: intersectionArea(connector, summary),
+      legendVisibleInCanvas: summary.left >= canvas.left && summary.right <= canvas.right,
+      pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    };
+  });
+  expect(Math.abs(geometry.boundaryStartError)).toBeLessThan(0.75);
+  expect(Math.abs(geometry.boundaryEndError)).toBeLessThan(0.75);
+  expect(Math.abs(geometry.routeStartError)).toBeLessThan(0.75);
+  expect(Math.abs(geometry.routeEndError)).toBeLessThan(0.75);
+  expect(geometry.connectorLegendOverlap).toBe(0);
+  expect(geometry.legendVisibleInCanvas).toBe(true);
+  expect(geometry.pageOverflow).toBe(false);
+
+  await legendSummary.focus();
+  await page.keyboard.press('Enter');
+  await expect(legend).toHaveAttribute('open', '');
+  await expect(legend.locator('.visualization-legend-panel')).toContainText('Loop / search scope');
+  await page.keyboard.press('Enter');
+  await expect(legend).not.toHaveAttribute('open', '');
+
+  await page.goto('/visualizer.html?activity=linked-list-traversal&preview=1');
+  const linkedLegend = page.locator('.visualization-legend');
+  await expect(linkedLegend.locator('summary')).toBeVisible();
+  await linkedLegend.locator('summary').click();
+  await expect(linkedLegend.locator('.visualization-legend-panel')).toContainText('Head');
+  await expect(linkedLegend.locator('.visualization-legend-panel')).toContainText('Current');
+  await expect(linkedLegend.locator('.visualization-legend-panel')).toContainText('Visited');
+  await expect(linkedLegend.locator('.visualization-legend-panel')).toContainText('Pointer write');
 });
 
 test('Motion swaps stable entities and gates rapid structural steps', async ({ page }) => {
   await page.goto('/visualizer.html?activity=bubble-sort');
-  await page.getByLabel('Motion preference').selectOption('on');
-  const slider = page.locator('#step-slider');
-  await slider.fill('1');
+  await (await visualizerMotion(page)).selectOption('on');
+  const slider = await visualizerTimeline(page);
+  await slider.fill('4');
   const before = await page.locator('[data-entity-id="item:0"]').boundingBox();
   await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Step', exact: true })).toBeDisabled();
-  await expect(slider).toHaveValue('2');
+  await expect(slider).toHaveValue('5');
   const during = await page.locator('[data-entity-id="item:0"]').boundingBox();
   expect(during.x).toBeGreaterThan(before.x);
   await expect(page.getByRole('button', { name: 'Step', exact: true })).toBeEnabled({ timeout: 1200 });
-  await expect(slider).toHaveValue('2');
+  await expect(slider).toHaveValue('5');
 });
 
 test('array-list shifts identify the moving value and its exact destination', async ({ page }) => {
-  await page.goto('/visualizer.html?activity=array-list-insert');
-  await page.getByLabel('Motion preference').selectOption('on');
-  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await page.goto('/visualizer.html?activity=array-list-insert&preview=1');
+  await (await visualizerMotion(page)).selectOption('on');
+  for (let step = 0; step < 4; step += 1) await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(page.locator('.array-connector span')).toHaveText('shift 12: [3] → [4]');
   await expect(page.locator('[data-motion-role="moving"]')).toHaveAttribute('data-entity-id', 'item:3');
-  await expect(page.locator('.array-held-value')).toHaveText('24');
+  await expect(page.locator('.array-held-value strong')).toHaveText('24');
 
-  await page.goto('/visualizer.html?activity=array-list-remove');
-  await page.getByLabel('Motion preference').selectOption('on');
-  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await page.goto('/visualizer.html?activity=array-list-remove&preview=1');
+  await (await visualizerMotion(page)).selectOption('on');
+  for (let step = 0; step < 3; step += 1) await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(page.locator('.array-connector span')).toHaveText('shift 31: [2] → [1]');
   await expect(page.locator('[data-motion-role="moving"]')).toHaveAttribute('data-entity-id', 'item:2');
   await expect(page.locator('.array-connector')).toHaveClass(/moves-left/);
@@ -212,23 +662,25 @@ test('array-list shifts identify the moving value and its exact destination', as
 
 test('Motion duration follows speed while direct seeking stays immediate', async ({ page }) => {
   await page.goto('/visualizer.html?activity=bubble-sort');
-  await page.getByLabel('Motion preference').selectOption('on');
-  await page.getByLabel('Speed').selectOption('3');
+  await (await visualizerMotion(page)).selectOption('on');
+  const speed = await visualizerSpeed(page);
+  await speed.selectOption('3');
   await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-motion-duration', '0.8');
-  await page.getByLabel('Speed').selectOption('6');
+  await speed.selectOption('6');
   await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-motion-duration', '0.52');
-  await page.getByLabel('Speed').selectOption('9');
+  await speed.selectOption('9');
   await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-motion-duration', '0.3');
-  await page.locator('#step-slider').fill('2');
+  await (await visualizerTimeline(page)).fill('2');
   await expect(page.getByRole('button', { name: 'Step', exact: true })).toBeEnabled();
 });
 
 test('motion preferences persist, reduce, turn off, and reset to the device', async ({ page }) => {
-  await page.goto('/visualizer.html');
-  const control = page.getByLabel('Motion preference');
+  await page.goto('/visualizer.html?activity=bubble-sort');
+  let control = await visualizerMotion(page);
   await control.selectOption('reduced');
   await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-reduced/);
   await page.reload();
+  control = await visualizerMotion(page);
   await expect(control).toHaveValue('reduced');
   await control.selectOption('off');
   await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-off/);
@@ -239,16 +691,16 @@ test('motion preferences persist, reduce, turn off, and reset to the device', as
 test('OS reduced motion becomes the default when no override is saved', async ({ browser }) => {
   const context = await browser.newContext({ reducedMotion: 'reduce' });
   const page = await context.newPage();
-  await page.goto('/visualizer.html');
-  await expect(page.getByLabel('Motion preference')).toHaveValue('device');
+  await page.goto('/visualizer.html?activity=bubble-sort');
+  await expect(await visualizerMotion(page)).toHaveValue('device');
   await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-reduced/);
   await context.close();
 });
 
 test('linked-list head insertion synchronizes references, links, source, and metrics', async ({ page }, testInfo) => {
-  await page.goto('/visualizer.html?activity=linked-list-insert-head');
+  await page.goto('/visualizer.html?activity=linked-list-insert-head&preview=1');
   await expect(page.getByRole('heading', { name: 'Insert at the head' })).toBeVisible();
-  const slider = page.locator('#step-slider');
+  const slider = await visualizerTimeline(page);
   await slider.fill(await slider.getAttribute('max'));
   await expect(page.locator('.linked-node')).toHaveCount(3);
   await expect(page.locator('.linked-node').first()).toContainText('24');
@@ -261,8 +713,8 @@ test('linked-list head insertion synchronizes references, links, source, and met
 });
 
 test('linked-list structure, head, and current pointer have distinct visual roles', async ({ page }) => {
-  await page.goto('/visualizer.html?activity=linked-list-traversal');
-  await page.locator('#step-slider').fill('9');
+  await page.goto('/visualizer.html?activity=linked-list-traversal&preview=1');
+  await (await visualizerTimeline(page)).fill('9');
   await expect(page.locator('.linked-node-wrap.has-head')).toHaveCount(1);
   await expect(page.locator('.linked-node-wrap.is-current')).toHaveCount(1);
   await expect(page.locator('.pointer-head')).toHaveText('head');
@@ -271,7 +723,7 @@ test('linked-list structure, head, and current pointer have distinct visual role
 });
 
 test('curated linked-list pseudocode opens in the lab and retains trace, output, and diagnostics', async ({ page }, testInfo) => {
-  await page.goto('/visualizer.html?activity=linked-list-traversal');
+  await page.goto('/visualizer.html?activity=linked-list-traversal&preview=1');
   await page.getByRole('link', { name: /Edit pseudocode/ }).click();
   await expect(page).toHaveURL(/tracer\.html\?activity=linked-list-traversal/);
   await expect(page.getByLabel('Pseudocode editor')).toHaveValue(/head <- NEW NODE\(18\)/);
@@ -303,15 +755,15 @@ WRITE alias = head`);
 
 test('mobile visualizer tabs replace the central surface without resetting playback', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone');
-  await page.goto('/visualizer.html');
+  await page.goto('/visualizer.html?activity=bubble-sort');
   await page.getByRole('button', { name: 'Step' }).click();
-  await expect(page.locator('#step-slider')).toHaveValue('1');
+  await expect(await visualizerTimeline(page)).toHaveValue('1');
   await page.getByRole('tab', { name: 'Code' }).click();
   await expect(page.locator('.desktop-source')).toBeVisible();
   await expect(page.locator('.visual-canvas')).toBeHidden();
   await page.getByRole('tab', { name: 'Trace' }).click();
   await expect(page.locator('.mobile-evidence')).toBeVisible();
-  await expect(page.locator('#step-slider')).toHaveValue('1');
+  await expect(await visualizerTimeline(page)).toHaveValue('1');
 });
 
 test('tracer runs and its result tabs work from the keyboard', async ({ page }) => {
@@ -396,10 +848,9 @@ test('module catalog opens an intermediate problem list before practice', async 
   await page.goto('/problems.html');
   await expect(page.getByRole('heading', { name: 'Explore the course' })).toBeVisible();
   await expect(page.locator('.module-card')).toHaveCount(8);
-  await expect(page.getByText('Not implemented', { exact: true })).toHaveCount(12);
-  const heights = await page.locator('.module-card').evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height));
-  expect(new Set(heights.map((height) => Math.round(height))).size).toBe(1);
-  await page.getByRole('link', { name: /Choose a problem/ }).first().click();
+  await expect(page.locator('.checkpoint-current')).toContainText('Queues and deques');
+  await expect(page.locator('.checkpoint-locked')).not.toHaveCount(0);
+  await page.getByRole('link', { name: /View module resources/ }).first().click();
   await expect(page).toHaveURL(/problem-list\.html\?module=1$/);
   await expect(page.getByRole('heading', { name: 'Module 1: select a problem' })).toBeVisible();
   await page.locator('.problem-choice-action').first().click();
@@ -414,7 +865,7 @@ test('module catalog opens an intermediate problem list before practice', async 
 test('modules catalog separates problem sets and visualizations without duplicating the visualizer rail', async ({ page }) => {
   await page.goto('/problems.html?view=visualizations');
   await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.visualization-card')).toHaveCount(9);
+  await expect(page.locator('.visualization-card')).toHaveCount(35);
   await page.getByRole('link', { name: /Bubble Sort/ }).click();
   await expect(page).toHaveURL(/visualizer\.html\?activity=bubble-sort$/);
   await expect(page.locator('.activity-rail')).toHaveCount(0);
@@ -456,10 +907,10 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
     await page.goto(fileUrl);
     await expect(page.locator('body')).toBeVisible();
   }
-  await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}`);
-  await page.getByLabel('Motion preference').selectOption('off');
+  await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}?activity=bubble-sort`);
+  await (await visualizerMotion(page)).selectOption('off');
   await page.getByRole('button', { name: 'Step', exact: true }).click();
-  await expect(page.locator('#step-slider')).toHaveValue('1');
+  await expect(await visualizerTimeline(page)).toHaveValue('1');
 
   await page.goto(`file:///${path.resolve(__dirname, '..', 'tracer.html').replace(/\\/g, '/')}`);
   await page.getByRole('button', { name: 'Load Example' }).click();

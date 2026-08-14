@@ -4,12 +4,15 @@
   "version": "1.0.0",
   "description": "Local-first BSIT learning tools for ITCC45 and ITCC47.",
   "scripts": {
+    "build:curriculum": "node tools/build-curriculum.js",
+    "build:problems": "node tools/build-problems.js",
+    "build": "npm run build:curriculum && npm run build:problems && npm run build:visualizer && node tools/build-sw.js",
     "build:visualizer": "vite build --config vite.visualizer.config.js && node tools/publish-visualizer.js",
     "test:unit": "node tools/test.js",
     "test:e2e": "playwright test tests/e2e.spec.js",
     "test:a11y": "playwright test tests/a11y.spec.js",
     "test:python": "node tools/test-python-examples.js",
-    "check": "npm run build:visualizer && npm run test:unit && npm run test:python && npm run test:e2e && npm run test:a11y"
+    "check": "npm run build && npm run test:unit && npm run test:python && npm run test:e2e && npm run test:a11y"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

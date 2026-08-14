@@ -9,6 +9,9 @@ problems.hidden.json
 # Large, and not ours to redistribute.
 context/
 
+# Legacy generated downloads are not part of the self-paced public application.
+student-bundles/
+
 # Windows Explorer folder metadata
 desktop.ini
 

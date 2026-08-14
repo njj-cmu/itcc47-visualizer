@@ -741,6 +741,8 @@ buildPresetList();
 const activityHandoff = (() => {
   const activityId = new URLSearchParams(window.location.search).get('activity');
   if (!activityId || typeof ITCC47Activities === 'undefined') return null;
+  const release = ITCC47Curriculum.stateForResource('activity', activityId, ITCC47CurriculumUI.previewOptions());
+  if (!['available', 'current'].includes(release.state)) return null;
   const activity = ITCC47Activities.get(activityId);
   if (!activity || !Array.isArray(activity.source)) return null;
   return activity;

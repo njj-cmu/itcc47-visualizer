@@ -3,6 +3,7 @@ const BSITLearningLab = (() => {
   const SCHEMA_VERSION = 1;
   const courses = new Map();
   const activityCatalogs = new Map();
+  const curriculumCatalogs = new Map();
 
   function registerCourse(course) {
     if (!course || !course.id || !course.code || !course.title || !course.home) {
@@ -19,6 +20,12 @@ const BSITLearningLab = (() => {
     return true;
   }
 
+  function registerCurriculum(courseId, catalog) {
+    if (!courses.has(courseId) || !catalog || typeof catalog.stateForResource !== 'function') return false;
+    curriculumCatalogs.set(courseId, catalog);
+    return true;
+  }
+
   function getCourse(id) { return courses.get(id) || null; }
   function listCourses() { return Object.freeze([...courses.values()]); }
   function listActivities(courseId) {
@@ -29,6 +36,7 @@ const BSITLearningLab = (() => {
     const activities = listActivities(courseId);
     return activities.find((activity) => activity.id === activityId) || activities[0] || null;
   }
+  function getCurriculum(courseId) { return curriculumCatalogs.get(courseId) || null; }
   function resolveCourse(id) { return courses.has(id) ? id : 'itcc47'; }
 
   registerCourse({
@@ -55,6 +63,6 @@ const BSITLearningLab = (() => {
     ],
   });
 
-  return Object.freeze({ SCHEMA_VERSION, registerCourse, registerActivities,
-    getCourse, listCourses, listActivities, getActivity, resolveCourse });
+  return Object.freeze({ SCHEMA_VERSION, registerCourse, registerActivities, registerCurriculum,
+    getCourse, listCourses, listActivities, getActivity, getCurriculum, resolveCourse });
 })();

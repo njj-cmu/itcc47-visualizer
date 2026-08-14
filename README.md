@@ -10,14 +10,16 @@ offline, and practise without an account or a submission system.
 
 The Python Object Lab teaches six connected topics: Classes, Objects,
 Encapsulation, Inheritance, Class Abstraction, and Polymorphism. Each topic has
-one deterministic guided visualization and three structured practice tasks.
+three complementary guided examples and three structured practice tasks. The
+18 retained examples were pruned from a 24-case teaching audit so introductory,
+transfer, and misconception-focused views do not repeat the same lesson.
 Examples are valid Python 3.9+ programs that students can copy and run locally;
 the browser intentionally does not execute arbitrary Python.
 
 | Page | Purpose |
 |---|---|
 | [`itcc45.html`](itcc45.html) | ITCC45 subject home |
-| [`itcc45-topics.html`](itcc45-topics.html) | Ordered six-topic curriculum |
+| [`itcc45-topics.html`](itcc45-topics.html) | Six topics with three guided examples each |
 | [`visualizer.html?course=itcc45`](visualizer.html?course=itcc45) | Python Object Lab |
 | [`itcc45-practice.html`](itcc45-practice.html) | Local structured practice |
 
@@ -39,7 +41,7 @@ The root [`index.html`](index.html) is the **BSIT Learning Lab** subject chooser
 
 ## Running it
 
-Open `index.html` directly. Checked-in bundles and classic scripts keep every
+Open `index.html` directly. Checked-in application assets and classic scripts keep every
 student route working through `file://`; no install or server is required.
 Opening the hosted version once also caches the complete shell for later offline
 use. Optional progress stays only in that browser.

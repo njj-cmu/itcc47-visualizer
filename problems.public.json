@@ -787,5 +787,117 @@
       {"inputs": [1000, 20, 120, 1000], "expected": ["UNRESOLVED", 8, 4, 960], "note": "a ninth probe would exceed the timeout"},
       {"inputs": [9, 4, 25, 100], "expected": ["ISOLATED", 4, 1, 100]}
     ]
+  },
+  {
+    "id":"bubble-pass","title":"One Complete Bubble Pass","module":"Module 2","difficulty":"Core","contentVersion":1,
+    "statement":"Perform exactly one left-to-right Bubble Sort pass and output the resulting array.",
+    "rules":[["Comparison","For every adjacent pair, swap only when values[j] > values[j + 1]."],["Boundary","Visit j from 0 through LENGTH(values) - 2."],["Output","Write the complete array after the pass."]],
+    "ioNote":"Read one array and write one array.","starter":"READ values\nFOR j <- 0 TO LENGTH(values) - 2 DO\n    # compare the adjacent pair\nENDFOR\nWRITE values",
+    "visibleTests":[{"inputs":[[5,1,4,2]],"expected":[[1,4,2,5]],"note":"the largest value reaches the pass boundary"},{"inputs":[[1,2,3]],"expected":[[1,2,3]]},{"inputs":[[]],"expected":[[]],"note":"an empty pass performs no comparison"}]
+  },
+  {
+    "id":"selection-minimum","title":"Select the Minimum Index","module":"Module 2","difficulty":"Core","contentVersion":1,
+    "statement":"Scan an array exactly as Selection Sort scans one unsorted region and output the index of its first minimum, or -1 for an empty array.",
+    "rules":[["Candidate","Initialize minIndex to 0 only when the array is nonempty."],["Tie","Update minIndex only for a strictly smaller value, preserving the first minimum."],["Output","Write one zero-based index, or -1."]],
+    "ioNote":"Read one array. Output one integer.","starter":"READ values\nIF LENGTH(values) = 0 THEN\n    WRITE -1\nELSE\n    minIndex <- 0\n    # scan the remaining candidates\nENDIF",
+    "visibleTests":[{"inputs":[[7,3,5,3]],"expected":[1],"note":"equal minima do not replace the first candidate"},{"inputs":[[9]],"expected":[0]},{"inputs":[[]],"expected":[-1]}]
+  },
+  {
+    "id":"stable-ticket-insertion","title":"Stable Ticket Insertion","module":"Module 2","difficulty":"Challenge","contentVersion":1,
+    "statement":"Insertion-sort parallel priority and identity arrays. Shift both fields together and preserve the arrival order of equal priorities.",
+    "rules":[["Record identity","priorities[i] and identities[i] describe one record and always move together."],["Stability","Shift only when the previous priority is strictly greater than the key priority."],["Output","Write sorted priorities, then sorted identities."]],
+    "ioNote":"Read priorities and identities as two arrays of equal length.","starter":"READ priorities\nREAD identities\nFOR i <- 1 TO LENGTH(priorities) - 1 DO\n    keyPriority <- priorities[i]\n    keyIdentity <- identities[i]\n    # shift complete records, then insert the key\nENDFOR\nWRITE priorities\nWRITE identities",
+    "visibleTests":[{"inputs":[[2,1,2,1],["A","B","C","D"]],"expected":[[1,1,2,2],["B","D","A","C"]],"note":"B stays before D and A stays before C"},{"inputs":[[1,1,1],["X","Y","Z"]],"expected":[[1,1,1],["X","Y","Z"]]}]
+  },
+  {
+    "id":"indexed-array-mutation","title":"Indexed Array Mutation","module":"Module 2","difficulty":"Challenge","contentVersion":1,
+    "statement":"Apply INSERT or REMOVE to a fixed-capacity array-list representation without losing the changed value.",
+    "rules":[["Storage","values includes spare physical slots; size is the logical item count."],["INSERT","Allow 0..size when capacity remains, shift right from the tail, and report the inserted value."],["REMOVE","Allow 0..size-1, hold the removed value, shift left, clear the old tail to 0, and report the removed value."],["Invalid","Write only INVALID for an unsupported operation or index."]],
+    "ioNote":"Read operation, values, size, index, and value. For REMOVE the final value input is ignored. Output size, physical values, and the inserted/removed value.","starter":"READ operation\nREAD values\nREAD size\nREAD index\nREAD value\n# validate, shift in the safe direction, then update size",
+    "visibleTests":[{"inputs":["INSERT",[10,20,30,0],3,1,15],"expected":[4,[10,15,20,30],15]},{"inputs":["REMOVE",[10,20,30,0],3,1,999],"expected":[2,[10,30,0,0],20]},{"inputs":["REMOVE",[10,0],1,1,0],"expected":["INVALID"]}]
+  },
+  {
+    "id":"linked-node-count","title":"Count Reachable Linked Nodes","module":"Module 3","difficulty":"Core","contentVersion":2,
+    "statement":"Build a singly linked list from n payloads, traverse from head to NULL, and output the number of reachable nodes.",
+    "rules":[["Construction","Append each allocated node exactly once."],["Traversal","Advance only with current <- current.next."],["Output","Write one count; an empty list has count 0."]],
+    "ioNote":"Read n followed by n payload values.","starter":"READ n\nhead <- NULL\ntail <- NULL\n# build the chain\ncount <- 0\ncurrent <- head\n# traverse to NULL\nWRITE count",
+    "visibleTests":[{"inputs":[3,10,20,30],"expected":[3]},{"inputs":[0],"expected":[0]},{"inputs":[1,7],"expected":[1]}]
+  },
+  {
+    "id":"linked-find-value","title":"Lookup and Update a Node","module":"Module 3","difficulty":"Core","contentVersion":2,
+    "statement":"Find the first node with a target payload, update only that node, then output its position and the resulting reachable sequence.",
+    "rules":[["Match","Use the first matching node."],["Missing","Output -1, then the unchanged sequence."],["Identity","Update current.value; do not allocate a replacement node."]],
+    "ioNote":"Read n payloads, target, and replacement. Output the zero-based position followed by every final payload.","starter":"READ n\nhead <- NULL\ntail <- NULL\n# build nodes\nREAD target\nREAD replacement\nposition <- -1\ncurrent <- head\n# find and update\nWRITE position\n# write the final chain",
+    "visibleTests":[{"inputs":[4,8,5,8,2,8,9],"expected":[0,9,5,8,2],"note":"only the first 8 changes"},{"inputs":[3,1,2,3,7,4],"expected":[-1,1,2,3]}]
+  },
+  {
+    "id":"linked-insert-head-problem","title":"Position-Aware Linked Insertion","module":"Module 3","difficulty":"Challenge","contentVersion":2,
+    "statement":"Insert one new node at a valid zero-based position, including head and tail positions, without losing the old chain.",
+    "rules":[["Valid position","Allow 0 through n; otherwise write INVALID."],["Head","newNode.next receives head before head changes."],["Middle/tail","Find the predecessor, connect newNode.next, then predecessor.next."],["Output","Write every payload in the new reachable order."]],
+    "ioNote":"Read n payloads, position, and new value.","starter":"READ n\nhead <- NULL\ntail <- NULL\n# build nodes\nREAD position\nREAD newValue\n# validate and insert one NEW NODE\n# write the reachable chain",
+    "visibleTests":[{"inputs":[3,10,20,30,0,5],"expected":[5,10,20,30]},{"inputs":[3,10,20,30,2,25],"expected":[10,20,25,30]},{"inputs":[1,9,2,4],"expected":["INVALID"]}]
+  },
+  {
+    "id":"linked-delete-first","title":"Delete the First Matching Node","module":"Module 3","difficulty":"Challenge","contentVersion":2,
+    "statement":"Delete the first node whose payload equals target, safely handling head, middle, tail, singleton, empty, and missing-target cases.",
+    "rules":[["Reconnect","Bypass current before clearing current.next."],["Status","Write DELETED or NOT FOUND first."],["Output","After the status, write every remaining reachable payload."]],
+    "ioNote":"Read n payloads and target.","starter":"READ n\nhead <- NULL\ntail <- NULL\n# build nodes\nREAD target\nprevious <- NULL\ncurrent <- head\n# locate, reconnect, and detach\n# write status and remaining chain",
+    "visibleTests":[{"inputs":[4,5,7,5,9,5],"expected":["DELETED",7,5,9]},{"inputs":[1,4,4],"expected":["DELETED"]},{"inputs":[3,1,2,3,8],"expected":["NOT FOUND",1,2,3]}]
+  },
+  {
+    "id":"linked-relocate-sorted","title":"Relocate an Updated Sorted Node","module":"Module 3","difficulty":"Challenge","contentVersion":2,
+    "statement":"Update the first target node in a sorted list, detach that same identity, and reinsert it so nondecreasing order is restored.",
+    "rules":[["Missing","Write NOT FOUND and leave the list unchanged."],["Identity","Do not allocate a replacement for the updated node."],["Stable gap","Reinsert before the first strictly greater payload."],["Output","Write UPDATED or NOT FOUND, then the final sequence."]],
+    "ioNote":"Read n sorted payloads, target, and replacement.","starter":"READ n\nhead <- NULL\ntail <- NULL\n# build the sorted chain\nREAD target\nREAD replacement\n# find, update, detach, and reinsert the same node\n# write status and final chain",
+    "visibleTests":[{"inputs":[4,10,20,30,40,20,35],"expected":["UPDATED",10,30,35,40]},{"inputs":[3,10,20,30,30,5],"expected":["UPDATED",5,10,20]},{"inputs":[3,10,20,30,99,15],"expected":["NOT FOUND",10,20,30]}]
+  },
+  {
+    "id":"linked-invariant-audit","title":"Audit Linked-List Invariants","module":"Module 3","difficulty":"Challenge","contentVersion":2,
+    "statement":"Build a chain, optionally link the tail back to head, then report CYCLE, UNSORTED, or VALID without looping forever.",
+    "rules":[["Cycle check","Use slow and fast references before attempting an unbounded traversal."],["Order check","Only a cycle-free chain may be checked for nondecreasing payload order."],["Output priority","CYCLE wins over UNSORTED; otherwise output VALID."]],
+    "ioNote":"Read n payloads, then TRUE/FALSE for link-tail-to-head.","starter":"READ n\nhead <- NULL\ntail <- NULL\n# build nodes\nREAD linkBack\n# optionally create the back edge\n# detect a cycle, then audit sorted order only when safe",
+    "visibleTests":[{"inputs":[3,10,20,30,false],"expected":["VALID"]},{"inputs":[3,10,5,30,false],"expected":["UNSORTED"]},{"inputs":[2,10,20,true],"expected":["CYCLE"]}]
+  },
+  {
+    "id":"stack-reverse","title":"Trace LIFO Output","module":"Module 4","difficulty":"Core","contentVersion":2,
+    "statement":"Treat an input array as values pushed from left to right, then pop and write every value in LIFO order.",
+    "rules":[["Top","The last array position is the initial top."],["Underflow","Stop when top reaches 0; never read values[-1]."],["Output","Write one popped value at a time."]],
+    "ioNote":"Read one array. The empty array produces no output.","starter":"READ values\ntop <- LENGTH(values)\nWHILE top > 0 DO\n    # move top, then write the popped value\nENDWHILE",
+    "visibleTests":[{"inputs":[[1,2,3]],"expected":[3,2,1]},{"inputs":[[7]],"expected":[7]},{"inputs":[[]],"expected":[]}]
+  },
+  {
+    "id":"balanced-delimiters","title":"Validate Nested Delimiters","module":"Module 4","difficulty":"Challenge","contentVersion":2,
+    "statement":"Validate (), [], and {} tokens using a stack. Equal counts are insufficient: nesting, mismatch, underflow, and leftover openers all matter.",
+    "rules":[["Opener","Push it."],["Closer","The stack must be nonempty and its top must be the matching opener."],["Finish","BALANCED requires no mismatch and an empty final stack."],["Unknown token","Treat it as INVALID."]],
+    "ioNote":"Read one array of one-character delimiter tokens. Output BALANCED or INVALID.","starter":"READ tokens\nstack <- []\ntop <- 0\nvalid <- TRUE\n# process each token without reading an empty top\n# accept only valid AND top = 0",
+    "visibleTests":[{"inputs":[["(","[","{","}","]",")"]],"expected":["BALANCED"]},{"inputs":[["(","[",")","]"]],"expected":["INVALID"],"note":"equal counts but incorrect nesting"},{"inputs":[[")"]],"expected":["INVALID"],"note":"closer underflow"},{"inputs":[[]],"expected":["BALANCED"]}]
+  },
+  {
+    "id":"postfix-operand-order","title":"Preserve Postfix Operand Order","module":"Module 4","difficulty":"Core","contentVersion":2,
+    "statement":"Push left then right, pop right first and left second, apply one operator, and output the result.",
+    "rules":[["Operators","Support +, -, *, and DIV."],["Order","Compute left operator right, never right operator left."],["Invalid","Write INVALID for an unsupported operator or DIV by zero."]],
+    "ioNote":"Read left, right, and operator.","starter":"READ leftInput\nREAD rightInput\nREAD operator\nstack <- []\n# push both operands\n# pop right, then left\n# validate and apply the operator",
+    "visibleTests":[{"inputs":[9,4,"-"],"expected":[5],"note":"reversing operands would produce -5"},{"inputs":[20,4,"DIV"],"expected":[5]},{"inputs":[7,0,"DIV"],"expected":["INVALID"]}]
+  },
+  {
+    "id":"queue-service","title":"Circular FIFO Wraparound","module":"Module 4","difficulty":"Challenge","contentVersion":2,
+    "statement":"Dequeue one or more values from a full circular queue, enqueue one new value with modulo wraparound, and output logical FIFO order.",
+    "rules":[["Valid","capacity must match the initial array and dequeueCount must be 1..capacity."],["Indices","Advance front and back with MOD capacity."],["Output","Write the last removed value, then every remaining queue value from front to back."]],
+    "ioNote":"Read capacity, a full initial array, dequeueCount, and incoming value.","starter":"READ capacity\nREAD storage\nREAD dequeueCount\nREAD incoming\n# validate, dequeue, wrap back, enqueue\n# write last removed and logical order",
+    "visibleTests":[{"inputs":[3,["A","B","C"],1,"D"],"expected":["A","B","C","D"],"note":"back wraps from physical 2 to 0"},{"inputs":[4,[1,2,3,4],3,9],"expected":[3,4,9]}]
+  },
+  {
+    "id":"round-robin-reenqueue","title":"Round-Robin Re-enqueueing","module":"Module 4","difficulty":"Challenge","contentVersion":2,
+    "statement":"Schedule process bursts by queue order. Run at most one quantum, re-enqueue unfinished process identities, and output identities in completion order.",
+    "rules":[["Identity","Processes are identified by their zero-based input positions."],["Slice","Subtract MIN(quantum, remaining)."],["Re-enqueue","Append only when remaining > 0."],["Invalid","Write INVALID for nonpositive quantum or negative bursts."]],
+    "ioNote":"Read a burst array and quantum. Output each completed process index.","starter":"READ bursts\nREAD quantum\nready <- []\n# enqueue each process index\nhead <- 0\n# consume queue entries and append unfinished identities",
+    "visibleTests":[{"inputs":[[5,2],2],"expected":[1,0],"note":"P1 re-enters behind P2"},{"inputs":[[1,1,1],3],"expected":[0,1,2]},{"inputs":[[4],0],"expected":["INVALID"]}]
+  },
+  {
+    "id":"deque-priority","title":"Execute Deque End Operations","module":"Module 4","difficulty":"Challenge","contentVersion":2,
+    "statement":"Execute operation codes against a fixed-capacity circular deque and distinguish both insertion ends and both removal ends.",
+    "rules":[["Codes","1 ADD_FRONT, 2 ADD_BACK, 3 REMOVE_FRONT, 4 REMOVE_BACK."],["Values","A parallel value is used only by add operations."],["Safety","Any add on full, remove on empty, or unknown code outputs INVALID and stops."],["Output","Write each removed value, then STATE, then remaining values from front to back."]],
+    "ioNote":"Read capacity, operation-code array, and parallel values array.","starter":"READ capacity\nREAD operations\nREAD values\n# create capacity slots and maintain front + size\n# execute only legal end operations\n# output removals, STATE, then remaining order",
+    "visibleTests":[{"inputs":[4,[2,2,1,4,3],[10,20,5,0,0]],"expected":[20,5,"STATE",10]},{"inputs":[2,[3],[0]],"expected":["INVALID"],"note":"remove-front underflow"},{"inputs":[3,[1,2],[7,8]],"expected":["STATE",7,8]}]
   }
 ]

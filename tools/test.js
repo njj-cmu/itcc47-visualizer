@@ -504,12 +504,12 @@ ok('run result capabilities are detected from events', compatibleResult.capabili
 const algorithmEngine = load(['playback.js', 'algorithms.js'], { setTimeout, clearTimeout });
 const ALGORITHMS = algorithmEngine.get('ALGORITHMS');
 const binaryEvents = ALGORITHMS.binary.run([4, -2, 9, 1], 9);
-ok('binary search begins with its sorted-data precondition', binaryEvents[0].type === 'preprocess' && binaryEvents[0].frame.array.join(',') === '4,-2,9,1');
-ok('binary precondition explains preprocessing cost', binaryEvents[0].message.includes('O(n log n)') && binaryEvents[0].message.includes('linear search may be cheaper'));
+ok('binary search assigns its target before preprocessing', binaryEvents[0].type === 'assign' && binaryEvents[0].source.line === 1 && binaryEvents[0].frame.array.join(',') === '4,-2,9,1');
+ok('binary precondition explains preprocessing cost', binaryEvents[1].message.includes('O(n log n)') && binaryEvents[1].message.includes('linear search cheaper'));
 ok('binary search shows a separate sorted-copy frame', binaryEvents[1].type === 'preprocess' && binaryEvents[1].frame.array.join(',') === '-2,1,4,9');
 ok('binary preprocessing does not mutate the original frame', binaryEvents[0].frame.array.join(',') === '4,-2,9,1');
 const alreadySortedEvents = ALGORITHMS.binary.run([-3, -3, 0, 8], -3);
-ok('binary search recognizes sorted input with duplicates', alreadySortedEvents[0].message.includes('already sorted') && alreadySortedEvents[0].frame.array.join(',') === '-3,-3,0,8');
+ok('binary search recognizes sorted input with duplicates', alreadySortedEvents[1].message.includes('already sorted') && alreadySortedEvents[1].frame.array.join(',') === '-3,-3,0,8');
 ok('insertion sort declares moves instead of swaps', ALGORITHMS.insertion.metrics.some((m) => m.key === 'moves') && !ALGORITHMS.insertion.metrics.some((m) => m.key === 'swaps'));
 ok('insertion move events use the declared move metric', ALGORITHMS.insertion.run([3, -1, 2]).some((event) => event.metrics.moves > 0 && event.frame.highlight.move));
 const insertionShift = ALGORITHMS.insertion.run([3, -1, 2]).find((event) => event.type === 'move');
@@ -523,21 +523,32 @@ ok('insertion presentation keeps a single held entity and explicit hole', insert
 const appSource = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
 ok('visual input uses one 18-value limit', appSource.includes('const MAX_VISUAL_VALUES = 18') && /parsed\.length > MAX_VISUAL_VALUES/.test(appSource));
 
-const workspaceEngine = load(['interpreter.js', 'playback.js', 'complexity.js', 'algorithms.js', 'activity-catalog.js', 'visualizer-registry.js'], { setTimeout, clearTimeout });
+const workspaceEngine = load(['interpreter.js', 'playback.js', 'complexity.js', 'algorithms.js', 'activity-catalog.js', 'linear-adt-activities.js', 'visualizer-registry.js'], { setTimeout, clearTimeout });
 const Activities = workspaceEngine.get('ITCC47Activities');
 const Registry = workspaceEngine.get('ITCC47VisualizerRegistry');
-ok('activity catalog is versioned', Activities.SCHEMA_VERSION === 1 && /^\d{4}\.\d{2}$/.test(Activities.CONTENT_VERSION));
+ok('activity catalog is versioned', Activities.SCHEMA_VERSION === 1 && /^\d{4}\.\d{2}(?:-[a-z0-9-]+)?$/.test(Activities.CONTENT_VERSION));
 ['bubble-sort', 'selection-sort', 'insertion-sort', 'linear-search', 'binary-search', 'array-list-insert', 'array-list-remove', 'linked-list-traversal', 'linked-list-insert-head']
   .forEach((id) => ok(`activity catalog contains ${id}`, Activities.list().some((activity) => activity.id === id)));
 const insertResultA = Activities.get('array-list-insert').run({ values: [18, 7, 31, 12], index: 2, value: 24 });
 const insertResultB = Activities.get('array-list-insert').run({ values: [18, 7, 31, 12], index: 2, value: 24 });
 ok('array-list insertion timeline is deterministic', JSON.stringify(insertResultA) === JSON.stringify(insertResultB));
-ok('array-list insertion shifts before storing', insertResultA.events.map((event) => event.type).join(',') === 'state,move,move,insert' && insertResultA.events.at(-1).frame.array.join(',') === '18,7,24,31,12');
+ok('array-list insertion executes every setup and loop line before storing', insertResultA.events.map((event) => event.type).join(',') === 'state,prepare,resize,loop,move,loop,move,loop-exit,insert' && insertResultA.events.at(-1).frame.array.join(',') === '18,7,24,31,12');
 ok('array-list insertion move preserves its held value', insertResultA.events.find((event) => event.type === 'move').frame.highlight.held.value === 24);
+ok('array-list insertion exposes the initialized loop boundary', insertResultA.events.find((event) => event.type === 'loop').frame.markers.boundary.start === 2 && insertResultA.events.find((event) => event.type === 'loop').frame.markers.i === 3);
 ok('array-list insertion transitions shift then enter the stable new entity', insertResultA.events.filter((event) => event.transition).map((event) => event.transition.kind).join(',') === 'shift,shift,insert' && insertResultA.events.at(-1).transition.enter[0] === 'item:insert');
 const removeResult = Activities.get('array-list-remove').run({ values: [18, 7, 31, 12], index: 1 });
-ok('array-list removal closes the gap', removeResult.events.map((event) => event.type).join(',') === 'remove,move,move,complete' && removeResult.events.at(-1).frame.array.join(',') === '18,31,12');
-ok('array-list removal begins with the exiting entity still in its slot', removeResult.events[0].frame.presentation.slots[1] === removeResult.events[0].transition.exit[0]);
+ok('array-list removal executes setup and every loop condition before closing the gap', removeResult.events.map((event) => event.type).join(',') === 'state,remove,loop,move,loop,move,loop-exit,complete' && removeResult.events.at(-1).frame.array.join(',') === '18,31,12');
+ok('array-list removal begins its mutation with the exiting entity still in its slot', removeResult.events.find((event) => event.type === 'remove').frame.presentation.slots[1] === removeResult.events.find((event) => event.type === 'remove').transition.exit[0]);
+const algorithmCoverageInputs = {
+  'bubble-sort': { values: [3, 1, 2] }, 'selection-sort': { values: [3, 1, 2] }, 'insertion-sort': { values: [3, 1, 2] },
+  'linear-search': { values: [3, 1, 2], target: 9 }, 'binary-search': { values: [3, 1, 2], target: 9 },
+};
+Object.entries(algorithmCoverageInputs).forEach(([id, options]) => {
+  const activity = Activities.get(id); const result = activity.run(options);
+  ok(`${id} maps every timeline event to a real pseudocode line`, result.events.every((event) => event.source && event.source.code === activity.sourceFor(options)[event.source.line - 1]));
+  ok(`${id} makes loop termination explicit`, result.events.some((event) => event.type === 'loop-exit'));
+  ok(`${id} finishes with an explicit return`, result.events.at(-1).type === 'return' && result.events.at(-1).terminal);
+});
 ok('visualizer capabilities include all synchronized evidence', insertResultA.capabilities.visualize && insertResultA.capabilities.trace && insertResultA.capabilities.operations);
 const linkedTraversalA = Activities.get('linked-list-traversal').run();
 const linkedTraversalB = Activities.get('linked-list-traversal').run();
@@ -547,6 +558,56 @@ const linkedInsert = Activities.get('linked-list-insert-head').run();
 ok('head insertion preserves the old chain after the new node', linkedInsert.events.at(-1).frame.nodes.map((node) => node.value).join(',') === '24,18,7' && linkedInsert.events.at(-1).metrics.pointerWrites === 2);
 ok('linked transitions preserve pointer and edge identities', linkedInsert.events.some((event) => event.transition?.moves?.some((move) => move.entityId === 'pointer:head')) && linkedInsert.events.some((event) => event.frame.links.every((link) => link.id === `edge:${link.from}->${link.to}`)));
 ok('linked-list events use immutable V2 frames', Object.isFrozen(linkedInsert.events[0]) && Object.isFrozen(linkedInsert.events[0].frame) && linkedInsert.events.every((event, index) => event.id === `linked-list-insert-head:${index}`));
+const semanticLineAudit = {
+  'bubble-sort': { lines: [1, 2, 3, 4, 5, 6, 7, 10, 11, 14], cases: [{ values: [3, 1, 2] }] },
+  'selection-sort': { lines: [1, 2, 3, 4, 5, 6, 9, 10, 12, 13], cases: [{ values: [3, 1, 2] }] },
+  'insertion-sort': { lines: [1, 2, 3, 4, 5, 6, 7, 9, 10, 11], cases: [{ values: [3, 1, 2] }] },
+  'linear-search': { lines: [1, 2, 3, 4, 5, 8], cases: [{ values: [3, 1, 2], target: 2 }, { values: [3, 1, 2], target: 9 }] },
+  'binary-search': { lines: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15], cases: [{ values: [1, 3, 7, 9], target: 7 }, { values: [1, 3, 7, 9], target: 8 }, { values: [1, 3, 7, 9], target: 0 }] },
+  'array-list-insert': { lines: [1, 2, 3, 4, 5, 6], cases: [{ values: [18, 7, 31, 12], index: 2, value: 24 }] },
+  'array-list-remove': { lines: [1, 2, 3, 4, 5], cases: [{ values: [18, 7, 31, 12], index: 1 }] },
+  'linked-list-traversal': { lines: [1, 2, 3, 4, 5, 6, 7], cases: [{}] },
+  'linked-list-insert-head': { lines: [1, 2, 3, 4, 5], cases: [{}] },
+};
+Object.entries(semanticLineAudit).forEach(([id, audit]) => {
+  const covered = new Set(audit.cases.flatMap((options) => Activities.get(id).run(options).events.map((event) => event.source?.line).filter(Boolean)));
+  const missing = audit.lines.filter((line) => !covered.has(line));
+  ok(`${id} emits every semantically executable pseudocode line`, missing.length === 0, missing.length ? `missing lines ${missing.join(', ')}` : '');
+});
+const teachingAuditCases = {
+  'bubble-sort': { values: [3, 1, 2] },
+  'selection-sort': { values: [3, 1, 2] },
+  'insertion-sort': { values: [3, 1, 2] },
+  'linear-search': { values: [3, 1, 2], target: 2 },
+  'binary-search': { values: [3, 1, 2], target: 2 },
+  'array-list-insert': { values: [3, 1, 2], index: 1, value: 9 },
+  'array-list-remove': { values: [3, 1, 2], index: 1 },
+  'linked-list-traversal': {},
+  'linked-list-insert-head': {},
+};
+Object.entries(teachingAuditCases).forEach(([id, options]) => {
+  const activity = Activities.get(id);
+  const events = activity.run(options).events;
+  const teachingEvents = events.filter((event) => event.frame.markers?.teaching);
+  ok(`${id} declares and emits its teaching variant`, !!activity.teachingVariant && teachingEvents.some((event) => event.frame.markers.teaching.variant === activity.teachingVariant));
+  ok(`${id} teaching metadata never emits an empty or stale shell`, teachingEvents.every((event) => {
+    const teaching = event.frame.markers.teaching;
+    return teaching.annotations?.length || teaching.status?.length || teaching.comparison;
+  }));
+  ok(`${id} teaching targets resolve inside the current frame`, teachingEvents.every((event) => (event.frame.markers.teaching.annotations || []).every((annotation) => {
+    if (annotation.target?.kind === 'slot') return Number.isInteger(annotation.target.index) && annotation.target.index >= 0 && annotation.target.index < event.frame.array.length;
+    if (annotation.target?.kind === 'pointer') return Object.prototype.hasOwnProperty.call(event.frame.pointers || {}, annotation.target.id);
+    return annotation.target?.kind === 'held';
+  })));
+  ok(`${id} value annotations agree with the rendered slot`, teachingEvents.every((event) => (event.frame.markers.teaching.annotations || []).every((annotation) => {
+    if (annotation.target?.kind !== 'slot' || !String(annotation.label).startsWith('values[')) return true;
+    return annotation.value === event.frame.array[annotation.target.index];
+  })));
+});
+const selectionTeaching = Activities.get('selection-sort').run({ values: [42, 17, 8] }).events.map((event) => event.frame.markers?.teaching).filter(Boolean);
+ok('selection teaching focuses on minIndex without a redundant minimum-value fact', selectionTeaching.some((teaching) => teaching.annotations.some((annotation) => annotation.label === 'minIndex')) && selectionTeaching.every((teaching) => ![...teaching.annotations, ...teaching.status].some((item) => item.label === 'minimum value')));
+const bubbleTeaching = Activities.get('bubble-sort').run({ values: [3, 1, 2] }).events.map((event) => event.frame.markers?.teaching).filter(Boolean);
+ok('bubble teaching names both adjacent operands', bubbleTeaching.some((teaching) => teaching.annotations.some((annotation) => annotation.label === 'values[j]') && teaching.annotations.some((annotation) => annotation.label === 'values[j + 1]')));
 const goldenTimelines = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests', 'golden-timelines.json'), 'utf8'));
 const transitionGoldens = goldenTimelines.transitions;
 Object.entries(goldenTimelines).filter(([id]) => id !== 'transitions').forEach(([id, golden]) => {
@@ -576,13 +637,37 @@ ok('visualizer registries report renderers and evidence views', Registry.rendere
 ok('algorithm metrics remain separate from primitive-operation analysis', !fs.readFileSync(path.join(ROOT, 'visualizer-src', 'main.jsx'), 'utf8').includes('primitiveTotal +'));
 
 section('multi-course catalog and ITCC45 OOP');
+const workspaceLayoutEngine = load(['workspace-layout.js']);
+const WorkspaceLayout = workspaceLayoutEngine.get('ITCC45WorkspaceLayout');
+const ITCC47Layout = workspaceLayoutEngine.get('ITCC47WorkspaceLayout');
+const savedLayout = new Map();
+const layoutStorage = { getItem: (key) => savedLayout.get(key) ?? null, setItem: (key, value) => savedLayout.set(key, value) };
+ok('ITCC45 workspace layout uses adaptive evidence defaults', WorkspaceLayout.defaults(1600).evidence === 'expanded' && WorkspaceLayout.defaults(1366).evidence === 'collapsed');
+ok('ITCC45 workspace layout clamps the source ratio', WorkspaceLayout.clampSourceRatio(0.1) === 0.3 && WorkspaceLayout.clampSourceRatio(0.9) === 0.65 && WorkspaceLayout.clampSourceRatio('bad') === 0.4);
+ok('ITCC45 workspace layout rejects outdated content', WorkspaceLayout.normalize({ version: 0, evidence: 'expanded', sourceRatio: 0.6 }, 1280).evidence === 'collapsed');
+WorkspaceLayout.write(layoutStorage, { evidence: 'expanded', sourceRatio: 0.52 }, 1280);
+ok('ITCC45 workspace layout persists only its versioned contract', JSON.stringify(WorkspaceLayout.read(layoutStorage, 1280)) === JSON.stringify({ version: 1, evidence: 'expanded', sourceRatio: 0.52 }));
+savedLayout.set(WorkspaceLayout.STORAGE_KEY, '{broken');
+ok('ITCC45 workspace layout safely ignores malformed storage', WorkspaceLayout.read(layoutStorage, 1600).evidence === 'expanded' && WorkspaceLayout.read(layoutStorage, 1600).sourceRatio === 0.4);
+ok('ITCC47 evidence starts expanded for first-time learners', ITCC47Layout.defaults().evidence === 'expanded');
+ITCC47Layout.write(layoutStorage, { evidence: 'collapsed' });
+ok('ITCC47 evidence choice persists under a separate versioned key', ITCC47Layout.STORAGE_KEY !== WorkspaceLayout.STORAGE_KEY && ITCC47Layout.read(layoutStorage).evidence === 'collapsed');
+savedLayout.set(ITCC47Layout.STORAGE_KEY, JSON.stringify({ version: 0, evidence: 'collapsed' }));
+ok('ITCC47 ignores outdated layout storage', ITCC47Layout.read(layoutStorage).evidence === 'expanded');
+
 const oopEngine = load(['course-catalog.js', 'playback.js', 'itcc45-activities.js', 'itcc45-practice-data.js'], { setTimeout, clearTimeout });
 const Courses = oopEngine.get('BSITLearningLab');
 const OOPActivities = oopEngine.get('ITCC45Activities');
 const OOPPractice = oopEngine.get('BSITOOPPractice');
 ok('course catalog is versioned and contains ITCC45 and ITCC47', Courses.SCHEMA_VERSION === 1 && Courses.listCourses().map((course) => course.id).join(',') === 'itcc45,itcc47');
-ok('course IDs and activity IDs are unique', new Set(Courses.listCourses().map((course) => course.id)).size === 2 && new Set(OOPActivities.list().map((activity) => activity.id)).size === 6);
-ok('ITCC45 activity catalog has the six ordered topics', OOPActivities.list().map((activity) => activity.topicId).join(',') === 'classes,objects,encapsulation,inheritance,abstraction,polymorphism');
+ok('course IDs and activity IDs are unique', new Set(Courses.listCourses().map((course) => course.id)).size === 2 && new Set(OOPActivities.list().map((activity) => activity.id)).size === 18);
+const oopTopicIds = ['classes', 'objects', 'encapsulation', 'inheritance', 'abstraction', 'polymorphism'];
+ok('ITCC45 activity catalog has three ordered examples for each topic', oopTopicIds.every((topicId) => OOPActivities.forTopic(topicId).length === 3 && OOPActivities.forTopic(topicId).every((activity, index) => activity.exampleOrder === index + 1)));
+ok('ITCC45 activities declare discovery and misconception metadata', OOPActivities.list().every((activity) => ['classroom', 'textbook', 'real-world'].includes(activity.context) && activity.learningGoal && activity.misconceptionIds.length));
+ok('every ITCC45 topic spans an introduction and a transfer context', oopTopicIds.every((topicId) => {
+  const contexts = new Set(OOPActivities.forTopic(topicId).map((activity) => activity.context));
+  return contexts.has('classroom') && contexts.has('real-world');
+}));
 OOPActivities.list().forEach((activity) => {
   const a = activity.run(activity.input.defaults);
   const b = activity.run(activity.input.defaults);
@@ -598,7 +683,19 @@ OOPActivities.list().forEach((activity) => {
 const rejectedScore = OOPActivities.get('itcc45-encapsulation-property').run({ startingScore: 88, proposedScore: 120 });
 ok('encapsulation rejects invalid scores without changing state', rejectedScore.events.some((item) => item.type === 'reject') && rejectedScore.events.at(-1).frame.objects[0].fields._score === 88);
 ok('abstraction demonstrates incomplete subclass rejection', OOPActivities.get('itcc45-abstraction-contract').run().events.some((item) => item.type === 'reject'));
-ok('polymorphism dispatches through both concrete classes', OOPActivities.get('itcc45-polymorphic-dispatch').run().events.filter((item) => item.type === 'dispatch').map((item) => item.frame.active.method).join(',') === 'Student.role_summary,Instructor.role_summary');
+ok('polymorphism dispatches through both concrete classes', OOPActivities.get('itcc45-polymorphic-dispatch').run().events.filter((item) => item.type === 'dispatch').map((item) => item.frame.active.method).join(',') === 'EmailNotification.send,SmsNotification.send');
+ok('class shadowing preserves the class fallback', OOPActivities.get('itcc45-classes-instance-shadowing').run().events.at(-1).frame.output.join('|') === 'OOP101: Lab 5|WEB101: Lab 2|Lab 2');
+ok('shared mutable class state is contrasted with independent repaired state', OOPActivities.get('itcc45-classes-shared-mutable').run().events.map((item) => item.segment?.id).filter(Boolean).join(',') === 'attempt,attempt,repair,repair');
+ok('recursive setter failure is caught before its backing-field repair', OOPActivities.get('itcc45-encapsulation-recursive-setter').run().events.some((item) => item.type === 'reject') && OOPActivities.get('itcc45-encapsulation-recursive-setter').run().events.at(-1).frame.objects[0].fields._celsius === 24);
+ok('name-mangling is visualized as convention rather than security', OOPActivities.get('itcc45-encapsulation-python-privacy').run().events.some((item) => item.frame.annotations.some((note) => note.value === '_StudentPortal__token')) && OOPActivities.get('itcc45-encapsulation-python-privacy').run().events.at(-1).frame.notice.includes('security'));
+ok('missing super exposes absent base state before repair', OOPActivities.get('itcc45-inheritance-missing-super').run().events.at(-1).frame.objects[0].fields.name === 'Ana' && OOPActivities.get('itcc45-inheritance-missing-super').run().events.some((item) => item.type === 'reject'));
+ok('abstraction begins with hidden details before ABC syntax', !OOPActivities.get('itcc45-abstraction-hidden-details').source.join('\n').includes('ABC') && OOPActivities.get('itcc45-abstraction-shape-contract').source.join('\n').includes('abstractmethod'));
+ok('type-switch contrast ends with runtime dispatch through both delivery classes', OOPActivities.get('itcc45-polymorphism-type-switch').run().events.filter((item) => item.type === 'dispatch').map((item) => item.frame.active.method).join(',') === 'StandardDelivery.fee,ExpressDelivery.fee');
+const oopAudit = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests', 'itcc45-example-audit.json'), 'utf8'));
+const retainedAudit = oopAudit.candidates.filter((candidate) => candidate.retained);
+ok('ITCC45 audit evaluates 24 candidates and retains 18', oopAudit.candidates.length === 24 && retainedAudit.length === 18);
+ok('every retained audit candidate clears the release rubric', retainedAudit.every((candidate) => candidate.total >= 10 && candidate.scores.length === 6 && candidate.scores.every((score) => score > 0)));
+ok('every shipped activity maps to one retained audit decision', new Set(retainedAudit.map((candidate) => candidate.activityId)).size === 18 && OOPActivities.list().every((activity) => retainedAudit.some((candidate) => candidate.activityId === activity.id)));
 ok('practice has exactly three challenges for each topic', OOPPractice.topics.every((topic) => OOPPractice.forTopic(topic.id).length === 3) && OOPPractice.challenges.length === 18);
 ok('challenge IDs are unique and answer indexes are valid', new Set(OOPPractice.challenges.map((item) => item.id)).size === 18 && OOPPractice.challenges.every((item) => Number.isInteger(item.answer) && item.answer >= 0 && item.answer < item.choices.length));
 
@@ -725,7 +822,7 @@ ok('service worker ignores non-GET requests', /request\.method\s*!==\s*'GET'/.te
 ok('service worker ignores cross-origin requests', swSource.includes('url.origin !== self.location.origin'));
 
 // Every page must register the worker, or that page is not available offline.
-['index.html', 'visualizer.html', 'writer.html', 'tracer.html', 'problems.html', 'problem-list.html', 'practice.html'].forEach((page) => {
+['index.html', 'visualizer.html', 'writer.html', 'tracer.html', 'problems.html', 'problem-list.html', 'practice.html', 'lesson.html'].forEach((page) => {
   const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
   ok(`${page} registers the offline worker`, html.includes('sw-register.js'));
 });
@@ -743,6 +840,111 @@ function isIgnored(file) {
 
 ok('no answer file is publishable', sourceLeak.length === 0,
   sourceLeak.length ? `${sourceLeak.join(', ')} exists and is not gitignored` : '');
+
+// ---------- curriculum governance ----------
+
+section('curriculum governance');
+const previewStorage = (() => { const values = new Map(); return { getItem:(key)=>values.has(key)?values.get(key):null,setItem:(key,value)=>values.set(key,String(value)),removeItem:(key)=>values.delete(key) }; })();
+const curriculumEngine = load(['course-catalog.js','curriculum.data.js','release-profile.js','curriculum.js'], { localStorage:previewStorage, location:{ search:'' }, URLSearchParams });
+const Curriculum = curriculumEngine.get('ITCC47Curriculum');
+const ReleaseProfile = curriculumEngine.get('ITCC47_RELEASE_PROFILE');
+ok('semester profile releases through queues and deques', ReleaseProfile.schemaVersion === 2 && ReleaseProfile.profileVersion === 2 && ReleaseProfile.currentCheckpointId === 'm4-queue-deque' && !('finalProjectId' in ReleaseProfile));
+ok('catalog preserves all six authoritative CLO definitions', Curriculum.clos.length === 6 && Curriculum.clos.every((clo)=>clo.id && clo.statement));
+ok('checkpoint order is unique and increasing', new Set(Curriculum.checkpoints.map((item)=>item.order)).size === Curriculum.checkpoints.length && Curriculum.checkpoints.every((item,index,list)=>!index || item.order > list[index-1].order));
+ok('every checkpoint prerequisite points backward', Curriculum.checkpoints.every((item)=>item.prerequisiteIds.every((id)=>Curriculum.getCheckpoint(id)?.order < item.order)));
+ok('every resource mapping resolves', Curriculum.listResources().every((resource)=>resource.alwaysAvailable || Curriculum.getCheckpoint(resource.checkpointId)));
+ok('review status follows the release boundary', Curriculum.checkpoints.filter((item)=>item.order <= Curriculum.getCheckpoint('m4-queue-deque').order).every((item)=>item.reviewStatus === 'reviewed') && Curriculum.checkpoints.filter((item)=>item.order > Curriculum.getCheckpoint('m4-queue-deque').order).every((item)=>item.reviewStatus === 'draft'));
+ok('public curriculum exposes practice resources only', Curriculum.listResources().every((resource)=>['lesson','tool','activity','problem'].includes(resource.kind) && !('labRefs' in resource) && ['reviewed','draft'].includes(resource.reviewStatus)));
+ok('current, available, and locked states share one resolver', Curriculum.stateForResource('activity','selection-sort').state === 'available' && Curriculum.stateForResource('activity','deque-service-lane').state === 'current' && Curriculum.stateForResource('activity','recursive-range-search').state === 'locked');
+ok('missing mappings fail closed at runtime', Curriculum.stateForResource('activity','not-mapped').state === 'planned' && !Curriculum.isOpen('activity','not-mapped'));
+Curriculum.writePreview('m8-dp',previewStorage);
+ok('preview is explicit and persisted under the versioned key', Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm8-dp' && previewStorage.getItem(Curriculum.PREVIEW_STORAGE_KEY));
+ok('normal visits ignore a stored instructor preview', Curriculum.activeProfile({preview:false,storage:previewStorage,search:''}).currentCheckpointId === 'm4-queue-deque');
+Curriculum.clearPreview(previewStorage);
+ok('array-list mutation belongs to Module 2', Activities.get('array-list-insert').module === 2 && Activities.get('array-list-remove').module === 2);
+ok('every shipped activity exposes curriculum metadata', Activities.list().filter((activity)=>Curriculum.getResource('activity',activity.id)).every((activity)=>activity.checkpointId && activity.cloIds.length));
+ok('every cataloged visualization has a concrete activity', Curriculum.listResources('activity').every((resource)=>Activities.list().some((activity)=>activity.id === resource.id)));
+const extendedIds = ['binary-range-search','stable-insertion-dispatch','array-linked-comparison','linked-list-sorted-insert','linked-list-find-update','linked-list-delete','recursive-range-search','stable-merge-sort','tree-traversals','bst-insert-search','bst-height-shape','graph-representation','bfs-shortest-path','dfs-reachability','greedy-dp-coin-change','knapsack-dp'];
+extendedIds.forEach((id) => {
+  const activity = Activities.get(id); const result = activity.run();
+  ok(`${id}: deterministic lifecycle and terminal return`, result.events[0].type === 'initialize' && result.events.at(-1).terminal && JSON.stringify(result) === JSON.stringify(activity.run()));
+  ok(`${id}: teaching targets are valid and never stale`, result.events.every((event)=>(event.frame.markers.teaching?.annotations || []).every((annotation)=> {
+    if (annotation.target.kind === 'slot') return annotation.target.index >= 0 && annotation.target.index < event.frame.array.length;
+    if (annotation.target.kind === 'entity') return [...(event.frame.nodes || []), ...(event.frame.detachedNodes || []), ...(event.frame.lanes || []).flatMap((lane)=>lane.items || [])].some((item)=>item.id === annotation.target.id);
+    if (annotation.target.kind === 'pointer') return Object.prototype.hasOwnProperty.call(event.frame.pointers || {},annotation.target.id);
+    return annotation.target.kind === 'held';
+  })));
+});
+const rangeSearch = Activities.get('binary-range-search').run({values:[2,4,4,4,4,9,11],target:4});
+ok('binary range search compares real values and returns duplicate bounds', rangeSearch.result.lower === 1 && rangeSearch.result.upper === 5 && rangeSearch.events.some((event)=>event.type === 'comparison') && rangeSearch.events.some((event)=>event.type === 'loop-exit'));
+ok('binary range boundaries remain valid half-open ranges', rangeSearch.events.every((event)=>{ const {low,high,mid}=event.frame.markers || {}; return (!Number.isInteger(low) || !Number.isInteger(high) || (low >= 0 && low <= high && high <= event.frame.array.length)) && (!Number.isInteger(mid) || (mid >= 0 && mid < event.frame.array.length)); }));
+const stableRecords = Activities.get('stable-insertion-dispatch').run();
+ok('stable record insertion preserves equal-priority identity order', stableRecords.result.identities.join(',') === 'B,D,A,C' && stableRecords.events.some((event)=>event.frame.presentation?.held) && stableRecords.events.at(-1).frame.markers.hole === undefined);
+['middle','head','tail','singleton'].forEach((preset)=> {
+  const result = Activities.get('linked-list-sorted-insert').run({preset});
+  ok(`linked sorted insertion ${preset} keeps all invariants`, result.events.at(-1).frame.invariants.sorted && result.events.at(-1).frame.invariants.cycleFree && result.events.at(-1).frame.invariants.reachable && result.events.at(-1).frame.detachedNodes.length === 0);
+});
+['relocation','head','tail','singleton','missing'].forEach((preset)=> {
+  const result = Activities.get('linked-list-find-update').run({preset});
+  ok(`linked relocation ${preset} preserves identity and structure`, result.events.at(-1).frame.invariants.sorted && result.events.at(-1).frame.invariants.cycleFree && result.events.at(-1).frame.invariants.reachable && result.events.at(-1).frame.detachedNodes.length === 0);
+});
+['middle','head','tail','singleton','missing'].forEach((preset)=> {
+  const result = Activities.get('linked-list-delete').run({preset});
+  ok(`linked deletion ${preset} reports detachment accurately`, result.events.at(-1).frame.invariants.cycleFree && Number.isInteger(result.events.at(-1).frame.invariants.reachable) && result.events.at(-1).frame.detachedNodes.length === (preset === 'missing' ? 0 : 1));
+});
+const module4Activities = Activities.list().filter((activity) => activity.module === 4);
+ok('Module 4 contains ten guided examples', module4Activities.length === 10);
+ok('Module 4 balances stacks, queues, and deques', ['Stacks','Queues','Deques'].every((family) => module4Activities.filter((activity) => activity.family === family).length >= 3));
+ok('Module 4 spans foundations, algorithmic reasoning, and real-world contexts', ['Foundations','Math resolver','Real world'].every((kind) => module4Activities.some((activity) => activity.exampleKind === kind)));
+module4Activities.forEach((activity) => {
+  const result = activity.run();
+  ok(`${activity.id}: every event maps to a real source line`, result.events.every((event) => event.source?.code === activity.source[event.source.line - 1]));
+  ok(`${activity.id}: linear-ADT frames and annotations stay valid`, result.events.every((event) => {
+    if (event.frame.kind !== 'linear-adt') return false;
+    const live = new Set(event.frame.lanes.flatMap((lane) => lane.items.map((item) => item.id)));
+    const held = new Set(event.frame.held.map((item) => item.id));
+    return event.frame.markers.teaching.annotations.every((annotation) => annotation.target.kind === 'held' ? held.has(annotation.target.id) : live.has(annotation.target.id));
+  }));
+  ok(`${activity.id}: timeline is deterministic and terminates`, JSON.stringify(result) === JSON.stringify(activity.run()) && result.events.at(-1).terminal);
+  ok(`${activity.id}: front/back/top invariants agree with the rendered lane`, result.events.every((event)=> {
+    const items = event.frame.lanes[0]?.items || [];
+    const invariant = event.frame.invariants;
+    return invariant.size === items.length && invariant.empty === (items.length === 0) && (event.frame.structure === 'stack' ? invariant.top === (items.at(-1)?.id || null) : invariant.front === (items[0]?.id || null) && invariant.back === (items.at(-1)?.id || null));
+  }));
+});
+ok('stack basics visibly enforce LIFO', Activities.get('stack-lifo-basics').run().result.popped === 'B');
+ok('stack basics guards underflow before any empty pop', Activities.get('stack-lifo-basics').run().events.some((event)=>event.frame.operation?.label === 'UNDERFLOW guard' && event.frame.markers.teaching.comparison?.outcome === false));
+ok('postfix resolver returns 21', Activities.get('stack-postfix-evaluator').run().result.value === 21);
+ok('postfix resolver pops right before left', Activities.get('stack-postfix-evaluator').run().events.findIndex((event)=>event.frame.operation?.label === 'POP right') < Activities.get('stack-postfix-evaluator').run().events.findIndex((event)=>event.frame.operation?.label === 'POP left'));
+ok('delimiter audit accepts only after the stack empties', Activities.get('stack-delimiter-audit').run().events.at(-1).frame.array.length === 0 && Activities.get('stack-delimiter-audit').run().result.valid);
+ok('queue basics visibly enforce FIFO', Activities.get('queue-fifo-basics').run().result.served === 'A');
+ok('queue basics demonstrates circular wraparound', Activities.get('queue-fifo-basics').run().events.some((event)=>event.message.toLowerCase().includes('wrap')));
+ok('deque foundation uses both removal ends', Activities.get('deque-end-operations').run().result.remaining.join(',') === 'A');
+ok('monotonic deque returns both window maxima', Activities.get('deque-sliding-window').run().result.maxima.join(',') === '12,12');
+const materialsPage = fs.readFileSync(path.join(ROOT,'student-materials.html'),'utf8');
+ok('former materials route is a metadata-free practice redirect', /problems\.html/.test(materialsPage) && !/curriculum\.data|student-bundles|laborator|project/i.test(materialsPage));
+ok('offline delivery excludes bundle metadata and downloads', !listed.some((asset)=>/student-bundles|student-materials\.js/.test(asset)) && !swSource.includes('student-bundles/'));
+const buildCurriculum = require('./build-curriculum.js');
+const rawCurriculum = JSON.parse(fs.readFileSync(path.join(ROOT,'curriculum.public.json'),'utf8'));
+const validatedCurriculum = buildCurriculum.validate(rawCurriculum);
+let draftReleaseRejected = false;
+try { buildCurriculum.validateRelease(validatedCurriculum,{...ReleaseProfile,currentCheckpointId:'m5-recursion'}); } catch (error) { draftReleaseRejected = /draft checkpoint/.test(error.message); }
+ok('release readiness rejects profiles that advance into draft work', draftReleaseRejected);
+vm.runInContext(fs.readFileSync(path.join(ROOT,'future-problems.js'),'utf8'),curriculumEngine.ctx);
+const FutureProblems = curriculumEngine.get('ITCC47FutureProblems');
+ok('only Modules 5-8 remain in the future problem catalog', [5,6,7,8].every((module)=>FutureProblems.problems.filter((problem)=>problem.module === `Module ${module}`).length === 4) && FutureProblems.problems.every((problem)=>![2,3,4].includes(Number(problem.module.replace('Module ','')))));
+ok('future problem metadata matches the curriculum resolver', FutureProblems.problems.every((problem)=>problem.checkpointId === Curriculum.getResource('problem',problem.id)?.checkpointId && problem.cloIds.length && problem.visibleTests.length >= 2));
+const invalidFutureStarters = FutureProblems.problems.filter((problem)=>!parses(problem.starter)).map((problem)=>problem.id);
+ok('every future problem starter parses', invalidFutureStarters.length === 0, invalidFutureStarters.join(', '));
+
+const companionEngine = load(['checkpoint-companions.js']);
+const Companions = companionEngine.get('ITCC47CheckpointCompanions');
+ok('Modules 2-4 ship exactly eleven reviewed checkpoint companions', Companions.checkpointIds.length === 11 && Companions.validate().length === 0);
+Companions.checkpointIds.forEach((checkpointId)=>{ const companion = Companions.get(checkpointId); ok(`${checkpointId}: companion contract is complete`, companion.mentalModel && companion.vocabulary.length >= 3 && companion.workedTrace.length >= 3 && companion.invariants.length >= 3 && companion.misconceptions.length >= 2 && companion.selfChecks.length === 2); });
+ok('released practice counts are Module 2: 10, Module 3: 6, Module 4: 6', [2,3,4].map((module)=>PROBLEMS.filter((problem)=>problem.module === `Module ${module}`).length).join(',') === '10,6,6');
+ok('released practice contracts are versioned and reviewed', PROBLEMS.filter((problem)=>['Module 2','Module 3','Module 4'].includes(problem.module)).every((problem)=>problem.contentVersion && problem.reviewStatus === 'reviewed' && problem.visibleTests.length >= 2 && problem.hidden.length >= 2));
+const practiceSource = fs.readFileSync(path.join(ROOT,'problems-app.js'),'utf8');
+ok('practice records are content-version aware with recoverable drafts', practiceSource.includes("itcc47.practice-records:v2") && practiceSource.includes('contentVersion') && practiceSource.includes('recovery'));
 
 // Practice results must be deterministic and contain no identity or clock data.
 const evaluationEngine = load(['evaluation.js']);

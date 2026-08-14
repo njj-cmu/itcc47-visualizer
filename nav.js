@@ -54,6 +54,9 @@
     }
     nav.querySelectorAll('[data-icon]').forEach((element) => element.insertAdjacentHTML('afterbegin', svg(element.dataset.icon)));
   }
+  if (courseId === 'itcc47' && new URLSearchParams(location.search).get('preview') === '1') {
+    nav.querySelectorAll('a').forEach((link) => { const url = new URL(link.href, location.href); url.searchParams.set('preview', '1'); link.href = url.href; });
+  }
   nav.id = nav.id || 'primary-navigation';
   nav.querySelectorAll('a').forEach((link) => {
     const href = (link.getAttribute('href') || '').split('?')[0].toLowerCase();

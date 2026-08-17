@@ -25,6 +25,7 @@ const wels = {
   btnOutdent: document.getElementById('btn-outdent'),
   toast: document.getElementById('toast'),
 };
+let pendingNestingViewport = null;
 
 function esc(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -85,7 +86,7 @@ const TYPE_LABEL = {
   loop: 'loop', terminal: 'stop', action: 'action', empty: '',
 };
 
-function fullRender(focusIndex, caretAtEnd) {
+function fullRender(focusIndex, caretAtEnd, viewportSnapshot) {
   const numbers = computeNumbers(wstate.steps);
   wels.stepsBox.innerHTML = '';
 
@@ -130,9 +131,13 @@ function fullRender(focusIndex, caretAtEnd) {
   if (focusIndex !== undefined && focusIndex !== null) {
     const ta = wels.stepsBox.querySelector(`.step-row[data-idx="${focusIndex}"] .step-input`);
     if (ta) {
-      ta.focus();
       const pos = caretAtEnd ? ta.value.length : 0;
-      ta.setSelectionRange(pos, pos);
+      if (viewportSnapshot && window.ITCC47EditorTools) {
+        window.ITCC47EditorTools.focusWithoutViewportShift(ta, pos, pos, viewportSnapshot);
+      } else {
+        ta.focus();
+        ta.setSelectionRange(pos, pos);
+      }
       wstate.activeIndex = focusIndex;
     }
   }
@@ -295,11 +300,17 @@ function updateNestingControls() {
 
 function changeIndent(idx, delta) {
   const end = blockEnd(idx);
+  const pressedViewport = pendingNestingViewport;
+  pendingNestingViewport = null;
   if ((delta > 0 && !canIndent(idx)) || (delta < 0 && wstate.steps[idx].level === 0)) return;
+  const activeInput = wels.stepsBox.querySelector(`.step-row[data-idx="${idx}"] .step-input`);
+  const viewport = pressedViewport || (activeInput && window.ITCC47EditorTools
+    ? window.ITCC47EditorTools.captureViewportScroll(activeInput)
+    : null);
   for (let k = idx; k < end; k++) {
     wstate.steps[k].level = Math.max(0, Math.min(MAX_LEVEL, wstate.steps[k].level + delta));
   }
-  fullRender(idx, true);
+  fullRender(idx, true, viewport);
 }
 
 function onKeyDown(e) {
@@ -501,6 +512,15 @@ wels.btnAdd.addEventListener('click', () => {
   fullRender(wstate.steps.length - 1, true);
 });
 
+[wels.btnIndent, wels.btnOutdent].forEach((button) => {
+  button.addEventListener('pointerdown', (event) => {
+    const activeInput = wels.stepsBox.querySelector(`.step-row[data-idx="${wstate.activeIndex}"] .step-input`);
+    pendingNestingViewport = activeInput && window.ITCC47EditorTools
+      ? window.ITCC47EditorTools.captureViewportScroll(activeInput)
+      : null;
+    event.preventDefault();
+  });
+});
 wels.btnIndent.addEventListener('click', () => changeIndent(wstate.activeIndex, 1));
 wels.btnOutdent.addEventListener('click', () => changeIndent(wstate.activeIndex, -1));
 

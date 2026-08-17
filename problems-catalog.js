@@ -1,98 +1,119 @@
-/* Module catalog for the public, local-first problem practice shell. */
+/* Curriculum roadmap: one release resolver for cards, menus, and direct routes. */
 (function () {
-  const modules = [
-    { number: 1, title: 'Algorithmic Thinking', summary: 'IPO, precise decisions, exact output, loops, and state.' },
-    { number: 2, title: 'Arrays, Searching & Sorting', summary: 'Arrays, scans, repeated values, and counted searches.' },
-    { number: 3, title: 'Linked Lists', summary: 'Node links, traversal, insertion, and deletion.' },
-    { number: 4, title: 'Stacks & Queues', summary: 'LIFO and FIFO structures with practical operations.' },
-    { number: 5, title: 'Recursion', summary: 'Base cases, recursive progress, and call tracing.' },
-    { number: 6, title: 'Trees', summary: 'Hierarchical structures, traversal, and search.' },
-    { number: 7, title: 'Graphs', summary: 'Vertices, edges, traversal, and path reasoning.' },
-    { number: 8, title: 'Advanced Algorithms', summary: 'Integrated techniques and larger problem-solving patterns.' },
-  ];
+  const ui = ITCC47CurriculumUI;
+  const options = ui.previewOptions();
+  const activeProfile = ITCC47Curriculum.activeProfile(options);
+  const activeCheckpoint = ITCC47Curriculum.getCheckpoint(activeProfile.currentCheckpointId);
+  const activeModule = ITCC47Curriculum.getModule(activeCheckpoint?.moduleId);
+  const resourceByModule = (moduleId, kind) => ITCC47Curriculum.listResources(kind)
+    .filter((item) => ITCC47Curriculum.getCheckpoint(item.checkpointId)?.moduleId === moduleId);
+  const resourceCountLabel = (kind, count) => `${count} ${count === 1 ? kind : kind === 'activity' ? 'activities' : `${kind}s`}`;
+  const problemById = new Map(PROBLEMS.map((problem) => [problem.id, problem]));
 
-  const grid = document.getElementById('module-grid');
-  const counts = PROBLEMS.reduce((result, problem) => {
-    const match = /^Module\s+(\d+)$/.exec(problem.module);
-    if (match) result[Number(match[1])] = (result[Number(match[1])] || 0) + 1;
-    return result;
-  }, {});
+  function readPracticeRecords() {
+    const progress = new Map();
+    try {
+      const stored = JSON.parse(localStorage.getItem('itcc47.practice-records:v2') || 'null');
+      if (stored?.schemaVersion === 2) {
+        PROBLEMS.forEach((problem) => {
+          const record = stored.records?.[problem.id];
+          if (record?.contentVersion === problem.contentVersion) progress.set(problem.id, {
+            complete: Boolean(record.completed),
+            draft: typeof record.draft === 'string' && record.draft.length > 0,
+          });
+        });
+        return progress;
+      }
+      const solved = JSON.parse(localStorage.getItem('itcc47.problems.v1') || '{}') || {};
+      const drafts = JSON.parse(localStorage.getItem('itcc47.problems.code.v1') || '{}') || {};
+      PROBLEMS.forEach((problem) => progress.set(problem.id, {
+        complete: Boolean(solved[problem.id]),
+        draft: Object.prototype.hasOwnProperty.call(drafts, problem.id),
+      }));
+    } catch { /* Practice storage is optional. */ }
+    return progress;
+  }
 
-  modules.forEach((module) => {
-    const count = counts[module.number] || 0;
-    const available = count > 0;
+  const practiceRecords = readPracticeRecords();
+
+  function practiceCards(module, resources) {
+    const rows = resources.map((resource) => ({
+      problem: problemById.get(resource.id),
+      release: ITCC47Curriculum.stateForResource('problem', resource.id, options),
+    })).filter((row) => row.problem && ['available', 'current'].includes(row.release.state));
+
+    return `<section class="module-practice" aria-labelledby="module-${module.number}-practice">
+      <header class="module-section-head"><div><p class="eyebrow">Practice bank</p><h3 id="module-${module.number}-practice">Choose a problem</h3></div><span>${rows.length} available</span></header>
+      <div class="module-problem-grid">${rows.map((row, index) => {
+        const progress = practiceRecords.get(row.problem.id) || {};
+        const progressLabel = progress.complete ? 'Review' : progress.draft ? 'Continue' : 'Start';
+        const status = progress.complete ? 'Completed' : progress.draft ? 'Draft saved' : `${row.problem.visibleTests.length} examples`;
+        const difficultyClass = `diff-${row.problem.difficulty.toLowerCase().replace(/[^a-z]/g, '')}`;
+        return `<a class="module-problem-card" href="${ui.href(`practice.html?module=${module.number}&problem=${encodeURIComponent(row.problem.id)}`)}">
+          <span class="module-problem-number" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span>
+          <span class="chip chip-diff ${difficultyClass}">${ui.esc(row.problem.difficulty)}</span>
+          <strong>${ui.esc(row.problem.title)}</strong>
+          <span class="module-problem-status">${ui.esc(status)}</span>
+          <span class="module-problem-action">${progressLabel} <span aria-hidden="true">→</span></span>
+        </a>`;
+      }).join('')}</div>
+      <a class="module-all-practice" href="${ui.href(`problem-list.html?module=${module.number}`)}">Browse all Module ${module.number} practice <span aria-hidden="true">→</span></a>
+    </section>`;
+  }
+
+  const moduleGrid = document.getElementById('module-grid');
+  ITCC47Curriculum.modules.forEach((module) => {
+    const checkpoints = ITCC47Curriculum.checkpoints.filter((item) => item.moduleId === module.id);
+    const stateRows = checkpoints.map((checkpoint) => ITCC47Curriculum.stateForCheckpoint(checkpoint.id, options));
+    const current = stateRows.find((item) => item.state === 'current');
+    const moduleState = current ? 'current' : stateRows.every((item) => item.state === 'locked') ? 'locked'
+      : stateRows.some((item) => ['available', 'current'].includes(item.state)) ? 'available' : 'planned';
+    const problems = resourceByModule(module.id, 'problem');
+    const activities = resourceByModule(module.id, 'activity');
+    const counts = [['problem', problems.length], ['activity', activities.length]];
+    const expanded = moduleState === 'current';
     const article = document.createElement('article');
-    article.className = `module-card ${available ? 'module-card-available' : 'module-card-pending'}`;
-    article.innerHTML = `
-      <div class="module-card-head">
-        <span class="module-number" aria-hidden="true">${module.number}</span>
-        <div>
-          <p class="module-label">Module ${module.number}</p>
-          <h2>${module.title}</h2>
-        </div>
-      </div>
-      <p class="module-summary">${module.summary}</p>
-      <div class="module-card-footer">
-        ${available
-          ? `<span class="module-status status-available">Available · ${count} problem${count === 1 ? '' : 's'}</span>
-             <a class="btn btn-primary module-action" href="problem-list.html?module=${module.number}" data-icon="problemsList">Choose a problem</a>`
-          : `<span class="module-status status-pending">Not implemented</span>
-             <span class="module-action module-action-disabled" aria-disabled="true">Not implemented</span>`}
-      </div>`;
-    grid.appendChild(article);
+    article.className = `module-card module-card-${moduleState}${expanded ? ' module-card-expanded' : ' module-card-compact'}`;
+    article.innerHTML = `<div class="module-card-head"><span class="module-number" aria-hidden="true">${module.number}</span><div><p class="module-label">Module ${module.number}</p><h2>${ui.esc(module.title)}</h2></div>${ui.badge(moduleState)}</div>
+      <div class="module-summary"><span>CLO ${module.cloIds.join(', ')}</span><span>${counts.map(([kind, count]) => resourceCountLabel(kind, count)).join(' · ')}</span></div>
+      ${expanded ? `<div class="module-card-body">${practiceCards(module, problems)}</div>`
+        : `<div class="module-card-footer"><span>${moduleState === 'locked' ? `Unlocks after the current Module ${activeModule?.number || 1} ${activeProfile.preview ? 'preview' : 'release'}.` : 'Previously released practice stays available.'}</span><a class="btn module-action" href="${ui.href(`problem-list.html?module=${module.number}`)}">${moduleState === 'locked' ? 'View requirements' : `Open ${problems.length} problems`}</a></div>`}`;
+    moduleGrid.appendChild(article);
   });
-  document.querySelectorAll('#module-grid [data-icon]').forEach((element) => {
-    if (window.ITCC47Icons) element.insertAdjacentHTML('afterbegin', window.ITCC47Icons(element.dataset.icon));
-  });
+  ui.mountPreviewControls(document.getElementById('release-controls'));
 
   const visualizationGrid = document.getElementById('visualization-grid');
   const activities = typeof ITCC47Activities === 'undefined' ? [] : ITCC47Activities.list();
-  const families = [...new Set(activities.map((activity) => activity.family))];
-  families.forEach((family) => {
-    const group = document.createElement('section');
-    group.className = 'visualization-group';
-    group.innerHTML = `<header><p>Course visualizations</p><h2>${family}</h2></header><div class="visualization-cards"></div>`;
-    const cards = group.querySelector('.visualization-cards');
+  const visualizationFamilies = [...new Set(activities.map((activity) => activity.family))]
+    .map((family, firstSeen) => ({
+      family,
+      firstSeen,
+      module: Math.min(...activities.filter((activity) => activity.family === family).map((activity) => activity.module)),
+    }))
+    .sort((left, right) => left.module - right.module || left.firstSeen - right.firstSeen);
+  visualizationFamilies.forEach(({ family }) => {
+    const group = document.createElement('section'); group.className = 'visualization-group';
+    group.innerHTML = `<header><p>Course visualizations</p><h2>${ui.esc(family)}</h2></header><div class="visualization-cards"></div>`;
     activities.filter((activity) => activity.family === family).forEach((activity) => {
-      const link = document.createElement('a');
-      link.className = 'visualization-card';
-      link.href = `visualizer.html?activity=${encodeURIComponent(activity.id)}`;
-      link.innerHTML = `<span class="visualization-module">Module ${activity.module} · ${activity.topic}</span><strong>${activity.title}</strong><span>${activity.subtitle}</span><em>Open visualization ${window.ITCC47Icons ? window.ITCC47Icons('arrow') : '→'}</em>`;
-      cards.appendChild(link);
+      const result = ITCC47Curriculum.stateForResource('activity', activity.id, options);
+      const link = document.createElement('a'); link.className = `visualization-card visualization-${result.state}`;
+      link.href = ui.href(`visualizer.html?activity=${encodeURIComponent(activity.id)}`);
+      const locked = !['available', 'current'].includes(result.state);
+      const lockIcon = locked ? `<span class="visualization-lock" role="img" aria-label="${ui.esc(result.state)}">${typeof BSITIcons === 'function' ? BSITIcons('lock') : '🔒'}</span>` : '';
+      link.innerHTML = `<span class="visualization-card-meta"><span class="visualization-module">Module ${activity.module} · ${ui.esc(activity.topic)}</span>${lockIcon}</span><strong>${ui.esc(activity.title)}</strong><span class="visualization-subtitle">${ui.esc(activity.subtitle)}</span><em>${locked ? 'View requirements' : 'Open visualization'} →</em>`;
+      group.querySelector('.visualization-cards').appendChild(link);
     });
     visualizationGrid.appendChild(group);
   });
 
   const tabs = [...document.querySelectorAll('[data-catalog-view]')];
-  const views = {
-    problems: document.getElementById('problem-catalog'),
-    visualizations: document.getElementById('visualization-catalog'),
-  };
+  const views = { problems: document.getElementById('problem-catalog'), visualizations: document.getElementById('visualization-catalog') };
   function selectView(name, updateUrl = true, focus = false) {
     const selected = views[name] ? name : 'problems';
-    tabs.forEach((tab) => {
-      const active = tab.dataset.catalogView === selected;
-      tab.setAttribute('aria-selected', String(active));
-      tab.tabIndex = active ? 0 : -1;
-      if (active && focus) tab.focus();
-    });
+    tabs.forEach((tab) => { const active = tab.dataset.catalogView === selected; tab.setAttribute('aria-selected', String(active)); tab.tabIndex = active ? 0 : -1; if (active && focus) tab.focus(); });
     Object.entries(views).forEach(([key, panel]) => { panel.hidden = key !== selected; });
-    if (updateUrl) {
-      const url = new URL(location.href);
-      if (selected === 'problems') url.searchParams.delete('view');
-      else url.searchParams.set('view', selected);
-      history.replaceState({}, '', url);
-    }
+    if (updateUrl) { const url = new URL(location.href); selected === 'problems' ? url.searchParams.delete('view') : url.searchParams.set('view', selected); history.replaceState({}, '', url); }
   }
-  tabs.forEach((tab, index) => {
-    tab.addEventListener('click', () => selectView(tab.dataset.catalogView));
-    tab.addEventListener('keydown', (event) => {
-      if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-      event.preventDefault();
-      const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
-        : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
-      selectView(tabs[next].dataset.catalogView, true, true);
-    });
-  });
+  tabs.forEach((tab, index) => { tab.addEventListener('click', () => selectView(tab.dataset.catalogView)); tab.addEventListener('keydown', (event) => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return; event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length; selectView(tabs[next].dataset.catalogView, true, true); }); });
   selectView(new URLSearchParams(location.search).get('view') || 'problems', false);
 })();

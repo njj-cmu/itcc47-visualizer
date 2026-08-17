@@ -13,6 +13,13 @@ const PROBLEMS = [
     "id": "sum-two",
     "title": "Sum of Two Numbers",
     "module": "Module 1",
+    "checkpointId": "m1-ipo",
+    "cloIds": [
+      1,
+      2,
+      3
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Warm-up",
     "contentVersion": 1,
     "statement": "Read two numbers and display their sum.",
@@ -77,6 +84,13 @@ const PROBLEMS = [
     "id": "delivery-fee",
     "title": "Delivery Fee",
     "module": "Module 1",
+    "checkpointId": "m1-ipo",
+    "cloIds": [
+      1,
+      2,
+      3
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Core",
     "contentVersion": 1,
     "statement": "A delivery service charges a fee based on how far the customer is from the store. The owner describes the rule in vague terms, so it has already been clarified into exact boundaries below. Premium customers get a discount, but only when the distance is valid.",
@@ -178,6 +192,13 @@ const PROBLEMS = [
     "id": "library-fine",
     "title": "Library Fine",
     "module": "Module 1",
+    "checkpointId": "m1-pseudocode",
+    "cloIds": [
+      1,
+      2,
+      3
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Core",
     "contentVersion": 1,
     "statement": "A library computes the fine for a borrowed book. The order in which you apply the rules changes the answer, so read them carefully before you start writing.",
@@ -286,6 +307,13 @@ const PROBLEMS = [
     "id": "package-class",
     "title": "Package Classification",
     "module": "Module 1",
+    "checkpointId": "m1-exact-io",
+    "cloIds": [
+      1,
+      2,
+      3
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Core",
     "contentVersion": 1,
     "statement": "A delivery system classifies a package by weight, and marks express deliveries. The checker compares your output character for character, so the exact wording matters as much as the logic.",
@@ -386,6 +414,13 @@ const PROBLEMS = [
     "id": "parking-fee",
     "title": "Parking Fee",
     "module": "Module 1",
+    "checkpointId": "m1-tracing",
+    "cloIds": [
+      1,
+      2,
+      3
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Core",
     "contentVersion": 1,
     "statement": "A parking area computes a fee from the number of hours parked. The shape of this problem is the same as the library fine, so if you got that one right, check whether your ordering still holds here.",
@@ -478,6 +513,13 @@ const PROBLEMS = [
     "id": "reward-points",
     "title": "Reward Points",
     "module": "Module 1",
+    "checkpointId": "m1-complexity",
+    "cloIds": [
+      1,
+      2,
+      3
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Challenge",
     "contentVersion": 1,
     "statement": "A store awards reward points across several purchases. You will need a loop, a running total, and a count of the purchases that were rejected. Read the number of purchases first, then the member flag, then each purchase amount in turn.",
@@ -575,6 +617,15 @@ const PROBLEMS = [
     "id": "array-total",
     "title": "Total of a List",
     "module": "Module 2",
+    "checkpointId": "m2-arrays",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Warm-up",
     "contentVersion": 1,
     "statement": "Read how many numbers there are, then read that many numbers, and display their total. This is the pattern every later list problem is built on: read a count, then loop exactly that many times.",
@@ -650,6 +701,15 @@ const PROBLEMS = [
     "id": "largest-value",
     "title": "Largest in a List",
     "module": "Module 2",
+    "checkpointId": "m2-arrays",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Core",
     "contentVersion": 1,
     "statement": "Read how many numbers there are, then read that many numbers, and display the largest. Think carefully about what the largest value starts as — a wrong starting value passes the obvious tests and fails the interesting ones.",
@@ -733,6 +793,15 @@ const PROBLEMS = [
     "id": "linear-position",
     "title": "Position in a List",
     "module": "Module 2",
+    "checkpointId": "m2-linear-search",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Core",
     "contentVersion": 1,
     "statement": "Read how many numbers there are, then that many numbers, and finally the value to look for. Display the position of the first match, counting from 1. Because the value to look for arrives last, you have to keep the numbers somewhere before you can search them.",
@@ -832,6 +901,15 @@ const PROBLEMS = [
     "id": "above-average",
     "title": "Above the Average",
     "module": "Module 2",
+    "checkpointId": "m2-arrays",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Challenge",
     "contentVersion": 1,
     "statement": "Read how many numbers there are, then that many numbers. Display the average, then how many of the numbers are above it. You cannot know the average until you have seen every number, so this one cannot be done in a single pass.",
@@ -917,6 +995,15 @@ const PROBLEMS = [
     "id": "has-duplicate",
     "title": "Any Repeats?",
     "module": "Module 2",
+    "checkpointId": "m2-arrays",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Challenge",
     "contentVersion": 1,
     "statement": "Read how many numbers there are, then that many numbers. Display YES if any number appears more than once, and NO if every number is different. Comparing every number against every other one is the straightforward approach — notice how much work that becomes as the list grows.",
@@ -1004,6 +1091,15 @@ const PROBLEMS = [
     "id": "binary-checks",
     "title": "Binary Search, Counted",
     "module": "Module 2",
+    "checkpointId": "m2-binary-search",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Challenge",
     "contentVersion": 1,
     "statement": "Read how many numbers there are, then that many numbers already in ascending order, then the value to look for. Display whether it was found, and how many middle values you had to examine. Compare that count against the length of the list — that gap is the whole reason binary search matters.",
@@ -1102,6 +1198,13 @@ const PROBLEMS = [
     "id": "CH01-PS01",
     "title": "Edge Gateway Request Admission",
     "module": "Module 1",
+    "checkpointId": "m1-pseudocode",
+    "cloIds": [
+      1,
+      2,
+      3
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Medium",
     "contentVersion": 1,
     "statement": "An edge gateway must classify one incoming packet. Validation always happens first, permanently blocked TCP ports cannot be bypassed, and maintenance mode changes which otherwise-valid traffic may pass. Translate the precedence into one deterministic decision that produces exactly one result.",
@@ -1213,6 +1316,13 @@ const PROBLEMS = [
     "id": "CH01-PS02",
     "title": "API Gateway Billing and SLA Audit",
     "module": "Module 1",
+    "checkpointId": "m1-tracing",
+    "cloIds": [
+      1,
+      2,
+      3
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Medium-Hard",
     "contentVersion": 1,
     "statement": "Process a batch of API request records. Invalid records must be counted and skipped before they can affect billing or SLA totals. Valid records may affect billing, server-error, and slow-request counters independently.",
@@ -1343,6 +1453,13 @@ const PROBLEMS = [
     "id": "CH01-PS03",
     "title": "Authentication Risk and Automatic Lockout",
     "module": "Module 1",
+    "checkpointId": "m1-tracing",
+    "cloIds": [
+      1,
+      2,
+      3
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Hard",
     "contentVersion": 1,
     "statement": "Examine authentication events for one account while maintaining risk, consecutive failures, invalid events, and the number of records actually read. A lockout stops input processing immediately, so unread events must never affect the result.",
@@ -1453,6 +1570,13 @@ const PROBLEMS = [
     "id": "CH01-PS04",
     "title": "Container Deployment Admission Controller",
     "module": "Module 1",
+    "checkpointId": "m1-exact-io",
+    "cloIds": [
+      1,
+      2,
+      3
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Hard",
     "contentVersion": 1,
     "statement": "Process deployment requests against a cluster's remaining resources. Each request passes through validation, image security, workload configuration, and capacity checks. Resource state changes only when the complete deployment is accepted.",
@@ -1581,6 +1705,13 @@ const PROBLEMS = [
     "id": "CH01-PS05",
     "title": "Binary Fault Isolation Under a Probe Budget",
     "module": "Module 1",
+    "checkpointId": "m1-complexity",
+    "cloIds": [
+      1,
+      2,
+      3
+    ],
+    "reviewStatus": "reviewed",
     "difficulty": "Medium-Hard",
     "contentVersion": 1,
     "statement": "Repeatedly halve a set of candidate nodes while respecting both a probe budget and a timeout. A probe may begin only when every stopping condition allows it; odd candidate counts must round upward.",
@@ -1675,6 +1806,1585 @@ const PROBLEMS = [
         "i": "FRmpFtAu5W5RTCCu6Q==",
         "n": 1,
         "h": "b96669a59362950d0ee8fab5b61928cda42fff30d09eb3248f513883051a3b3e"
+      }
+    ]
+  },
+  {
+    "id": "bubble-pass",
+    "title": "One Complete Bubble Pass",
+    "module": "Module 2",
+    "checkpointId": "m2-bubble-sort",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Core",
+    "contentVersion": 1,
+    "statement": "Perform exactly one left-to-right Bubble Sort pass and output the resulting array.",
+    "rules": [
+      [
+        "Comparison",
+        "For every adjacent pair, swap only when values[j] > values[j + 1]."
+      ],
+      [
+        "Boundary",
+        "Visit j from 0 through LENGTH(values) - 2."
+      ],
+      [
+        "Output",
+        "Write the complete array after the pass."
+      ]
+    ],
+    "ioNote": "Read one array and write one array.",
+    "starter": "READ values\nFOR j <- 0 TO LENGTH(values) - 2 DO\n    # compare the adjacent pair\nENDFOR\nWRITE values",
+    "salt": "a93b07f837fb66c0b212a85683400a6e",
+    "visibleTests": [
+      {
+        "inputs": [
+          [
+            1,
+            4,
+            2,
+            5
+          ]
+        ],
+        "expected": [
+          [
+            1,
+            4,
+            2,
+            5
+          ]
+        ],
+        "note": "the largest value reaches the pass boundary"
+      },
+      {
+        "inputs": [
+          [
+            1,
+            2,
+            3
+          ]
+        ],
+        "expected": [
+          [
+            1,
+            2,
+            3
+          ]
+        ]
+      },
+      {
+        "inputs": [
+          []
+        ],
+        "expected": [
+          []
+        ],
+        "note": "an empty pass performs no comparison"
+      }
+    ],
+    "hidden": [
+      {
+        "i": "a6zCiNPICYVUzj0=",
+        "n": 1,
+        "h": "42a296228367703f16eb5d0a812dc486dc391435c093e187fb58ff07a447dc1d"
+      },
+      {
+        "i": "02Yyf/kIJw30",
+        "n": 1,
+        "h": "d4d819d28ad491748885cd104a9554df71fa39ba61af5fd9fb645d3da4ab2b1a"
+      },
+      {
+        "i": "tf2pvMHPLjTjFv8=",
+        "n": 1,
+        "h": "004a0f4e6b9d8684d74239a08c93d30c661469ec3a3549312a692c9b9ee7b7c2"
+      }
+    ]
+  },
+  {
+    "id": "selection-minimum",
+    "title": "Select the Minimum Index",
+    "module": "Module 2",
+    "checkpointId": "m2-selection-sort",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Core",
+    "contentVersion": 1,
+    "statement": "Scan an array exactly as Selection Sort scans one unsorted region and output the index of its first minimum, or -1 for an empty array.",
+    "rules": [
+      [
+        "Candidate",
+        "Initialize minIndex to 0 only when the array is nonempty."
+      ],
+      [
+        "Tie",
+        "Update minIndex only for a strictly smaller value, preserving the first minimum."
+      ],
+      [
+        "Output",
+        "Write one zero-based index, or -1."
+      ]
+    ],
+    "ioNote": "Read one array. Output one integer.",
+    "starter": "READ values\nIF LENGTH(values) = 0 THEN\n    WRITE -1\nELSE\n    minIndex <- 0\n    # scan the remaining candidates\nENDIF",
+    "salt": "2f910a12f2f95dce17d5b4085121eba8",
+    "visibleTests": [
+      {
+        "inputs": [
+          [
+            7,
+            3,
+            5,
+            3
+          ]
+        ],
+        "expected": [
+          1
+        ],
+        "note": "equal minima do not replace the first candidate"
+      },
+      {
+        "inputs": [
+          [
+            9
+          ]
+        ],
+        "expected": [
+          0
+        ]
+      },
+      {
+        "inputs": [
+          []
+        ],
+        "expected": [
+          -1
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "eHTGr6eEs+g5rQIKVw==",
+        "n": 1,
+        "h": "eda0c2ac17bafc813425e11a9c3d817b0ee28f4f0fcf3a6f4d0affc0b8d2493f"
+      },
+      {
+        "i": "h90flSbqBTFZ",
+        "n": 1,
+        "h": "beaf7029371d0d6721932ab9dd269d49ac36b337ab28a4a6f4388427d28cf932"
+      },
+      {
+        "i": "Rn3a0kjtUQ==",
+        "n": 1,
+        "h": "ea4a1e5f7278a17f6ecd2f7b31d4fa3e2865191973dad18246cd379743268017"
+      }
+    ]
+  },
+  {
+    "id": "stable-ticket-insertion",
+    "title": "Stable Ticket Insertion",
+    "module": "Module 2",
+    "checkpointId": "m2-insertion-sort",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Challenge",
+    "contentVersion": 1,
+    "statement": "Insertion-sort parallel priority and identity arrays. Shift both fields together and preserve the arrival order of equal priorities.",
+    "rules": [
+      [
+        "Record identity",
+        "priorities[i] and identities[i] describe one record and always move together."
+      ],
+      [
+        "Stability",
+        "Shift only when the previous priority is strictly greater than the key priority."
+      ],
+      [
+        "Output",
+        "Write sorted priorities, then sorted identities."
+      ]
+    ],
+    "ioNote": "Read priorities and identities as two arrays of equal length.",
+    "starter": "READ priorities\nREAD identities\nFOR i <- 1 TO LENGTH(priorities) - 1 DO\n    keyPriority <- priorities[i]\n    keyIdentity <- identities[i]\n    # shift complete records, then insert the key\nENDFOR\nWRITE priorities\nWRITE identities",
+    "salt": "5a19555d4511a1d8960ad7a308f8a3c9",
+    "visibleTests": [
+      {
+        "inputs": [
+          [
+            1,
+            1,
+            2,
+            2
+          ],
+          [
+            "B",
+            "D",
+            "A",
+            "C"
+          ]
+        ],
+        "expected": [
+          [
+            1,
+            1,
+            2,
+            2
+          ],
+          [
+            "B",
+            "D",
+            "A",
+            "C"
+          ]
+        ],
+        "note": "B stays before D and A stays before C"
+      },
+      {
+        "inputs": [
+          [
+            1,
+            1,
+            1
+          ],
+          [
+            "X",
+            "Y",
+            "Z"
+          ]
+        ],
+        "expected": [
+          [
+            1,
+            1,
+            1
+          ],
+          [
+            "X",
+            "Y",
+            "Z"
+          ]
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "daQoLo6OtE9cT9CsZCNqzBrdCP7GqZ0IOR765c0=",
+        "n": 2,
+        "h": "1ca7ab5b76add2d89239f4d811201677b2e5137407f9e091ae379b1af9c134ff"
+      },
+      {
+        "i": "RRNKLeTgaw==",
+        "n": 2,
+        "h": "39caa72b65e98008beb1e362fd2d89004559a80638c7a1974f452aec5fece6a9"
+      },
+      {
+        "i": "ps5CC1twOa4OKJmilBz8h3E=",
+        "n": 2,
+        "h": "47185b84edde5cde9a383fe2473b680b86d20798ba5ff1dd7804c9d0af5cd3c1"
+      }
+    ]
+  },
+  {
+    "id": "indexed-array-mutation",
+    "title": "Indexed Array Mutation",
+    "module": "Module 2",
+    "checkpointId": "m2-array-mutation",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Challenge",
+    "contentVersion": 1,
+    "statement": "Apply INSERT or REMOVE to a fixed-capacity array-list representation without losing the changed value.",
+    "rules": [
+      [
+        "Storage",
+        "values includes spare physical slots; size is the logical item count."
+      ],
+      [
+        "INSERT",
+        "Allow 0..size when capacity remains, shift right from the tail, and report the inserted value."
+      ],
+      [
+        "REMOVE",
+        "Allow 0..size-1, hold the removed value, shift left, clear the old tail to 0, and report the removed value."
+      ],
+      [
+        "Invalid",
+        "Write only INVALID for an unsupported operation or index."
+      ]
+    ],
+    "ioNote": "Read operation, values, size, index, and value. For REMOVE the final value input is ignored. Output size, physical values, and the inserted/removed value.",
+    "starter": "READ operation\nREAD values\nREAD size\nREAD index\nREAD value\n# validate, shift in the safe direction, then update size",
+    "salt": "fbca4cc409b4853b6c65876a712c9c63",
+    "visibleTests": [
+      {
+        "inputs": [
+          "INSERT",
+          [
+            10,
+            15,
+            20,
+            30
+          ],
+          3,
+          1,
+          15
+        ],
+        "expected": [
+          4,
+          [
+            10,
+            15,
+            20,
+            30
+          ],
+          15
+        ]
+      },
+      {
+        "inputs": [
+          "REMOVE",
+          [
+            10,
+            30,
+            0,
+            0
+          ],
+          3,
+          1,
+          999
+        ],
+        "expected": [
+          2,
+          [
+            10,
+            30,
+            0,
+            0
+          ],
+          20
+        ]
+      },
+      {
+        "inputs": [
+          "REMOVE",
+          [
+            10,
+            0
+          ],
+          1,
+          1,
+          0
+        ],
+        "expected": [
+          "INVALID"
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "1ckywDrCn/2TdwWSUfE5aFx/5wWKoYiT",
+        "n": 3,
+        "h": "21372e8cc9632c6275e6c8e5b32c39eb6ff1abcde62bc1f7844277bba855c8bc"
+      },
+      {
+        "i": "mYFlktK38CSGXqfuik1T+QK37hlJBOVG",
+        "n": 3,
+        "h": "77b25bebdf3ab1d5fe591594f7074b973bfde8fb7b0823909f3fc736a5bdfd9e"
+      },
+      {
+        "i": "YbZeDWJBR3hMIID7Z0pQObjn+8DJYg==",
+        "n": 1,
+        "h": "186980fb325e73ee70d71e896ac40b7ede3aab93cd5afe2736247d01e1738312"
+      },
+      {
+        "i": "8A7AlhrLnb4h95rK9W1WiTg5kz+fXw==",
+        "n": 1,
+        "h": "186980fb325e73ee70d71e896ac40b7ede3aab93cd5afe2736247d01e1738312"
+      }
+    ]
+  },
+  {
+    "id": "linked-node-count",
+    "title": "Count Reachable Linked Nodes",
+    "module": "Module 3",
+    "checkpointId": "m3-linked-foundations",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Core",
+    "contentVersion": 2,
+    "statement": "Build a singly linked list from n payloads, traverse from head to NULL, and output the number of reachable nodes.",
+    "rules": [
+      [
+        "Construction",
+        "Append each allocated node exactly once."
+      ],
+      [
+        "Traversal",
+        "Advance only with current <- current.next."
+      ],
+      [
+        "Output",
+        "Write one count; an empty list has count 0."
+      ]
+    ],
+    "ioNote": "Read n followed by n payload values.",
+    "starter": "READ n\nhead <- NULL\ntail <- NULL\n# build the chain\ncount <- 0\ncurrent <- head\n# traverse to NULL\nWRITE count",
+    "salt": "4db0ce49f0b9b8f565a18dc39575c749",
+    "visibleTests": [
+      {
+        "inputs": [
+          3,
+          10,
+          20,
+          30
+        ],
+        "expected": [
+          3
+        ]
+      },
+      {
+        "inputs": [
+          0
+        ],
+        "expected": [
+          0
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          7
+        ],
+        "expected": [
+          1
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "EcEs2TZ6r1UgatSyfg==",
+        "n": 1,
+        "h": "0ca7e8d14733628b1086d1c5f4f184cb90d2de4a5dfb92d5c79772eb628f4c97"
+      },
+      {
+        "i": "ym4I7zHnr3U=",
+        "n": 1,
+        "h": "be2217be072f468b9425275171ab8c2bba38be2ca2b18e54cf30fd235269d523"
+      },
+      {
+        "i": "SvxF",
+        "n": 1,
+        "h": "ed8a8301619c32f3c85fdaf092bbddbc5459752f67fff996b014fbc7aa186d84"
+      }
+    ]
+  },
+  {
+    "id": "linked-find-value",
+    "title": "Lookup and Update a Node",
+    "module": "Module 3",
+    "checkpointId": "m3-linked-foundations",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Core",
+    "contentVersion": 2,
+    "statement": "Find the first node with a target payload, update only that node, then output its position and the resulting reachable sequence.",
+    "rules": [
+      [
+        "Match",
+        "Use the first matching node."
+      ],
+      [
+        "Missing",
+        "Output -1, then the unchanged sequence."
+      ],
+      [
+        "Identity",
+        "Update current.value; do not allocate a replacement node."
+      ]
+    ],
+    "ioNote": "Read n payloads, target, and replacement. Output the zero-based position followed by every final payload.",
+    "starter": "READ n\nhead <- NULL\ntail <- NULL\n# build nodes\nREAD target\nREAD replacement\nposition <- -1\ncurrent <- head\n# find and update\nWRITE position\n# write the final chain",
+    "salt": "042ce025d641494967906a2850e4ac30",
+    "visibleTests": [
+      {
+        "inputs": [
+          4,
+          8,
+          5,
+          8,
+          2,
+          8,
+          9
+        ],
+        "expected": [
+          0,
+          9,
+          5,
+          8,
+          2
+        ],
+        "note": "only the first 8 changes"
+      },
+      {
+        "inputs": [
+          3,
+          1,
+          2,
+          3,
+          7,
+          4
+        ],
+        "expected": [
+          -1,
+          1,
+          2,
+          3
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "ZeOL3dBXv1vWaQuozQ==",
+        "n": 4,
+        "h": "67269c0cb6ac4743d880d52a10fc9ed3d64a5371af7d358a9f0c3c8d6a7dbf43"
+      },
+      {
+        "i": "VvF0Kth9hnFz1g==",
+        "n": 2,
+        "h": "f4f30dbe30fe9e4f13c4fac70342c1676798e6959142d6be5f1d0b5a94439ba5"
+      },
+      {
+        "i": "UgcgTpMztA==",
+        "n": 1,
+        "h": "d50f6a63661ef2deb81fdf40a149cc24d72cbb84cd62fdcbf1bcd277e46cb982"
+      }
+    ]
+  },
+  {
+    "id": "linked-insert-head-problem",
+    "title": "Position-Aware Linked Insertion",
+    "module": "Module 3",
+    "checkpointId": "m3-linked-mutation",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Challenge",
+    "contentVersion": 2,
+    "statement": "Insert one new node at a valid zero-based position, including head and tail positions, without losing the old chain.",
+    "rules": [
+      [
+        "Valid position",
+        "Allow 0 through n; otherwise write INVALID."
+      ],
+      [
+        "Head",
+        "newNode.next receives head before head changes."
+      ],
+      [
+        "Middle/tail",
+        "Find the predecessor, connect newNode.next, then predecessor.next."
+      ],
+      [
+        "Output",
+        "Write every payload in the new reachable order."
+      ]
+    ],
+    "ioNote": "Read n payloads, position, and new value.",
+    "starter": "READ n\nhead <- NULL\ntail <- NULL\n# build nodes\nREAD position\nREAD newValue\n# validate and insert one NEW NODE\n# write the reachable chain",
+    "salt": "f1ae74cff3900f0d3a17d2e36cc87921",
+    "visibleTests": [
+      {
+        "inputs": [
+          3,
+          10,
+          20,
+          30,
+          0,
+          5
+        ],
+        "expected": [
+          5,
+          10,
+          20,
+          30
+        ]
+      },
+      {
+        "inputs": [
+          3,
+          10,
+          20,
+          30,
+          2,
+          25
+        ],
+        "expected": [
+          10,
+          20,
+          25,
+          30
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          9,
+          2,
+          4
+        ],
+        "expected": [
+          "INVALID"
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "7P9gBBQWaQ==",
+        "n": 1,
+        "h": "c590068f2fa5e39711e78654139634ecb5176e013532797f03ec9d99551256d5"
+      },
+      {
+        "i": "QKoswxWZ76TeLAw=",
+        "n": 3,
+        "h": "82f06c8ed801314bdaa2d4c8b35b9bde48d8f42429215474f00f630012988011"
+      },
+      {
+        "i": "0Lt3RHqeeG6UEjFr",
+        "n": 1,
+        "h": "ee514efb1791e4c94ceca4cfb10c7074ba70b643505780a0d0cabd5484a75846"
+      }
+    ]
+  },
+  {
+    "id": "linked-delete-first",
+    "title": "Delete the First Matching Node",
+    "module": "Module 3",
+    "checkpointId": "m3-linked-mutation",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Challenge",
+    "contentVersion": 2,
+    "statement": "Delete the first node whose payload equals target, safely handling head, middle, tail, singleton, empty, and missing-target cases.",
+    "rules": [
+      [
+        "Reconnect",
+        "Bypass current before clearing current.next."
+      ],
+      [
+        "Status",
+        "Write DELETED or NOT FOUND first."
+      ],
+      [
+        "Output",
+        "After the status, write every remaining reachable payload."
+      ]
+    ],
+    "ioNote": "Read n payloads and target.",
+    "starter": "READ n\nhead <- NULL\ntail <- NULL\n# build nodes\nREAD target\nprevious <- NULL\ncurrent <- head\n# locate, reconnect, and detach\n# write status and remaining chain",
+    "salt": "124dd9a0f79ed01eeda98cb052181976",
+    "visibleTests": [
+      {
+        "inputs": [
+          4,
+          5,
+          7,
+          5,
+          9,
+          5
+        ],
+        "expected": [
+          "DELETED",
+          7,
+          5,
+          9
+        ]
+      },
+      {
+        "inputs": [
+          1,
+          4,
+          4
+        ],
+        "expected": [
+          "DELETED"
+        ]
+      },
+      {
+        "inputs": [
+          3,
+          1,
+          2,
+          3,
+          8
+        ],
+        "expected": [
+          "NOT FOUND",
+          1,
+          2,
+          3
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "I6Fk9hiI8rtLo2w=",
+        "n": 3,
+        "h": "662591705356a8556bf457617fd4b4d7ca7f22fc4b840ddd1e4771ad004492f0"
+      },
+      {
+        "i": "bfFbreA=",
+        "n": 1,
+        "h": "a22de6de43787129c5319d1bd99ed11ce6fdea648ecc2118d2e6b3bbf5568453"
+      },
+      {
+        "i": "+ezcHM/+yWyZZY4=",
+        "n": 3,
+        "h": "25c17b4414ee6d2a8693c3c4fb78f24465093b1fc020d7ac1453c567fd627bad"
+      }
+    ]
+  },
+  {
+    "id": "linked-relocate-sorted",
+    "title": "Relocate an Updated Sorted Node",
+    "module": "Module 3",
+    "checkpointId": "m3-linked-mutation",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Challenge",
+    "contentVersion": 2,
+    "statement": "Update the first target node in a sorted list, detach that same identity, and reinsert it so nondecreasing order is restored.",
+    "rules": [
+      [
+        "Missing",
+        "Write NOT FOUND and leave the list unchanged."
+      ],
+      [
+        "Identity",
+        "Do not allocate a replacement for the updated node."
+      ],
+      [
+        "Stable gap",
+        "Reinsert before the first strictly greater payload."
+      ],
+      [
+        "Output",
+        "Write UPDATED or NOT FOUND, then the final sequence."
+      ]
+    ],
+    "ioNote": "Read n sorted payloads, target, and replacement.",
+    "starter": "READ n\nhead <- NULL\ntail <- NULL\n# build the sorted chain\nREAD target\nREAD replacement\n# find, update, detach, and reinsert the same node\n# write status and final chain",
+    "salt": "2575df44bd8858e8fd74148164ad8835",
+    "visibleTests": [
+      {
+        "inputs": [
+          4,
+          10,
+          20,
+          30,
+          40,
+          20,
+          35
+        ],
+        "expected": [
+          "UPDATED",
+          10,
+          30,
+          35,
+          40
+        ]
+      },
+      {
+        "inputs": [
+          3,
+          10,
+          20,
+          30,
+          30,
+          5
+        ],
+        "expected": [
+          "UPDATED",
+          5,
+          10,
+          20
+        ]
+      },
+      {
+        "inputs": [
+          3,
+          10,
+          20,
+          30,
+          99,
+          15
+        ],
+        "expected": [
+          "NOT FOUND",
+          10,
+          20,
+          30
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "TP7bn2ldqLx2",
+        "n": 2,
+        "h": "f7a8748509fa9db06ba85ba8519cf369b81c6924a73724267581b8f88e6eab6e"
+      },
+      {
+        "i": "m/uPSLfEDNlEUbBq+ooN",
+        "n": 5,
+        "h": "b95ebbf4a2bc2a94416c46803182a222ebd127c20ef529c9b46d0633a84020a7"
+      },
+      {
+        "i": "IdXvdR6NbQ==",
+        "n": 1,
+        "h": "5de058e0a314ccd8c3e03ffa25f64ccdb13a87840d1667e1de8d032487dacb2c"
+      }
+    ]
+  },
+  {
+    "id": "linked-invariant-audit",
+    "title": "Audit Linked-List Invariants",
+    "module": "Module 3",
+    "checkpointId": "m3-linked-mutation",
+    "cloIds": [
+      1,
+      2,
+      3,
+      4,
+      6
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Challenge",
+    "contentVersion": 2,
+    "statement": "Build a chain, optionally link the tail back to head, then report CYCLE, UNSORTED, or VALID without looping forever.",
+    "rules": [
+      [
+        "Cycle check",
+        "Use slow and fast references before attempting an unbounded traversal."
+      ],
+      [
+        "Order check",
+        "Only a cycle-free chain may be checked for nondecreasing payload order."
+      ],
+      [
+        "Output priority",
+        "CYCLE wins over UNSORTED; otherwise output VALID."
+      ]
+    ],
+    "ioNote": "Read n payloads, then TRUE/FALSE for link-tail-to-head.",
+    "starter": "READ n\nhead <- NULL\ntail <- NULL\n# build nodes\nREAD linkBack\n# optionally create the back edge\n# detect a cycle, then audit sorted order only when safe",
+    "salt": "df8bce0aa1c57b923cf452a79be249a3",
+    "visibleTests": [
+      {
+        "inputs": [
+          3,
+          10,
+          20,
+          30,
+          false
+        ],
+        "expected": [
+          "VALID"
+        ]
+      },
+      {
+        "inputs": [
+          3,
+          10,
+          5,
+          30,
+          false
+        ],
+        "expected": [
+          "UNSORTED"
+        ]
+      },
+      {
+        "inputs": [
+          2,
+          10,
+          20,
+          true
+        ],
+        "expected": [
+          "CYCLE"
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "Kr5zR4J1kRGs",
+        "n": 1,
+        "h": "42cc71975007996aca6efc12142ef142f5f7f02da72d95709c3f6661ffc92679"
+      },
+      {
+        "i": "7zhGlPhRN3sncQ==",
+        "n": 1,
+        "h": "8df6798b9e84dff906c06b3017ab760a005e4127deee911cd79905c6dfc4e71c"
+      },
+      {
+        "i": "EKfvm/VHpsKmgj3aaMIqitb13Q==",
+        "n": 1,
+        "h": "42cc71975007996aca6efc12142ef142f5f7f02da72d95709c3f6661ffc92679"
+      },
+      {
+        "i": "G8zC0lDXZ708da27IK3w41g=",
+        "n": 1,
+        "h": "69e87aa4e888d0e1430b32037b39dede7c1a9823125aa60cd743e32076c80457"
+      }
+    ]
+  },
+  {
+    "id": "stack-reverse",
+    "title": "Trace LIFO Output",
+    "module": "Module 4",
+    "checkpointId": "m4-stack",
+    "cloIds": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Core",
+    "contentVersion": 2,
+    "statement": "Treat an input array as values pushed from left to right, then pop and write every value in LIFO order.",
+    "rules": [
+      [
+        "Top",
+        "The last array position is the initial top."
+      ],
+      [
+        "Underflow",
+        "Stop when top reaches 0; never read values[-1]."
+      ],
+      [
+        "Output",
+        "Write one popped value at a time."
+      ]
+    ],
+    "ioNote": "Read one array. The empty array produces no output.",
+    "starter": "READ values\ntop <- LENGTH(values)\nWHILE top > 0 DO\n    # move top, then write the popped value\nENDWHILE",
+    "salt": "86eeb3c418a341c5a6ed61d6884a936f",
+    "visibleTests": [
+      {
+        "inputs": [
+          [
+            1,
+            2,
+            3
+          ]
+        ],
+        "expected": [
+          3,
+          2,
+          1
+        ]
+      },
+      {
+        "inputs": [
+          [
+            7
+          ]
+        ],
+        "expected": [
+          7
+        ]
+      },
+      {
+        "inputs": [
+          []
+        ],
+        "expected": []
+      }
+    ],
+    "hidden": [
+      {
+        "i": "GJ3f8YURgDka",
+        "n": 3,
+        "h": "69750f63c47565dab04283ad3a2ae749c984ef101140e8ac1b41b4db24a9e8c4"
+      },
+      {
+        "i": "+Ud/af19mHs=",
+        "n": 2,
+        "h": "1b6890f4b550760bd98c74a58fd121f16876312beafbfa4ad5290f778a84e5bd"
+      },
+      {
+        "i": "wyMvUg==",
+        "n": 0,
+        "h": "f16377d4977a0611b063b32a7355b0e07c930bd090ab3b5b8b3c502c99b1b8f8"
+      }
+    ]
+  },
+  {
+    "id": "balanced-delimiters",
+    "title": "Validate Nested Delimiters",
+    "module": "Module 4",
+    "checkpointId": "m4-stack",
+    "cloIds": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Challenge",
+    "contentVersion": 2,
+    "statement": "Validate (), [], and {} tokens using a stack. Equal counts are insufficient: nesting, mismatch, underflow, and leftover openers all matter.",
+    "rules": [
+      [
+        "Opener",
+        "Push it."
+      ],
+      [
+        "Closer",
+        "The stack must be nonempty and its top must be the matching opener."
+      ],
+      [
+        "Finish",
+        "BALANCED requires no mismatch and an empty final stack."
+      ],
+      [
+        "Unknown token",
+        "Treat it as INVALID."
+      ]
+    ],
+    "ioNote": "Read one array of one-character delimiter tokens. Output BALANCED or INVALID.",
+    "starter": "READ tokens\nstack <- []\ntop <- 0\nvalid <- TRUE\n# process each token without reading an empty top\n# accept only valid AND top = 0",
+    "salt": "344c5912a9ad96727a418f0fa4476efd",
+    "visibleTests": [
+      {
+        "inputs": [
+          [
+            "(",
+            "[",
+            "{",
+            "}",
+            "]",
+            ")"
+          ]
+        ],
+        "expected": [
+          "BALANCED"
+        ]
+      },
+      {
+        "inputs": [
+          [
+            "(",
+            "[",
+            ")",
+            "]"
+          ]
+        ],
+        "expected": [
+          "INVALID"
+        ],
+        "note": "equal counts but incorrect nesting"
+      },
+      {
+        "inputs": [
+          [
+            ")"
+          ]
+        ],
+        "expected": [
+          "INVALID"
+        ],
+        "note": "closer underflow"
+      },
+      {
+        "inputs": [
+          []
+        ],
+        "expected": [
+          "BALANCED"
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "Kyc1Ajcd15ZhZop3Dj2n",
+        "n": 1,
+        "h": "35df0915867693705def614120aaa34c56160eaa0355a09e092c52850714a353"
+      },
+      {
+        "i": "JgNAxDsG4Jt6/Ds=",
+        "n": 1,
+        "h": "35df0915867693705def614120aaa34c56160eaa0355a09e092c52850714a353"
+      },
+      {
+        "i": "JXAPfdE4PDbxMSXQBLvdABRhYQ==",
+        "n": 1,
+        "h": "0f834ca6c8e98fbb2616cb52fba6863b55836810388f3d76ce0ee19ed94c01ff"
+      },
+      {
+        "i": "a+djPSZ7aQ==",
+        "n": 1,
+        "h": "35df0915867693705def614120aaa34c56160eaa0355a09e092c52850714a353"
+      }
+    ]
+  },
+  {
+    "id": "postfix-operand-order",
+    "title": "Preserve Postfix Operand Order",
+    "module": "Module 4",
+    "checkpointId": "m4-stack",
+    "cloIds": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Core",
+    "contentVersion": 2,
+    "statement": "Push left then right, pop right first and left second, apply one operator, and output the result.",
+    "rules": [
+      [
+        "Operators",
+        "Support +, -, *, and DIV."
+      ],
+      [
+        "Order",
+        "Compute left operator right, never right operator left."
+      ],
+      [
+        "Invalid",
+        "Write INVALID for an unsupported operator or DIV by zero."
+      ]
+    ],
+    "ioNote": "Read left, right, and operator.",
+    "starter": "READ leftInput\nREAD rightInput\nREAD operator\nstack <- []\n# push both operands\n# pop right, then left\n# validate and apply the operator",
+    "salt": "831f3ac931321499bc95b32be6dc3758",
+    "visibleTests": [
+      {
+        "inputs": [
+          9,
+          4,
+          "-"
+        ],
+        "expected": [
+          5
+        ],
+        "note": "reversing operands would produce -5"
+      },
+      {
+        "inputs": [
+          20,
+          4,
+          "DIV"
+        ],
+        "expected": [
+          5
+        ]
+      },
+      {
+        "inputs": [
+          7,
+          0,
+          "DIV"
+        ],
+        "expected": [
+          "INVALID"
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "N2XWrdoGJGz/",
+        "n": 1,
+        "h": "b25c625f4ab708160a447c4ef1243af407bd74121f2d79f8534323d1668c4812"
+      },
+      {
+        "i": "RhsgjE2mgYOPaRQ=",
+        "n": 1,
+        "h": "315685abbd7efb8907aafaea4c16016c15c41e4904dcb8ce898e631e5c41e902"
+      },
+      {
+        "i": "R0eR+kqygnhd",
+        "n": 1,
+        "h": "a9a00a183d996231ed73650a838fd99ad92094ac07f8ca8bc6b6045f220f2278"
+      },
+      {
+        "i": "nJyLjXpU7NGM",
+        "n": 1,
+        "h": "086a013a0c396e61c358b12d4baa6b89bd38d254e1cbb5a551d62240fc432da6"
+      }
+    ]
+  },
+  {
+    "id": "queue-service",
+    "title": "Circular FIFO Wraparound",
+    "module": "Module 4",
+    "checkpointId": "m4-queue-deque",
+    "cloIds": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Challenge",
+    "contentVersion": 2,
+    "statement": "Dequeue one or more values from a full circular queue, enqueue one new value with modulo wraparound, and output logical FIFO order.",
+    "rules": [
+      [
+        "Valid",
+        "capacity must match the initial array and dequeueCount must be 1..capacity."
+      ],
+      [
+        "Indices",
+        "Advance front and back with MOD capacity."
+      ],
+      [
+        "Output",
+        "Write the last removed value, then every remaining queue value from front to back."
+      ]
+    ],
+    "ioNote": "Read capacity, a full initial array, dequeueCount, and incoming value.",
+    "starter": "READ capacity\nREAD storage\nREAD dequeueCount\nREAD incoming\n# validate, dequeue, wrap back, enqueue\n# write last removed and logical order",
+    "salt": "fd69ea947bef870a8d0a3ecf4214a2b1",
+    "visibleTests": [
+      {
+        "inputs": [
+          3,
+          [
+            "D",
+            "B",
+            "C"
+          ],
+          1,
+          "D"
+        ],
+        "expected": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ],
+        "note": "back wraps from physical 2 to 0"
+      },
+      {
+        "inputs": [
+          4,
+          [
+            9,
+            2,
+            3,
+            4
+          ],
+          3,
+          9
+        ],
+        "expected": [
+          3,
+          4,
+          9
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "rbieiafFWxMxVP8=",
+        "n": 2,
+        "h": "c6e9a41e1b02b478b1ca3830fbdd9bb55a07479a609ee3b7b74956c32eca415c"
+      },
+      {
+        "i": "qHzCprgXitE6Ccz3VNcY",
+        "n": 3,
+        "h": "2bdcda49cd0ef52b0d3d50cce6f4f1d8886eaf1efd7f9a61d079de85ba5f8a0f"
+      },
+      {
+        "i": "TDpvfbT2WUVL4w==",
+        "n": 1,
+        "h": "28038ab940d5658cc5b25a58913a62785161590521dd5ab4ceba82425854fa90"
+      },
+      {
+        "i": "qSxfrHXqUuAaSTwIvg==",
+        "n": 1,
+        "h": "28038ab940d5658cc5b25a58913a62785161590521dd5ab4ceba82425854fa90"
+      }
+    ]
+  },
+  {
+    "id": "round-robin-reenqueue",
+    "title": "Round-Robin Re-enqueueing",
+    "module": "Module 4",
+    "checkpointId": "m4-queue-deque",
+    "cloIds": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Challenge",
+    "contentVersion": 2,
+    "statement": "Schedule process bursts by queue order. Run at most one quantum, re-enqueue unfinished process identities, and output identities in completion order.",
+    "rules": [
+      [
+        "Identity",
+        "Processes are identified by their zero-based input positions."
+      ],
+      [
+        "Slice",
+        "Subtract MIN(quantum, remaining)."
+      ],
+      [
+        "Re-enqueue",
+        "Append only when remaining > 0."
+      ],
+      [
+        "Invalid",
+        "Write INVALID for nonpositive quantum or negative bursts."
+      ]
+    ],
+    "ioNote": "Read a burst array and quantum. Output each completed process index.",
+    "starter": "READ bursts\nREAD quantum\nready <- []\n# enqueue each process index\nhead <- 0\n# consume queue entries and append unfinished identities",
+    "salt": "bfc810c5406d129ea30821510cfdb5c1",
+    "visibleTests": [
+      {
+        "inputs": [
+          [
+            0,
+            0
+          ],
+          2
+        ],
+        "expected": [
+          1,
+          0
+        ],
+        "note": "P1 re-enters behind P2"
+      },
+      {
+        "inputs": [
+          [
+            0,
+            0,
+            0
+          ],
+          3
+        ],
+        "expected": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "inputs": [
+          [
+            4
+          ],
+          0
+        ],
+        "expected": [
+          "INVALID"
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "El1fs/xk",
+        "n": 0,
+        "h": "7481a5bef3c50c5cb0d858515f3cb6284701c5d7ac58bce21c4c97a76be31391"
+      },
+      {
+        "i": "dTsChhQF7M6cSEg=",
+        "n": 3,
+        "h": "b32ea97921bf8f021944c7e2de07f1252e7b75d761aec0bb7c9fb06c7b223a79"
+      },
+      {
+        "i": "5JuPWNW1I7KL",
+        "n": 2,
+        "h": "0e175b630493e1a60dbbf529826ecb7b990a8357531bfa067ff341a71f6c240b"
+      },
+      {
+        "i": "vbUnL0wKT/G+Xg==",
+        "n": 1,
+        "h": "aa7724c12b8cd6ef01c752aa281cd2cde9ef9d31dbe449905f55caa64a609568"
+      }
+    ]
+  },
+  {
+    "id": "deque-priority",
+    "title": "Execute Deque End Operations",
+    "module": "Module 4",
+    "checkpointId": "m4-queue-deque",
+    "cloIds": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "reviewStatus": "reviewed",
+    "difficulty": "Challenge",
+    "contentVersion": 2,
+    "statement": "Execute operation codes against a fixed-capacity circular deque and distinguish both insertion ends and both removal ends.",
+    "rules": [
+      [
+        "Codes",
+        "1 ADD_FRONT, 2 ADD_BACK, 3 REMOVE_FRONT, 4 REMOVE_BACK."
+      ],
+      [
+        "Values",
+        "A parallel value is used only by add operations."
+      ],
+      [
+        "Safety",
+        "Any add on full, remove on empty, or unknown code outputs INVALID and stops."
+      ],
+      [
+        "Output",
+        "Write each removed value, then STATE, then remaining values from front to back."
+      ]
+    ],
+    "ioNote": "Read capacity, operation-code array, and parallel values array.",
+    "starter": "READ capacity\nREAD operations\nREAD values\n# create capacity slots and maintain front + size\n# execute only legal end operations\n# output removals, STATE, then remaining order",
+    "salt": "bfd2d0cd60ab934da9ddb2ef8ed10825",
+    "visibleTests": [
+      {
+        "inputs": [
+          4,
+          [
+            2,
+            2,
+            1,
+            4,
+            3
+          ],
+          [
+            10,
+            20,
+            5,
+            0,
+            0
+          ]
+        ],
+        "expected": [
+          20,
+          5,
+          "STATE",
+          10
+        ]
+      },
+      {
+        "inputs": [
+          2,
+          [
+            3
+          ],
+          [
+            0
+          ]
+        ],
+        "expected": [
+          "INVALID"
+        ],
+        "note": "remove-front underflow"
+      },
+      {
+        "inputs": [
+          3,
+          [
+            1,
+            2
+          ],
+          [
+            7,
+            8
+          ]
+        ],
+        "expected": [
+          "STATE",
+          7,
+          8
+        ]
+      }
+    ],
+    "hidden": [
+      {
+        "i": "iIZVY6bQ5rOcnqdR8wZ9dXc3cA==",
+        "n": 3,
+        "h": "e293fa6ee99a9def312d4256f13f79c6170100a821267e8bab325036f5fa5381"
+      },
+      {
+        "i": "xPI77lkhTsd94kYDo6zVdIz9NA==",
+        "n": 3,
+        "h": "e293fa6ee99a9def312d4256f13f79c6170100a821267e8bab325036f5fa5381"
+      },
+      {
+        "i": "qWw74cuJ7nf6irI8luYp",
+        "n": 1,
+        "h": "443a4f62242afd30ee2ec176f116ec2e9587b97ee71d1bace45b2773c448aea3"
+      },
+      {
+        "i": "afWXz09h61W0xdA=",
+        "n": 1,
+        "h": "443a4f62242afd30ee2ec176f116ec2e9587b97ee71d1bace45b2773c448aea3"
       }
     ]
   }

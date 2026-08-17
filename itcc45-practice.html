@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITCC45 Practice</title><link rel="stylesheet" href="styles.css">
+</head>
+<body class="oop-practice-page" data-course="itcc45">
+<header class="topbar"><div class="topbar-title"><span class="topbar-code">ITCC45</span> Practice</div><nav class="topbar-nav"></nav></header>
+<main class="oop-practice-layout">
+  <aside class="oop-practice-rail"><a href="itcc45-topics.html" class="practice-back" data-icon="back">All topics</a><h2>Choose a topic</h2><nav id="practice-topic-nav" aria-label="Practice topics"></nav><div class="practice-progress"><strong id="practice-progress-count">0 / 18 complete</strong><button id="clear-practice-progress" type="button">Clear progress</button></div></aside>
+  <section class="oop-practice-main" aria-labelledby="practice-heading">
+    <header class="practice-heading"><p id="practice-position">Task 1 of 3</p><h1 id="practice-heading">Classes</h1><span id="practice-kind">Predict state</span></header>
+    <article class="practice-challenge">
+      <div class="practice-question"><h2 id="challenge-title"></h2><pre><code id="challenge-code"></code></pre><p id="challenge-prompt"></p></div>
+      <form id="challenge-form"><fieldset><legend>Choose your answer</legend><div id="challenge-choices"></div></fieldset><div class="practice-controls"><button class="btn oop-primary" type="submit">Check answer</button><button id="retry-challenge" class="btn oop-secondary" type="button">Retry</button></div></form>
+      <div id="challenge-feedback" class="challenge-feedback" role="status" aria-live="polite" hidden></div>
+    </article>
+    <nav class="practice-pager" aria-label="Challenge navigation"><button id="previous-challenge" type="button" data-icon="back">Previous</button><div id="challenge-dots"></div><button id="next-challenge" type="button" data-icon="arrow">Next</button></nav>
+    <a id="practice-lab-link" class="practice-lab-link" href="visualizer.html?course=itcc45" data-icon="visualize">Open this topic in Python Object Lab</a>
+  </section>
+</main>
+<script src="course-catalog.js"></script><script src="nav.js"></script><script src="itcc45-practice-data.js"></script><script src="itcc45-practice.js"></script><script src="sw-register.js" defer></script>
+</body>
+</html>

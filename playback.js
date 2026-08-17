@@ -33,6 +33,7 @@ const ITCC47Playback = (() => {
       message: String(spec.message || ''),
       frame: freezeFrame({ ...(spec.frame || {}) }),
       metrics: deepFreeze({ ...(spec.metrics || {}) }),
+      transition: spec.transition ? deepFreeze({ ...spec.transition }) : null,
       source: spec.source || null,
       segment: spec.segment || null,
       boundary: !!spec.boundary,
@@ -53,6 +54,11 @@ const ITCC47Playback = (() => {
     let timer = null;
     let disposed = false;
     let cachedSnapshot = null;
+    let transitioning = false;
+    let transitionToken = null;
+    let transitionSerial = 0;
+    let direction = 0;
+    let navigationSource = 'load';
 
     function snapshot() {
       const next = {
@@ -62,6 +68,10 @@ const ITCC47Playback = (() => {
         speed,
         currentEvent: events[index] || null,
         atEnd: events.length === 0 || index >= events.length - 1,
+        transitioning,
+        transitionToken,
+        direction,
+        navigationSource,
       };
       if (cachedSnapshot && Object.keys(next).every((key) => cachedSnapshot[key] === next[key])) return cachedSnapshot;
       cachedSnapshot = Object.freeze(next);
@@ -82,6 +92,19 @@ const ITCC47Playback = (() => {
       }
     }
 
+    function cancelTransition() {
+      transitioning = false;
+      transitionToken = null;
+    }
+
+    function beginTransition(event) {
+      if (!event?.transition?.wait) return false;
+      transitionSerial += 1;
+      transitioning = true;
+      transitionToken = `${event.id}:${transitionSerial}`;
+      return true;
+    }
+
     function setStatus(next) {
       if (!STATES.has(next)) throw new Error(`Unknown playback state: ${next}`);
       status = next;
@@ -95,10 +118,16 @@ const ITCC47Playback = (() => {
       if (shouldEmit) emit();
     }
 
-    function advance() {
+    function advance(source = 'play') {
+      if (transitioning) return;
+      const previous = index;
       if (index < events.length - 1) index += 1;
+      direction = Math.sign(index - previous);
+      navigationSource = source;
+      const waiting = beginTransition(events[index]);
       if (index >= events.length - 1) pause();
       else emit();
+      return waiting;
     }
 
     function schedule() {
@@ -106,15 +135,18 @@ const ITCC47Playback = (() => {
       if (status !== 'playing' || disposed) return;
       timer = setTimeout(() => {
         timer = null;
-        advance();
-        if (status === 'playing') schedule();
+        const waiting = advance('play');
+        if (status === 'playing' && !waiting) schedule();
       }, delayForSpeed(speed));
     }
 
     function load(nextEvents, startIndex = 0) {
       clearTimer();
+      cancelTransition();
       events = Array.isArray(nextEvents) ? [...nextEvents] : [];
       index = events.length ? Math.max(0, Math.min(events.length - 1, Number(startIndex) || 0)) : 0;
+      direction = 0;
+      navigationSource = 'load';
       setStatus(events.length ? (index === events.length - 1 ? 'complete' : 'paused') : 'idle');
       emit();
       return snapshot();
@@ -124,7 +156,7 @@ const ITCC47Playback = (() => {
       if (disposed || events.length === 0 || index >= events.length - 1) return snapshot();
       setStatus('playing');
       emit();
-      schedule();
+      if (!transitioning) schedule();
       return snapshot();
     }
 
@@ -133,8 +165,13 @@ const ITCC47Playback = (() => {
     }
 
     function step(delta = 1) {
+      if (transitioning) return snapshot();
       pause(false);
+      const previous = index;
       index = Math.max(0, Math.min(Math.max(events.length - 1, 0), index + Number(delta || 0)));
+      direction = Math.sign(index - previous);
+      navigationSource = 'step';
+      beginTransition(events[index]);
       setStatus(events.length === 0 ? 'idle' : (index >= events.length - 1 ? 'complete' : 'paused'));
       emit();
       return snapshot();
@@ -142,18 +179,27 @@ const ITCC47Playback = (() => {
 
     function seek(nextIndex) {
       pause(false);
+      cancelTransition();
+      const previous = index;
       index = Math.max(0, Math.min(Math.max(events.length - 1, 0), Number(nextIndex) || 0));
+      direction = Math.sign(index - previous);
+      navigationSource = 'seek';
       setStatus(events.length === 0 ? 'idle' : (index >= events.length - 1 ? 'complete' : 'paused'));
       emit();
       return snapshot();
     }
 
     function finishSegment() {
+      if (transitioning) return snapshot();
       pause(false);
+      const previous = index;
       while (index < events.length - 1) {
         index += 1;
         if (events[index].boundary || events[index].terminal) break;
       }
+      direction = Math.sign(index - previous);
+      navigationSource = 'segment';
+      beginTransition(events[index]);
       setStatus(events.length === 0 ? 'idle' : (index >= events.length - 1 ? 'complete' : 'paused'));
       emit();
       return snapshot();
@@ -166,8 +212,17 @@ const ITCC47Playback = (() => {
       return snapshot();
     }
 
+    function completeTransition(token) {
+      if (!transitioning || token !== transitionToken) return snapshot();
+      cancelTransition();
+      emit();
+      if (status === 'playing') schedule();
+      return snapshot();
+    }
+
     function dispose() {
       clearTimer();
+      cancelTransition();
       disposed = true;
       events = [];
       status = 'idle';
@@ -180,7 +235,7 @@ const ITCC47Playback = (() => {
       return () => listeners.delete(listener);
     }
 
-    return { load, play, pause, toggle, step, seek, finishSegment, setSpeed, dispose,
+    return { load, play, pause, toggle, step, seek, finishSegment, setSpeed, completeTransition, dispose,
       subscribe, getSnapshot: snapshot, getState: snapshot };
   }
 
@@ -210,3 +265,6 @@ const ITCC47Playback = (() => {
 
   return { EVENT_SCHEMA_VERSION, timelineEvent, createController, runResult, deepFreeze };
 })();
+
+/* Course-neutral name with the ITCC47 global retained as a compatibility facade. */
+const BSITPlayback = ITCC47Playback;

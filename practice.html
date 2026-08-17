@@ -6,7 +6,7 @@
 <title>ITCC47 Problem Practice</title>
 <link rel="stylesheet" href="styles.css">
 </head>
-<body class="app-fixed">
+<body class="app-fixed" data-course="itcc47">
 
 <header class="topbar">
   <div class="topbar-title">
@@ -30,8 +30,8 @@
   </div>
 
   <!-- PROBLEM STATEMENT -->
-  <main id="problem-pane" class="stage" aria-labelledby="mobile-tab-problem">
-    <div class="card problem-card">
+  <main id="problem-pane" class="stage" aria-labelledby="mobile-tab-problem" tabindex="0">
+    <div class="card problem-card" tabindex="0">
       <div class="problem-head">
         <div>
           <h1 id="p-title">Choose a problem</h1>
@@ -81,6 +81,8 @@
 
       <textarea id="code-box" class="code-box code-editor" spellcheck="false" rows="14"
         placeholder="Choose a problem to start writing." aria-label="Problem solution pseudocode"></textarea>
+
+      <div id="draft-recovery" class="draft-recovery hidden"></div>
 
       <div id="error-box" class="error-box hidden" role="alert"></div>
     </div>
@@ -162,6 +164,11 @@ AND   OR   NOT
   </div>
 </dialog>
 
+<script src="course-catalog.js"></script>
+<script src="curriculum.data.js"></script>
+<script src="release-profile.js"></script>
+<script src="curriculum.js"></script>
+<script src="curriculum-ui.js"></script>
 <script src="nav.js"></script>
 <script src="editor-tools.js"></script>
 <script src="sha256.js"></script>
@@ -170,6 +177,8 @@ AND   OR   NOT
 <script src="complexity.js"></script>
 <script src="evaluation.js"></script>
 <script src="problems.data.js"></script>
+<script src="future-problems.js"></script>
+<script>ITCC47FutureProblems.register(PROBLEMS);</script>
 <script src="problems-app.js"></script>
 <script src="sw-register.js" defer></script>
 </body>

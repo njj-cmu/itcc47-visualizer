@@ -144,6 +144,10 @@ function readJson(file, hint) {
 
 function build() {
   const problems = readJson('problems.public.json', 'this file is committed; restore it from git.');
+  const curriculum = readJson('curriculum.public.json', 'the release catalog is required to map every problem.');
+  const curriculumProblems = new Map(curriculum.resources.filter((resource) => resource.kind === 'problem').map((resource) => [resource.id, resource]));
+  const checkpointById = new Map(curriculum.checkpoints.map((checkpoint) => [checkpoint.id, checkpoint]));
+  const moduleById = new Map(curriculum.modules.map((module) => [module.id, module]));
   const hidden = readJson('problems.hidden.json',
     'this file is deliberately gitignored. Restore it from your own backup — it is not in the repo.');
 
@@ -152,6 +156,10 @@ function build() {
 
   const out = problems.map((p) => {
     const entry = hidden[p.id];
+    const mapping = curriculumProblems.get(p.id);
+    const checkpoint = mapping && checkpointById.get(mapping.checkpointId);
+    const curriculumModule = checkpoint && moduleById.get(checkpoint.moduleId);
+    if (!mapping || !checkpoint || !curriculumModule) failures.push(`${p.id}: missing or invalid curriculum checkpoint mapping`);
     if (!entry) {
       failures.push(`${p.id}: no entry in problems.hidden.json`);
       return null;
@@ -166,6 +174,9 @@ function build() {
       id: p.id,
       title: p.title,
       module: p.module,
+      checkpointId: mapping?.checkpointId || null,
+      cloIds: mapping?.cloIds || curriculumModule?.cloIds || [],
+      reviewStatus: checkpoint?.reviewStatus || 'draft',
       difficulty: p.difficulty,
       contentVersion: p.contentVersion || 1,
       statement: p.statement,

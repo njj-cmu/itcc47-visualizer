@@ -9,6 +9,7 @@
 
 const PROGRESS_KEY = 'itcc47.problems.v1';
 const CODE_KEY = 'itcc47.problems.code.v1';
+const PRACTICE_RECORDS_KEY = 'itcc47.practice-records:v2';
 const HANDOFF_KEY = 'itcc47.tracer.handoff';
 const STEP_CAP = 20000;
 const mobileTabs = [...document.querySelectorAll('[data-mobile-panel]')];
@@ -19,11 +20,19 @@ const requestedProblem = new URLSearchParams(window.location.search).get('proble
 const moduleProblems = requestedModule
   ? PROBLEMS.filter((problem) => problem.module === `Module ${requestedModule}`)
   : PROBLEMS;
+const requestedProblemRecord = requestedProblem ? PROBLEMS.find((problem) => problem.id === requestedProblem) : moduleProblems[0];
+const requestedRelease = requestedProblem
+  ? ITCC47Curriculum.stateForResource('problem', requestedProblem, ITCC47CurriculumUI.previewOptions())
+  : requestedProblemRecord ? ITCC47Curriculum.stateForResource('problem', requestedProblemRecord.id, ITCC47CurriculumUI.previewOptions())
+  : null;
+const requestedIsOpen = !requestedRelease || ['available', 'current'].includes(requestedRelease.state);
 
 const pstate = {
   problem: null,
   solved: {},   // id -> true
   drafts: {},   // id -> code
+  records: {},  // id -> { contentVersion, draft, completed }
+  recovery: {}, // id -> earlier versioned drafts
   lastEvaluation: null,
 };
 
@@ -47,6 +56,7 @@ const pels = {
   resultsScore: document.getElementById('results-score'),
   resultsBody: document.getElementById('results-body'),
   dlgGrammar: document.getElementById('dlg-grammar'),
+  recovery: document.getElementById('draft-recovery'),
 };
 
 function esc(s) {
@@ -71,18 +81,46 @@ function selectMobilePanel(name, focus = false) {
 
 function loadProgress() {
   try {
-    pstate.solved = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}') || {};
-    pstate.drafts = JSON.parse(localStorage.getItem(CODE_KEY) || '{}') || {};
+    const stored = JSON.parse(localStorage.getItem(PRACTICE_RECORDS_KEY) || 'null');
+    const previousSolved = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}') || {};
+    const previousDrafts = JSON.parse(localStorage.getItem(CODE_KEY) || '{}') || {};
+    pstate.records = stored?.schemaVersion === 2 ? { ...(stored.records || {}) } : {};
+    pstate.recovery = stored?.schemaVersion === 2 ? { ...(stored.recovery || {}) } : {};
+    PROBLEMS.forEach((problem) => {
+      let record = pstate.records[problem.id];
+      if (!record && (Object.prototype.hasOwnProperty.call(previousDrafts, problem.id) || previousSolved[problem.id])) {
+        record = { contentVersion: 1, draft: previousDrafts[problem.id] ?? problem.starter, completed: Boolean(previousSolved[problem.id]) };
+      }
+      if (!record) record = { contentVersion: problem.contentVersion, draft: problem.starter, completed: false };
+      if (Number(record.contentVersion) !== Number(problem.contentVersion)) {
+        if (typeof record.draft === 'string' && record.draft.trim()) {
+          pstate.recovery[problem.id] = [...(pstate.recovery[problem.id] || []), { contentVersion: record.contentVersion, draft: record.draft }];
+        }
+        record = { contentVersion: problem.contentVersion, draft: problem.starter, completed: false };
+      }
+      pstate.records[problem.id] = record;
+    });
+    pstate.solved = Object.fromEntries(Object.entries(pstate.records).filter(([,record]) => record.completed).map(([id]) => [id,true]));
+    pstate.drafts = Object.fromEntries(Object.entries(pstate.records).map(([id,record]) => [id,record.draft]));
   } catch (e) {
     pstate.solved = {};
     pstate.drafts = {};
+    pstate.records = {};
+    pstate.recovery = {};
   }
+  saveProgress();
 }
 
 function saveProgress() {
   try {
-    localStorage.setItem(PROGRESS_KEY, JSON.stringify(pstate.solved));
-    localStorage.setItem(CODE_KEY, JSON.stringify(pstate.drafts));
+    PROBLEMS.forEach((problem) => {
+      pstate.records[problem.id] = {
+        contentVersion: problem.contentVersion,
+        draft: pstate.drafts[problem.id] ?? problem.starter,
+        completed: Boolean(pstate.solved[problem.id]),
+      };
+    });
+    localStorage.setItem(PRACTICE_RECORDS_KEY, JSON.stringify({ schemaVersion: 2, records: pstate.records, recovery: pstate.recovery }));
   } catch (e) { /* storage may be unavailable */ }
 }
 
@@ -323,6 +361,10 @@ function selectProblem(problem) {
       </div>`)
     .join('');
 
+  const recovered = pstate.recovery[problem.id] || [];
+  pels.recovery.classList.toggle('hidden', recovered.length === 0);
+  pels.recovery.innerHTML = recovered.length ? `<details><summary>Recover an earlier draft (${recovered.length})</summary><p>This problem contract changed. The new starter is loaded and only this problem’s earlier completion was cleared.</p>${recovered.map((item,index) => `<section><header>Content version ${esc(item.contentVersion)}</header><pre>${esc(item.draft)}</pre><button type="button" data-restore-draft="${index}">Restore this draft for editing</button></section>`).join('')}</details>` : '';
+
   pels.codeBox.value = pstate.drafts[problem.id] !== undefined ? pstate.drafts[problem.id] : problem.starter;
   pels.codeBox.disabled = false;
   pels.btnCheck.disabled = false;
@@ -383,6 +425,16 @@ pels.btnTrace.addEventListener('click', () => {
 });
 
 pels.btnGrammar.addEventListener('click', () => pels.dlgGrammar.showModal());
+pels.recovery.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-restore-draft]');
+  if (!button || !pstate.problem) return;
+  const recovered = pstate.recovery[pstate.problem.id]?.[Number(button.dataset.restoreDraft)];
+  if (!recovered) return;
+  pels.codeBox.value = recovered.draft;
+  pstate.drafts[pstate.problem.id] = recovered.draft;
+  pstate.solved[pstate.problem.id] = false;
+  saveProgress(); renderProblemMeta(); renderProgress();
+});
 
 document.querySelectorAll('[data-close]').forEach((btn) => {
   btn.addEventListener('click', () => document.getElementById(btn.dataset.close).close());
@@ -395,7 +447,10 @@ document.querySelectorAll('dialog.dlg').forEach((dlg) => {
 // ---------- init ----------
 
 loadProgress();
-if (moduleProblems.length) {
+if (!requestedIsOpen) {
+  document.querySelector('.layout').innerHTML = ITCC47CurriculumUI.lockedPanel(requestedRelease, { title: `${requestedProblemRecord?.title || requestedRelease.resource?.title || 'This problem'} is not released yet` });
+  document.title = 'Locked resource · ITCC47';
+} else if (moduleProblems.length) {
   selectProblem(moduleProblems.find((problem) => problem.id === requestedProblem) || moduleProblems[0]);
 } else {
   window.location.replace('problems.html');

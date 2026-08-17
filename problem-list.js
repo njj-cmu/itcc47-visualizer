@@ -1,52 +1,46 @@
-/* The intermediate Module -> Problem -> Practice navigation step. */
+/* Module -> Problem navigation governed by the shared curriculum resolver. */
 (function () {
   const moduleNumber = Number(new URLSearchParams(location.search).get('module') || 1);
   const moduleName = `Module ${moduleNumber}`;
   const problems = PROBLEMS.filter((problem) => problem.module === moduleName);
-  let solved = {};
-  let drafts = {};
+  const releaseOptions = ITCC47CurriculumUI.previewOptions();
+  let solved = {}; let drafts = {};
   try {
-    solved = JSON.parse(localStorage.getItem('itcc47.problems.v1') || '{}') || {};
-    drafts = JSON.parse(localStorage.getItem('itcc47.problems.code.v1') || '{}') || {};
-  } catch (error) { /* file-mode storage can be unavailable */ }
-
-  const esc = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+    const stored = JSON.parse(localStorage.getItem('itcc47.practice-records:v2') || 'null');
+    if (stored?.schemaVersion === 2) {
+      problems.forEach((problem) => { const record = stored.records?.[problem.id]; if (record?.contentVersion === problem.contentVersion) { solved[problem.id] = Boolean(record.completed); drafts[problem.id] = record.draft; } });
+    } else {
+      solved = JSON.parse(localStorage.getItem('itcc47.problems.v1') || '{}') || {};
+      drafts = JSON.parse(localStorage.getItem('itcc47.problems.code.v1') || '{}') || {};
+    }
+  } catch { /* optional storage */ }
+  const esc = ITCC47CurriculumUI.esc;
   const cards = document.getElementById('problem-cards');
   document.getElementById('module-crumb').textContent = moduleName;
   document.getElementById('problem-list-heading').textContent = `${moduleName}: select a problem`;
 
   if (!problems.length) {
-    cards.innerHTML = '<div class="empty-module"><h2>Not implemented</h2><p>This module does not have practice problems yet.</p><a class="btn btn-primary" href="problems.html">Return to all modules</a></div>';
-    return;
+    cards.innerHTML = '<div class="empty-module"><h2>Planned practice</h2><p>This module is on the roadmap; its checked practice set is still being prepared.</p><a class="btn btn-primary" href="problems.html">Return to roadmap</a></div>';
+  } else {
+    problems.forEach((problem, index) => {
+      const release = ITCC47Curriculum.stateForResource('problem', problem.id, releaseOptions);
+      const open = ['available', 'current'].includes(release.state);
+      const complete = Boolean(solved[problem.id]);
+      const hasDraft = Object.prototype.hasOwnProperty.call(drafts, problem.id);
+      const difficultyClass = `diff-${problem.difficulty.toLowerCase().replace(/[^a-z]/g, '')}`;
+      const article = document.createElement('article'); article.className = `problem-choice problem-choice-${release.state}`;
+      article.innerHTML = `<div class="problem-choice-number" aria-hidden="true">${String(index + 1).padStart(2, '0')}</div>
+        <div class="problem-choice-body"><div class="problem-choice-heading"><h2>${esc(problem.title)}</h2>${ITCC47CurriculumUI.badge(release.state)}<span class="chip chip-diff ${difficultyClass}">${esc(problem.difficulty)}</span>${complete ? '<span class="chip chip-solved">Solved</span>' : ''}</div>
+        <p>${open ? esc(problem.statement) : esc(ITCC47CurriculumUI.requirement(release))}</p>
+        <small>${open ? `${problem.visibleTests.length} visible example${problem.visibleTests.length === 1 ? '' : 's'} · ${hasDraft && !complete ? 'Draft saved' : complete ? 'Completed in this browser' : 'Not started'}` : `Requires ${esc(release.checkpoint?.title || 'curriculum review')}`}</small></div>
+        <a class="btn ${open && !complete ? 'btn-primary' : 'btn-edit'} problem-choice-action" href="${ITCC47CurriculumUI.href(`practice.html?module=${moduleNumber}&problem=${encodeURIComponent(problem.id)}`)}">${open ? complete ? 'Review' : hasDraft ? 'Continue' : 'Start' : 'Requirements'}</a>`;
+      cards.appendChild(article);
+    });
   }
-
-  problems.forEach((problem, index) => {
-    const complete = Boolean(solved[problem.id]);
-    const hasDraft = Object.prototype.hasOwnProperty.call(drafts, problem.id);
-    const difficultyClass = `diff-${problem.difficulty.toLowerCase().replace(/[^a-z]/g, '')}`;
-    const article = document.createElement('article');
-    article.className = 'problem-choice';
-    article.innerHTML = `
-      <div class="problem-choice-number" aria-hidden="true">${String(index + 1).padStart(2, '0')}</div>
-      <div class="problem-choice-body">
-        <div class="problem-choice-heading"><h2>${esc(problem.title)}</h2><span class="chip chip-diff ${difficultyClass}">${esc(problem.difficulty)}</span>${complete ? '<span class="chip chip-solved">Solved</span>' : ''}</div>
-        <p>${esc(problem.statement)}</p>
-        <small>${problem.visibleTests.length} visible example${problem.visibleTests.length === 1 ? '' : 's'} · ${hasDraft && !complete ? 'Draft saved' : complete ? 'Completed in this browser' : 'Not started'}</small>
-      </div>
-      <a class="btn ${complete ? 'btn-edit' : 'btn-primary'} problem-choice-action" href="practice.html?module=${moduleNumber}&amp;problem=${encodeURIComponent(problem.id)}" data-icon="${complete || hasDraft ? 'edit' : 'play'}">${complete ? 'Review' : hasDraft ? 'Continue' : 'Start'}</a>`;
-    cards.appendChild(article);
-  });
-
-  document.querySelectorAll('#problem-cards [data-icon]').forEach((element) => {
-    if (window.ITCC47Icons) element.insertAdjacentHTML('afterbegin', window.ITCC47Icons(element.dataset.icon));
-  });
 
   document.getElementById('btn-clear-progress').addEventListener('click', () => {
     if (!confirm('Clear all saved problem progress and drafts in this browser?')) return;
-    try {
-      localStorage.removeItem('itcc47.problems.v1');
-      localStorage.removeItem('itcc47.problems.code.v1');
-    } catch (error) { /* file-mode storage can be unavailable */ }
+    try { localStorage.removeItem('itcc47.practice-records:v2'); localStorage.removeItem('itcc47.problems.v1'); localStorage.removeItem('itcc47.problems.code.v1'); } catch { /* optional storage */ }
     location.reload();
   });
 })();

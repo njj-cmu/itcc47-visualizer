@@ -1,4 +1,55 @@
-# ITCC47 practice architecture
+# BSIT Learning Lab architecture
+
+## Multi-course shell
+
+`BSITLearningLab` is the versioned registry for course metadata and activity
+catalogs. A course declares a stable ID, code, title, home route, accent, and
+navigation. Activities add `courseId`, `topicId`, language, source, renderer,
+evidence views, inputs, and a deterministic `run()` contract. Direct ITCC47
+routes remain stable while `index.html` is the neutral subject chooser.
+
+`BSITPlayback` and `BSITVisualizerRegistry` are the course-neutral names for
+the shared timeline and renderer contracts. `ITCC47Playback`,
+`ITCC47VisualizerRegistry`, and `ITCC47Activities` remain compatibility APIs so
+the existing pseudocode and algorithm tools do not require a flag-day rename.
+
+## Guided Python object model
+
+ITCC45 is a deterministic simulator, not a general Python interpreter. Its
+displayed programs are executed in CI on the supported Python 3.9 floor, while
+the browser consumes curated event timelines. This keeps `file://` and offline
+operation small and predictable without shipping Pyodide.
+
+The `object-model` render frame contains class definitions and bases, object
+identities and field state, name-to-object references, an optional active call
+with call-frame and class lookup path, accumulated output, and optional semantic
+concept annotations. Timeline events may use the existing `segment` field to
+label an Attempt/Repair contrast. Identities such as `student:1` are stable
+teaching labels, never fake memory addresses.
+
+The object-model renderer derives motion only from those stable identities.
+Classes expand as keyed members enter or leave, objects and references use
+scoped layout identities, and fields crossfade values while retaining visible
+`new`, `updated`, or `removed` text. Lookup paths reveal in declared order and
+also mark the participating class cards. The stage and full-view dialog use
+separate motion scopes, so opening the dialog cannot connect unrelated DOM
+nodes. Field-change labels compare the current frame with the preceding
+timeline frame instead of relying on component mount timing, so fast
+scrub-then-step interactions remain deterministic. These transitions never
+mutate a frame or add playback events; seeking
+remains immediate, while Step and Play use the shared speed and reduced-motion
+preferences. Initial activity loads still introduce their first class; direct
+timeline seeking is the one navigation path that deliberately skips motion.
+
+ITCC45 activities also declare backward-compatible teaching metadata:
+`context`, `exampleOrder`, `learningGoal`, and `misconceptionIds`. The topics
+page groups activities by `topicId`; these fields affect discovery and labels,
+not playback or renderer selection. The six original activity IDs remain the
+stable primary or compatibility entries for their topics.
+
+Structured ITCC45 practice stores only `{ contentVersion, solvedIds }` under the
+versioned `itcc45.practice:v1` key. It is optional local feedback and cannot be
+treated as a grade or submission.
 
 ## Trust boundary: two separate shells
 
@@ -23,11 +74,24 @@ They have no DOM, storage, network, authentication, or framework dependency.
 `ITCC47Playback.timelineEvent(spec)` creates an immutable event with stable
 identity, domain, semantic type, student-facing message, immutable render frame,
 named metrics, and optional source, segment, boundary, and terminal information.
+Structural events may also carry an immutable `transition` with a semantic kind,
+stable entity moves, enter/exit identities, and a wait flag. Existing event
+fields and ordering remain authoritative for older consumers.
+
+Array frames retain their compatibility `array`, `items`, and highlight fields
+and may add a renderer-oriented `presentation`: immutable logical entities are
+separate from slot IDs, with explicit holes and an optional held entity. Linked
+frames use heap node IDs, pointer names, and deterministic edge IDs. Renderers
+can therefore animate identity without inferring it from duplicate values or
+from local call frames.
 
 `ITCC47Playback.createController(options)` owns deterministic playback state:
 `idle`, `paused`, `playing`, or `complete`, plus the current index, total event
 count, and speed. Its public operations are `load`, `play`, `pause`, `toggle`,
 `step`, `seek`, `finishSegment`, `setSpeed`, and `dispose`.
+Snapshots also expose transition state, token, direction, and navigation source.
+`completeTransition(token)` is idempotent; `seek` and `load` cancel active
+transitions, while structural Step/Play waits for the renderer boundary.
 
 Timelines are precomputed and cached. This keeps backward scrubbing instant and
 makes classroom behavior reproducible. Streaming should be considered only if
@@ -83,6 +147,31 @@ engines. Algorithm generation, parsing, evaluation, and playback remain outside
 components. Once the contract works for that feature, other shells can migrate
 without rewriting course behavior. Authentication belongs only in the hosted
 portal, not in the static practice build.
+
+The visualizer React bundle uses Motion through a static `LazyMotion`/`domMax`
+boundary and still publishes one `visualizer-app.js` plus one stylesheet for
+offline and `file://` use. Full motion follows playback speed; reduced motion
+uses instant relocation with brief emphasis; Off is immediate. The saved
+On/Reduced/Off override is optional, so the default continues to follow the
+operating-system preference.
+
+## Module 4 linear ADTs
+
+`linear-adt-activities.js` owns the ten reviewed Module 4 scenarios: four
+stacks, three queues, and three deques. Each event carries stable entity IDs,
+one or more ordered lanes, optional held values and input tokens, current
+operation metadata, output, metrics, and display-ready teaching annotations.
+Annotations may target only an entity currently present in a lane or a held
+entity in that same frame; the builder rejects stale targets while constructing
+the deterministic timeline.
+
+The React `linear-adt` renderer is shared across all three structures. A stack
+renders its single legal end vertically, queues label front and back around a
+FIFO lane, and deques use the same two end markers without implying arbitrary
+middle access. Multiple lanes support examples such as undo/redo without
+introducing activity-specific renderer branches. The curriculum catalog, direct
+route resolver, activity menu, and source panel all consume the same registered
+activity metadata.
 
 ## Functions, calls, and recurrences
 

@@ -117,6 +117,15 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+function syncCodeEditorHeight() {
+  if (!tels.codeBox || tels.codeBox.classList.contains('hidden')) return;
+  tels.codeBox.style.height = 'auto';
+  tels.codeBox.style.height = `${Math.max(tels.codeBox.scrollHeight + 2, 192)}px`;
+}
+
+tels.codeBox.addEventListener('input', syncCodeEditorHeight);
+window.addEventListener('resize', syncCodeEditorHeight);
+
 /**
  * Scroll `container` the minimum amount needed to reveal `el`.
  * scrollIntoView({block:'nearest'}) is unreliable when the container has a
@@ -530,6 +539,7 @@ function exitRunMode() {
   tels.growthResult.classList.add('hidden');
   clearError();
   selectMobileWorkspace('code');
+  requestAnimationFrame(syncCodeEditorHeight);
 }
 
 function selectMobileWorkspace(which) {
@@ -741,6 +751,8 @@ buildPresetList();
 const activityHandoff = (() => {
   const activityId = new URLSearchParams(window.location.search).get('activity');
   if (!activityId || typeof ITCC47Activities === 'undefined') return null;
+  const release = ITCC47Curriculum.stateForResource('activity', activityId, ITCC47CurriculumUI.previewOptions());
+  if (!['available', 'current'].includes(release.state)) return null;
   const activity = ITCC47Activities.get(activityId);
   if (!activity || !Array.isArray(activity.source)) return null;
   return activity;
@@ -768,3 +780,4 @@ if (activityHandoff) {
   tels.inputsBox.value = PRESETS[0].inputs;
   document.querySelector('#preset-list .algo-btn')?.classList.add('active');
 }
+requestAnimationFrame(syncCodeEditorHeight);

@@ -6,7 +6,7 @@
 <title>ITCC47 Modules</title>
 <link rel="stylesheet" href="styles.css">
 </head>
-<body class="catalog-page">
+<body class="catalog-page" data-course="itcc47">
 
 <header class="topbar">
   <div class="topbar-title">
@@ -23,12 +23,13 @@
 
 <main class="catalog-main">
   <header class="catalog-intro">
-    <h1>Explore the course</h1>
-    <p>Choose a problem to solve or open a synchronized visualization from the same module map.</p>
+    <div><p class="eyebrow">Self-paced practice roadmap</p><h1>Choose what to practise</h1>
+    <p>Start with the current problem bank or preview what comes next. Opening an activity never advances the semester.</p></div>
+    <div id="release-controls"></div>
   </header>
 
   <div class="catalog-tabs" role="tablist" aria-label="Module resources">
-    <button id="problems-tab" type="button" role="tab" aria-controls="problem-catalog" aria-selected="true" data-catalog-view="problems" data-icon="problemsList">Problem sets</button>
+    <button id="problems-tab" type="button" role="tab" aria-controls="problem-catalog" aria-selected="true" data-catalog-view="problems" data-icon="problemsList">Practice banks</button>
     <button id="visualizations-tab" type="button" role="tab" aria-controls="visualization-catalog" aria-selected="false" tabindex="-1" data-catalog-view="visualizations" data-icon="visualize">Visualizations</button>
   </div>
 
@@ -36,7 +37,7 @@
     <div id="module-grid" class="module-grid" aria-label="ITCC47 problem-set modules"></div>
     <aside class="practice-note" aria-label="Practice data notice">
       <span class="practice-note-icon" aria-hidden="true">i</span>
-      <p>This is a public practice area. Your progress stays in this browser and is not a grade.</p>
+      <p>This is a self-paced practice area. Your drafts and completion indicators stay in this browser.</p>
     </aside>
   </section>
 
@@ -45,11 +46,19 @@
   </section>
 </main>
 
+<script src="course-catalog.js"></script>
+<script src="curriculum.data.js"></script>
+<script src="release-profile.js"></script>
+<script src="curriculum.js"></script>
+<script src="curriculum-ui.js"></script>
 <script src="nav.js"></script>
 <script src="playback.js"></script>
 <script src="algorithms.js"></script>
 <script src="activity-catalog.js"></script>
+<script src="linear-adt-activities.js"></script>
 <script src="problems.data.js"></script>
+<script src="future-problems.js"></script>
+<script>ITCC47FutureProblems.register(PROBLEMS);</script>
 <script src="problems-catalog.js"></script>
 <script src="sw-register.js" defer></script>
 </body>

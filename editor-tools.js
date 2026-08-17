@@ -1,8 +1,47 @@
 /* Touch-friendly indentation for the shared pseudocode textareas. */
 (function () {
   const INDENT = '    ';
+  const pointerViewports = new WeakMap();
 
-  function editIndent(textarea, direction) {
+  function captureViewportScroll(element) {
+    const containers = [];
+    let parent = element?.parentElement || null;
+    while (parent && parent !== document.body && parent !== document.documentElement) {
+      if (parent.scrollHeight > parent.clientHeight || parent.scrollWidth > parent.clientWidth) {
+        containers.push({ element: parent, top: parent.scrollTop, left: parent.scrollLeft });
+      }
+      parent = parent.parentElement;
+    }
+    const pageX = window.scrollX;
+    const pageY = window.scrollY;
+    return {
+      restore() {
+        containers.forEach(({ element: container, top, left }) => {
+          container.scrollTop = top;
+          container.scrollLeft = left;
+        });
+        window.scrollTo(pageX, pageY);
+      },
+    };
+  }
+
+  function focusWithoutViewportShift(element, selectionStart, selectionEnd, snapshot) {
+    const viewport = snapshot || captureViewportScroll(element);
+    try {
+      element.focus({ preventScroll: true });
+    } catch (error) {
+      element.focus();
+    }
+    if (Number.isInteger(selectionStart)) {
+      element.setSelectionRange(selectionStart, Number.isInteger(selectionEnd) ? selectionEnd : selectionStart);
+    }
+    viewport.restore();
+    requestAnimationFrame(() => viewport.restore());
+    return viewport;
+  }
+
+  function editIndent(textarea, direction, viewportSnapshot) {
+    const viewport = viewportSnapshot || captureViewportScroll(textarea);
     const value = textarea.value;
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
@@ -31,15 +70,22 @@
       ? start + INDENT.length
       : Math.max(lineStart, start - removedBeforeStart);
     const newEnd = Math.max(newStart, end + totalDelta);
-    textarea.focus();
-    textarea.setSelectionRange(newStart, newEnd);
+    focusWithoutViewportShift(textarea, newStart, newEnd, viewport);
     textarea.dispatchEvent(new Event('input', { bubbles: true }));
+    viewport.restore();
   }
 
   document.querySelectorAll('[data-editor-action]').forEach((button) => {
+    button.addEventListener('pointerdown', (event) => {
+      const textarea = document.getElementById(button.dataset.editorTarget);
+      if (textarea && !textarea.disabled) pointerViewports.set(button, captureViewportScroll(textarea));
+      event.preventDefault();
+    });
     button.addEventListener('click', () => {
       const textarea = document.getElementById(button.dataset.editorTarget);
-      if (textarea && !textarea.disabled) editIndent(textarea, button.dataset.editorAction);
+      const viewport = pointerViewports.get(button);
+      pointerViewports.delete(button);
+      if (textarea && !textarea.disabled) editIndent(textarea, button.dataset.editorAction, viewport);
     });
   });
 
@@ -51,5 +97,9 @@
     });
   });
 
-  window.ITCC47EditorTools = Object.freeze({ editIndent });
+  window.ITCC47EditorTools = Object.freeze({
+    captureViewportScroll,
+    editIndent,
+    focusWithoutViewportShift,
+  });
 })();

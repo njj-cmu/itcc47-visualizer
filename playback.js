@@ -266,5 +266,5 @@ const ITCC47Playback = (() => {
   return { EVENT_SCHEMA_VERSION, timelineEvent, createController, runResult, deepFreeze };
 })();
 
-/* Course-neutral name; the legacy global remains the ITCC47 compatibility API. */
+/* Course-neutral name with the ITCC47 global retained as a compatibility facade. */
 const BSITPlayback = ITCC47Playback;

@@ -27,6 +27,20 @@ concept annotations. Timeline events may use the existing `segment` field to
 label an Attempt/Repair contrast. Identities such as `student:1` are stable
 teaching labels, never fake memory addresses.
 
+The object-model renderer derives motion only from those stable identities.
+Classes expand as keyed members enter or leave, objects and references use
+scoped layout identities, and fields crossfade values while retaining visible
+`new`, `updated`, or `removed` text. Lookup paths reveal in declared order and
+also mark the participating class cards. The stage and full-view dialog use
+separate motion scopes, so opening the dialog cannot connect unrelated DOM
+nodes. Field-change labels compare the current frame with the preceding
+timeline frame instead of relying on component mount timing, so fast
+scrub-then-step interactions remain deterministic. These transitions never
+mutate a frame or add playback events; seeking
+remains immediate, while Step and Play use the shared speed and reduced-motion
+preferences. Initial activity loads still introduce their first class; direct
+timeline seeking is the one navigation path that deliberately skips motion.
+
 ITCC45 activities also declare backward-compatible teaching metadata:
 `context`, `exampleOrder`, `learningGoal`, and `misconceptionIds`. The topics
 page groups activities by `topicId`; these fields affect discovery and labels,

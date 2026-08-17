@@ -7,6 +7,20 @@
   const MIN_SOURCE_RATIO = 0.3;
   const MAX_SOURCE_RATIO = 0.65;
 
+  function normalizeEvidence(value, fallback) {
+    return value === 'expanded' || value === 'collapsed' ? value : fallback;
+  }
+
+  function readStored(storage, key, fallback, normalizeValue) {
+    try { return normalizeValue(JSON.parse(storage.getItem(key))); }
+    catch { return fallback(); }
+  }
+
+  function writeStored(storage, key, value) {
+    try { storage.setItem(key, JSON.stringify(value)); } catch { /* in-memory layout still applies */ }
+    return value;
+  }
+
   function clampSourceRatio(value) {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return DEFAULT_SOURCE_RATIO;
@@ -30,25 +44,18 @@
     if (!value || value.version !== VERSION) return fallback;
     return {
       version: VERSION,
-      evidence: value.evidence === 'expanded' || value.evidence === 'collapsed'
-        ? value.evidence : fallback.evidence,
+      evidence: normalizeEvidence(value.evidence, fallback.evidence),
       sourceRatio: clampSourceRatio(value.sourceRatio),
     };
   }
 
   function read(storage, viewportWidth) {
-    try {
-      const saved = JSON.parse(storage.getItem(STORAGE_KEY));
-      return normalize(saved, viewportWidth);
-    } catch {
-      return defaults(viewportWidth);
-    }
+    return readStored(storage, STORAGE_KEY, () => defaults(viewportWidth), (value) => normalize(value, viewportWidth));
   }
 
   function write(storage, value, viewportWidth) {
     const next = normalize({ ...value, version: VERSION }, viewportWidth);
-    try { storage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* in-memory layout still applies */ }
-    return next;
+    return writeStored(storage, STORAGE_KEY, next);
   }
 
   root.ITCC45WorkspaceLayout = Object.freeze({
@@ -74,18 +81,15 @@
     if (!value || value.version !== VERSION) return fallback;
     return {
       version: VERSION,
-      evidence: value.evidence === 'expanded' || value.evidence === 'collapsed'
-        ? value.evidence : fallback.evidence,
+      evidence: normalizeEvidence(value.evidence, fallback.evidence),
     };
   }
   function readITCC47(storage) {
-    try { return normalizeITCC47(JSON.parse(storage.getItem(ITCC47_STORAGE_KEY))); }
-    catch { return itcc47Defaults(); }
+    return readStored(storage, ITCC47_STORAGE_KEY, itcc47Defaults, normalizeITCC47);
   }
   function writeITCC47(storage, value) {
     const next = normalizeITCC47({ ...value, version: VERSION });
-    try { storage.setItem(ITCC47_STORAGE_KEY, JSON.stringify(next)); } catch { /* in-memory layout still applies */ }
-    return next;
+    return writeStored(storage, ITCC47_STORAGE_KEY, next);
   }
 
   root.ITCC47WorkspaceLayout = Object.freeze({

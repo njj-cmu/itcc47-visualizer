@@ -6,7 +6,7 @@ All ITCC47 catalogs and direct routes resolve through `ITCC47Curriculum.stateFor
 
 Locked visualizer and practice routes render requirement metadata before constructing an activity timeline, source panel, statement, or editor. Relocking does not delete versioned practice records or their recoverable earlier drafts.
 
-The public catalog supports lessons, tools, activities, and self-paced problems only. Checkpoints and resources declare `reviewStatus`; the build rejects a deployed checkpoint that is a draft or depends on any unreviewed public resource. The deployed version 2 profile currently ends at `m4-queue-deque`. Modules 5â€“8 remain draft-only instructor previews and carry a persistent Draft preview indicator.
+The public catalog supports lessons, tools, activities, and self-paced problems only. Checkpoints and resources declare `reviewStatus`; the build rejects a deployed checkpoint that is a draft or depends on any unreviewed public resource. The deployed version 3 profile currently ends at `m1-complexity`. Later modules remain available through explicit instructor preview; Modules 5–8 are draft-only and carry a persistent Draft preview indicator.
 
 `context/content-manifest.json` records source authority and quarantine decisions. The syllabus and canonical laboratory Markdown remain provenance inside `context/`; they are not linked, cataloged, downloaded, or cached by the public application. Lecture DOCX files are drafts, the older Midterm material is historical, Auto-Battle is experimental, and the unrelated Vue `currentversion.txt` is quarantined.
 

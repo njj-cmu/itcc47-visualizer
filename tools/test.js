@@ -498,7 +498,7 @@ queuedPlay.completeTransition(queuedToken);
 ok('queued play resumes only after transition completion', queuedPlay.getState().status === 'playing' && queuedPlay.getState().index === 1);
 
 const compatibleResult = Playback.runResult({ events: timeline, result: { value: 3 } });
-ok('run results expose events and legacy steps together', compatibleResult.schemaVersion === 2 && compatibleResult.events === compatibleResult.steps);
+ok('run results expose events and compatibility steps together', compatibleResult.schemaVersion === 2 && compatibleResult.events === compatibleResult.steps);
 ok('run result capabilities are detected from events', compatibleResult.capabilities.visualize && compatibleResult.capabilities.trace && compatibleResult.capabilities.operations);
 
 const algorithmEngine = load(['playback.js', 'algorithms.js'], { setTimeout, clearTimeout });
@@ -514,7 +514,7 @@ ok('insertion sort declares moves instead of swaps', ALGORITHMS.insertion.metric
 ok('insertion move events use the declared move metric', ALGORITHMS.insertion.run([3, -1, 2]).some((event) => event.metrics.moves > 0 && event.frame.highlight.move));
 const insertionShift = ALGORITHMS.insertion.run([3, -1, 2]).find((event) => event.type === 'move');
 ok('insertion shift events preserve held and displaced values for presentation', insertionShift.frame.highlight.transition.value === 3 && insertionShift.frame.highlight.held.value === -1 && insertionShift.frame.highlight.transition.displacedValue === -1);
-ok('legacy array timeline items retain stable slot identities', ALGORITHMS.bubble.run([3, 1, 2]).every((event) => event.frame.items.every((item, index) => item.id === `slot:${index}`)));
+ok('array timeline compatibility items retain stable slot identities', ALGORITHMS.bubble.run([3, 1, 2]).every((event) => event.frame.items.every((item, index) => item.id === `slot:${index}`)));
 const duplicateSwap = ALGORITHMS.bubble.run([2, 2, 1]).find((event) => event.type === 'swap');
 ok('presentation identities remain deterministic with duplicate values', duplicateSwap.frame.presentation.entities.map((entity) => entity.id).join(',') === 'item:0,item:1,item:2' && new Set(duplicateSwap.frame.presentation.slots.filter(Boolean)).size === 3);
 ok('swap metadata moves stable entities between slots', duplicateSwap.transition.kind === 'swap' && duplicateSwap.transition.moves.length === 2 && duplicateSwap.transition.wait);
@@ -637,6 +637,22 @@ ok('visualizer registries report renderers and evidence views', Registry.rendere
 ok('algorithm metrics remain separate from primitive-operation analysis', !fs.readFileSync(path.join(ROOT, 'visualizer-src', 'main.jsx'), 'utf8').includes('primitiveTotal +'));
 
 section('multi-course catalog and ITCC45 OOP');
+const visualizerReactSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'main.jsx'), 'utf8');
+const visualizerWorkspaceStyles = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'workspace.css'), 'utf8');
+ok('ITCC45 object animation components stay top-level and memoized',
+  ['AnimatedClassMember', 'AnimatedClassCard', 'AnimatedReference', 'AnimatedObjectField', 'AnimatedObjectCard', 'AnimatedActiveCall']
+    .every((name) => visualizerReactSource.includes(`const ${name} = memo(`)));
+ok('ITCC45 object motion uses stable class, object, reference, and field identities',
+  [':class:${item.id}', ':object:${item.id}', ':reference:${name}', ':field:${objectId}:${name}']
+    .every((token) => visualizerReactSource.includes(token)));
+ok('ITCC45 object motion supports entry, value replacement, and deletion transitions',
+  visualizerReactSource.includes('exit={{ opacity: 0, height: 0, x: -10 }}')
+  && visualizerReactSource.includes('key={serialized}')
+  && visualizerWorkspaceStyles.includes('.object-field-change'));
+ok('ITCC45 object motion receives playback duration and motion preference',
+  visualizerReactSource.includes('duration={objectVisualDuration} motionMode={motionPreference.mode}')
+  && visualizerReactSource.includes("playback.navigationSource === 'seek' ? 0 : duration")
+  && visualizerReactSource.includes('motionMode === \'on\''));
 const workspaceLayoutEngine = load(['workspace-layout.js']);
 const WorkspaceLayout = workspaceLayoutEngine.get('ITCC45WorkspaceLayout');
 const ITCC47Layout = workspaceLayoutEngine.get('ITCC47WorkspaceLayout');
@@ -671,21 +687,61 @@ ok('every ITCC45 topic spans an introduction and a transfer context', oopTopicId
 OOPActivities.list().forEach((activity) => {
   const a = activity.run(activity.input.defaults);
   const b = activity.run(activity.input.defaults);
+  const printLines = activity.source
+    .map((line, index) => line.trim().startsWith('print(') ? index + 1 : null)
+    .filter(Boolean);
+  const coveredLines = new Set(a.events.map((item) => item.source?.line));
   ok(`${activity.id}: timeline is deterministic`, JSON.stringify(a) === JSON.stringify(b));
   ok(`${activity.id}: output matches its declared example`, JSON.stringify(a.events.at(-1).frame.output) === JSON.stringify(activity.expectedOutput));
+  ok(`${activity.id}: every displayed print statement has a timeline step`, printLines.every((line) => coveredLines.has(line)));
+  ok(`${activity.id}: output remains accumulated throughout playback`, a.events.every((item, index) => {
+    if (!index) return true;
+    const previous = a.events[index - 1].frame.output;
+    return previous.every((line, outputIndex) => item.frame.output[outputIndex] === line);
+  }));
+  ok(`${activity.id}: output grows only on the source line that prints it`, a.events.every((item, index) => {
+    const previousLength = index ? a.events[index - 1].frame.output.length : 0;
+    return item.frame.output.length === previousLength || item.source?.code.trim().startsWith('print(');
+  }));
+  const boundaryScenarios = ['minimum', 'middle', 'maximum'].map((boundary) => Object.fromEntries(activity.input.controls.map((control) => {
+    if (control.type !== 'number') return [control.key, boundary === 'minimum' ? 'A "quoted" value' : boundary === 'middle' ? 'Learner' : 'Transfer case'];
+    if (boundary === 'minimum') return [control.key, control.min];
+    if (boundary === 'maximum') return [control.key, control.max];
+    return [control.key, (Number(control.min) + Number(control.max)) / 2];
+  })));
+  ok(`${activity.id}: boundary scenarios keep source, frames, and output synchronized`, boundaryScenarios.every((options) => {
+    const source = activity.sourceFor(options);
+    const first = activity.run(options);
+    const second = activity.run(options);
+    return JSON.stringify(first) === JSON.stringify(second)
+      && first.events.every((item) => item.source?.code === source[item.source.line - 1])
+      && first.events.every((item, index) => !index || first.events[index - 1].frame.output.every((line, outputIndex) => item.frame.output[outputIndex] === line));
+  }));
   a.events.forEach((item) => {
     const classIds = new Set(item.frame.classes.map((model) => model.id));
     const objectIds = new Set(item.frame.objects.map((model) => model.id));
+    ok(`${activity.id}: frame identities are unique`, classIds.size === item.frame.classes.length && objectIds.size === item.frame.objects.length);
     ok(`${activity.id}: object classes and references are valid`, item.frame.objects.every((model) => classIds.has(model.classId)) && Object.values(item.frame.references).every((id) => objectIds.has(id)));
+    ok(`${activity.id}: active receiver is a displayed object when one is declared`, !item.frame.active?.receiverId || objectIds.has(item.frame.active.receiverId));
     ok(`${activity.id}: lookup path references known classes`, !item.frame.active || item.frame.active.lookupPath.every((id) => classIds.has(id)));
   });
 });
+const classReading = OOPActivities.get('itcc45-classes-blueprint').run();
+const classSchoolOutput = classReading.events.find((item) => item.source?.line === 12);
+ok('classes blueprint reads and renders Student.school on line 12', classSchoolOutput?.frame.output.join('|') === 'CMU' && classSchoolOutput.frame.annotations.some((item) => item.value === 'Student.school'));
+ok('classes blueprint reveals instance fields only as their assignment lines execute',
+  JSON.stringify(classReading.events.find((item) => item.source?.line === 5).frame.objects[0].fields) === JSON.stringify({ name: 'Ana' })
+  && JSON.stringify(classReading.events.find((item) => item.source?.line === 6).frame.objects[0].fields) === JSON.stringify({ name: 'Ana', program: 'BSIT' }));
 const rejectedScore = OOPActivities.get('itcc45-encapsulation-property').run({ startingScore: 88, proposedScore: 120 });
 ok('encapsulation rejects invalid scores without changing state', rejectedScore.events.some((item) => item.type === 'reject') && rejectedScore.events.at(-1).frame.objects[0].fields._score === 88);
 ok('abstraction demonstrates incomplete subclass rejection', OOPActivities.get('itcc45-abstraction-contract').run().events.some((item) => item.type === 'reject'));
 ok('polymorphism dispatches through both concrete classes', OOPActivities.get('itcc45-polymorphic-dispatch').run().events.filter((item) => item.type === 'dispatch').map((item) => item.frame.active.method).join(',') === 'EmailNotification.send,SmsNotification.send');
 ok('class shadowing preserves the class fallback', OOPActivities.get('itcc45-classes-instance-shadowing').run().events.at(-1).frame.output.join('|') === 'OOP101: Lab 5|WEB101: Lab 2|Lab 2');
-ok('shared mutable class state is contrasted with independent repaired state', OOPActivities.get('itcc45-classes-shared-mutable').run().events.map((item) => item.segment?.id).filter(Boolean).join(',') === 'attempt,attempt,repair,repair');
+const sharedMutable = OOPActivities.get('itcc45-classes-shared-mutable').run();
+ok('shared mutable class state is contrasted with independent repaired state',
+  sharedMutable.events.some((item) => item.type === 'mutate-shared' && item.segment?.id === 'attempt')
+  && sharedMutable.events.some((item) => item.segment?.id === 'repair')
+  && sharedMutable.events.at(-1).frame.objects.find((item) => item.id === 'fixed:second').fields.items.length === 0);
 ok('recursive setter failure is caught before its backing-field repair', OOPActivities.get('itcc45-encapsulation-recursive-setter').run().events.some((item) => item.type === 'reject') && OOPActivities.get('itcc45-encapsulation-recursive-setter').run().events.at(-1).frame.objects[0].fields._celsius === 24);
 ok('name-mangling is visualized as convention rather than security', OOPActivities.get('itcc45-encapsulation-python-privacy').run().events.some((item) => item.frame.annotations.some((note) => note.value === '_StudentPortal__token')) && OOPActivities.get('itcc45-encapsulation-python-privacy').run().events.at(-1).frame.notice.includes('security'));
 ok('missing super exposes absent base state before repair', OOPActivities.get('itcc45-inheritance-missing-super').run().events.at(-1).frame.objects[0].fields.name === 'Ana' && OOPActivities.get('itcc45-inheritance-missing-super').run().events.some((item) => item.type === 'reject'));
@@ -814,7 +870,7 @@ ok('precache list covers every shipped asset', missing.length === 0,
 ok('precache list has no stale entries', extra.length === 0,
   extra.length ? `no longer exist: ${extra.join(', ')} — run: node tools/build-sw.js` : '');
 ok('precache includes the site root', listed.includes('./'));
-ok('service worker uses the BSIT cache prefix', swSource.includes("const CACHE_PREFIX = 'bsit-learning-lab-'") && swSource.includes("const LEGACY_CACHE_PREFIX = 'itcc47-practice-'"));
+ok('service worker uses the BSIT cache prefix', swSource.includes("const CACHE_PREFIX = 'bsit-learning-lab-'") && swSource.includes("const RETIRED_CACHE_PREFIX = 'itcc47-practice-'"));
 ok('service worker precaches atomically', swSource.includes('cache.addAll(PRECACHE)'));
 ok('service worker cleans up old caches', swSource.includes('caches.delete'));
 ok('service worker preserves unrelated origin caches', swSource.includes('n.startsWith(CACHE_PREFIX) && n !== CACHE'));
@@ -848,18 +904,18 @@ const previewStorage = (() => { const values = new Map(); return { getItem:(key)
 const curriculumEngine = load(['course-catalog.js','curriculum.data.js','release-profile.js','curriculum.js'], { localStorage:previewStorage, location:{ search:'' }, URLSearchParams });
 const Curriculum = curriculumEngine.get('ITCC47Curriculum');
 const ReleaseProfile = curriculumEngine.get('ITCC47_RELEASE_PROFILE');
-ok('semester profile releases through queues and deques', ReleaseProfile.schemaVersion === 2 && ReleaseProfile.profileVersion === 2 && ReleaseProfile.currentCheckpointId === 'm4-queue-deque' && !('finalProjectId' in ReleaseProfile));
+ok('semester profile currently ends with Module 1 complexity', ReleaseProfile.schemaVersion === 2 && ReleaseProfile.profileVersion === 3 && ReleaseProfile.currentCheckpointId === 'm1-complexity' && !('finalProjectId' in ReleaseProfile));
 ok('catalog preserves all six authoritative CLO definitions', Curriculum.clos.length === 6 && Curriculum.clos.every((clo)=>clo.id && clo.statement));
 ok('checkpoint order is unique and increasing', new Set(Curriculum.checkpoints.map((item)=>item.order)).size === Curriculum.checkpoints.length && Curriculum.checkpoints.every((item,index,list)=>!index || item.order > list[index-1].order));
 ok('every checkpoint prerequisite points backward', Curriculum.checkpoints.every((item)=>item.prerequisiteIds.every((id)=>Curriculum.getCheckpoint(id)?.order < item.order)));
 ok('every resource mapping resolves', Curriculum.listResources().every((resource)=>resource.alwaysAvailable || Curriculum.getCheckpoint(resource.checkpointId)));
-ok('review status follows the release boundary', Curriculum.checkpoints.filter((item)=>item.order <= Curriculum.getCheckpoint('m4-queue-deque').order).every((item)=>item.reviewStatus === 'reviewed') && Curriculum.checkpoints.filter((item)=>item.order > Curriculum.getCheckpoint('m4-queue-deque').order).every((item)=>item.reviewStatus === 'draft'));
+ok('Modules 1-4 are reviewed while Modules 5-8 remain drafts', Curriculum.checkpoints.filter((item)=>item.order <= Curriculum.getCheckpoint('m4-queue-deque').order).every((item)=>item.reviewStatus === 'reviewed') && Curriculum.checkpoints.filter((item)=>item.order > Curriculum.getCheckpoint('m4-queue-deque').order).every((item)=>item.reviewStatus === 'draft'));
 ok('public curriculum exposes practice resources only', Curriculum.listResources().every((resource)=>['lesson','tool','activity','problem'].includes(resource.kind) && !('labRefs' in resource) && ['reviewed','draft'].includes(resource.reviewStatus)));
-ok('current, available, and locked states share one resolver', Curriculum.stateForResource('activity','selection-sort').state === 'available' && Curriculum.stateForResource('activity','deque-service-lane').state === 'current' && Curriculum.stateForResource('activity','recursive-range-search').state === 'locked');
+ok('current, available, and locked states share one resolver', Curriculum.stateForResource('problem','sum-two').state === 'available' && Curriculum.stateForResource('problem','reward-points').state === 'current' && Curriculum.stateForResource('activity','selection-sort').state === 'locked');
 ok('missing mappings fail closed at runtime', Curriculum.stateForResource('activity','not-mapped').state === 'planned' && !Curriculum.isOpen('activity','not-mapped'));
 Curriculum.writePreview('m8-dp',previewStorage);
 ok('preview is explicit and persisted under the versioned key', Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm8-dp' && previewStorage.getItem(Curriculum.PREVIEW_STORAGE_KEY));
-ok('normal visits ignore a stored instructor preview', Curriculum.activeProfile({preview:false,storage:previewStorage,search:''}).currentCheckpointId === 'm4-queue-deque');
+ok('normal visits ignore a stored instructor preview', Curriculum.activeProfile({preview:false,storage:previewStorage,search:''}).currentCheckpointId === 'm1-complexity');
 Curriculum.clearPreview(previewStorage);
 ok('array-list mutation belongs to Module 2', Activities.get('array-list-insert').module === 2 && Activities.get('array-list-remove').module === 2);
 ok('every shipped activity exposes curriculum metadata', Activities.list().filter((activity)=>Curriculum.getResource('activity',activity.id)).every((activity)=>activity.checkpointId && activity.cloIds.length));

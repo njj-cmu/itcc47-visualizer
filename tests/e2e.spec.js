@@ -4,7 +4,7 @@ const path = require('path');
 const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=deque-sliding-window&preview=1', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'writer.html', 'tracer.html', 'problems.html', 'lesson.html?checkpoint=m2-selection-sort', 'student-materials.html', 'problem-list.html?module=1', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count'];
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('itcc47.release-preview:v1', JSON.stringify({ schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 2, currentCheckpointId: 'm8-dp' })));
+  await page.addInitScript(() => localStorage.setItem('itcc47.release-preview:v1', JSON.stringify({ schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 3, currentCheckpointId: 'm8-dp' })));
 });
 
 async function openMobilePlaybackDetails(page) {
@@ -41,6 +41,42 @@ async function visualizerSpeed(page) {
   return desktop;
 }
 
+async function installITCC45MotionProbe(page) {
+  await page.evaluate(() => {
+    window.__itcc45MotionObserver?.disconnect();
+    window.__itcc45MotionSamples = [];
+    const root = document.querySelector('.itcc45-model-pane');
+    const record = (element) => {
+      if (!(element instanceof Element)) return;
+      const kind = element.matches('.object-class-member') ? 'member'
+        : element.matches('.object-instance-card') ? 'object'
+          : element.matches('[data-field-name] code') ? 'field'
+            : null;
+      if (!kind) return;
+      window.__itcc45MotionSamples.push({ kind, text: element.textContent, style: element.getAttribute('style') || '' });
+      if (window.__itcc45MotionSamples.length > 800) window.__itcc45MotionSamples.shift();
+    };
+    const observer = new MutationObserver((records) => records.forEach((mutation) => {
+      if (mutation.type === 'attributes') record(mutation.target);
+      mutation.addedNodes.forEach((node) => {
+        record(node);
+        node.querySelectorAll?.('.object-class-member, .object-instance-card, [data-field-name] code').forEach(record);
+      });
+    }));
+    observer.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['style'] });
+    window.__itcc45MotionObserver = observer;
+  });
+}
+
+async function expectRecordedMotion(page, kind, text) {
+  await expect.poll(() => page.evaluate(({ kind, text }) => {
+    const styles = (window.__itcc45MotionSamples || [])
+      .filter((sample) => sample.kind === kind && sample.text.includes(text)).map((sample) => sample.style);
+    return styles.some((style) => /opacity:\s*0(?:;|$)/.test(style))
+      && styles.some((style) => /opacity:\s*1(?:;|$)/.test(style));
+  }, { kind, text })).toBeTruthy();
+}
+
 for (const entry of entries) {
   test(`${entry} has no horizontal overflow`, async ({ page }) => {
     await page.goto(`/${entry}`);
@@ -62,23 +98,42 @@ test('mobile navigation opens and moves focus', async ({ page }, testInfo) => {
 test('start page gives students a clear route into the current lecture', async ({ page }) => {
   await page.goto('/itcc47.html');
   await expect(page.getByRole('heading', { name: /Start with a problem/ })).toBeVisible();
-  await expect(page.locator('#current-checkpoint')).toContainText('Queues and deques');
+  await expect(page.locator('#current-checkpoint')).toContainText('Complexity basics');
   await page.getByRole('link', { name: /Continue current lecture/ }).click();
-  await expect(page).toHaveURL(/lesson\.html\?checkpoint=m4-queue-deque$/);
-  await expect(page.getByRole('heading', { name: /Queues and deques/ })).toBeVisible();
+  await expect(page).toHaveURL(/lesson\.html\?checkpoint=m1-complexity$/);
+  await expect(page.getByRole('heading', { name: /Complexity basics/ })).toBeVisible();
 });
 
-test('curriculum roadmap exposes current, available, and locked checkpoints', async ({ page }) => {
+test('curriculum roadmap expands the current module and compacts locked modules', async ({ page }) => {
   await page.goto('/problems.html');
   await expect(page.locator('.module-card')).toHaveCount(8);
-  await expect(page.locator('.checkpoint-current')).toContainText('Queues and deques');
-  await expect(page.locator('.checkpoint-locked').first()).toBeVisible();
+  await expect(page.locator('.module-card-current')).toContainText('Algorithmic Thinking');
+  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(11);
+  await expect(page.locator('.checkpoint-list, .module-lessons, .module-outline')).toHaveCount(0);
+  await expect(page.locator('.module-card-locked').first()).toBeVisible();
+  await expect(page.locator('.module-card-locked .module-problem-card')).toHaveCount(0);
   await expect(page.getByText('Instructor preview', { exact: true })).toBeVisible();
+});
+
+test('locked visualization cards use a compact icon and border state', async ({ page }) => {
+  await page.goto('/problems.html?view=visualizations');
+  await expect(page.locator('.visualization-card')).toHaveCount(35);
+  await expect(page.locator('.visualization-card.visualization-locked')).toHaveCount(35);
+  await expect(page.locator('.visualization-lock')).toHaveCount(35);
+  await expect(page.locator('.visualization-card .release-badge')).toHaveCount(0);
+  await expect(page.locator('.visualization-card').first().locator('.visualization-card-meta')).toContainText('Module 2');
+  const familyOrder = await page.locator('.visualization-group h2').allTextContents();
+  expect(familyOrder.slice(0, 7)).toEqual(['Sorting', 'Searching', 'Array Lists', 'Linked Lists', 'Stacks', 'Queues', 'Deques']);
+  expect(familyOrder.indexOf('Deques')).toBeLessThan(familyOrder.indexOf('Recursion'));
 });
 
 test('locked visualizer route renders requirements without source or playback', async ({ page }) => {
   await page.goto('/visualizer.html?activity=recursive-range-search');
   await expect(page.locator('.curriculum-lock')).toContainText('Recursive duplicate-range search is not released yet');
+  const actions = page.locator('.curriculum-lock-actions .btn');
+  await expect(actions).toHaveCount(2);
+  expect(await actions.evaluateAll((links) => links.every((link) => getComputedStyle(link).textDecorationLine === 'none'))).toBe(true);
+  await expect(actions.first()).toHaveCSS('min-height', '44px');
   await expect(page.locator('.source-panel')).toHaveCount(0);
   await expect(page.getByRole('slider', { name: /Timeline/ })).toHaveCount(0);
   await expect(page.locator('.visualizer-workspace')).toHaveCount(0);
@@ -126,20 +181,54 @@ test('instructor preview renders every later-domain teaching activity', async ({
   }
 });
 
-test('normal Module 4 release exposes ten line-by-line stack, queue, and deque examples', async ({ page }) => {
+test('instructor preview exposes ten line-by-line Module 4 examples', async ({ page }) => {
   const activities = ['stack-lifo-basics','stack-postfix-evaluator','stack-delimiter-audit','stack-editor-undo','queue-fifo-basics','queue-round-robin','queue-printer-jobs','deque-end-operations','deque-sliding-window','deque-service-lane'];
-  await page.goto('/problems.html?view=visualizations');
-  await expect(page.locator('.module-card', { hasText: 'Module 4' }).locator('.module-status')).toContainText('10 activities');
+  await page.goto('/problems.html?view=visualizations&preview=1');
   await expect(page.locator('.visualization-group', { hasText: 'Stacks' }).locator('.visualization-card')).toHaveCount(4);
   await expect(page.locator('.visualization-group', { hasText: 'Queues' }).locator('.visualization-card')).toHaveCount(3);
   await expect(page.locator('.visualization-group', { hasText: 'Deques' }).locator('.visualization-card')).toHaveCount(3);
   for (const activity of activities) {
-    await page.goto(`/visualizer.html?activity=${activity}`);
+    await page.goto(`/visualizer.html?activity=${activity}&preview=1`);
     await expect(page.locator('.linear-adt')).toBeVisible();
     await expect(page.locator('.linear-teaching')).toBeVisible();
     await expect(page.locator('.source-line.is-current')).toHaveCount(1);
     await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
   }
+});
+
+test('visualizer workspaces choose a structure-aware desktop composition', async ({ page }, testInfo) => {
+  await page.goto('/visualizer.html?activity=stack-lifo-basics&preview=1');
+  await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-workspace-composition', 'split-vertical');
+  if (testInfo.project.name === 'laptop') {
+    const stackPanels = await page.locator('.itcc47-workbench').evaluate((workbench) => {
+      const source = workbench.querySelector('.desktop-source').getBoundingClientRect();
+      const visual = workbench.querySelector('.itcc47-visual-shell').getBoundingClientRect();
+      return { sourceTop: source.top, visualTop: visual.top, sourceRight: source.right, visualLeft: visual.left };
+    });
+    expect(Math.abs(stackPanels.sourceTop - stackPanels.visualTop)).toBeLessThan(3);
+    expect(stackPanels.visualLeft).toBeGreaterThan(stackPanels.sourceRight);
+    const stackSections = await page.locator('.linear-adt-stack').evaluate((renderer) => {
+      const operation = renderer.querySelector('.linear-operation').getBoundingClientRect();
+      const lane = renderer.querySelector('.linear-lane').getBoundingClientRect();
+      return { operationBottom: operation.bottom, laneTop: lane.top };
+    });
+    expect(stackSections.laneTop).toBeGreaterThanOrEqual(stackSections.operationBottom);
+  }
+
+  await page.goto('/visualizer.html?activity=queue-fifo-basics&preview=1');
+  await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-workspace-composition', 'stacked-horizontal');
+  if (testInfo.project.name === 'laptop') {
+    const queuePanels = await page.locator('.itcc47-workbench').evaluate((workbench) => {
+      const source = workbench.querySelector('.desktop-source').getBoundingClientRect();
+      const visual = workbench.querySelector('.itcc47-visual-shell').getBoundingClientRect();
+      return { sourceBottom: source.bottom, visualTop: visual.top };
+    });
+    expect(queuePanels.visualTop).toBeGreaterThan(queuePanels.sourceBottom);
+  }
+
+  await page.goto('/visualizer.html?activity=tree-traversals&preview=1');
+  await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-workspace-composition', 'wide-hierarchy');
+  await expect(page.locator('.concept-domain-trees')).toBeVisible();
 });
 
 test('deque foundation names both ends and changes state line by line', async ({ page }) => {
@@ -152,8 +241,8 @@ test('deque foundation names both ends and changes state line by line', async ({
   await expect(page.locator('.source-line.is-current')).toContainText('ADD_BACK deque, A');
 });
 
-test('normal release opens the six-problem Module 3 practice bank', async ({ page }, testInfo) => {
-  await page.goto('/problem-list.html?module=3');
+test('instructor preview opens the six-problem Module 3 practice bank', async ({ page }, testInfo) => {
+  await page.goto('/problem-list.html?module=3&preview=1');
   await expect(page.locator('.problem-choice')).toHaveCount(6);
   await page.locator('.problem-choice-action').first().click();
   await expect(page.getByRole('heading', { name: /Count Reachable Linked Nodes/i })).toBeVisible();
@@ -163,7 +252,7 @@ test('normal release opens the six-problem Module 3 practice bank', async ({ pag
 });
 
 test('reviewed companions expose the full teaching bridge and practice-only links', async ({ page }) => {
-  await page.goto('/lesson.html?checkpoint=m2-binary-search');
+  await page.goto('/lesson.html?checkpoint=m2-binary-search&preview=1');
   await expect(page.locator('.companion-mental')).toContainText('Mental model');
   await expect(page.locator('.companion-trace')).toContainText('Worked trace');
   await expect(page.locator('.companion-invariants')).toContainText('Invariants and complexity');
@@ -183,7 +272,7 @@ test('practice contract changes preserve the old draft and clear only that compl
     },
     recovery: {},
   })), earlierDraft);
-  await page.goto('/practice.html?module=3&problem=linked-node-count');
+  await page.goto('/practice.html?module=3&problem=linked-node-count&preview=1');
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
   await expect(page.getByLabel('Problem solution pseudocode')).not.toHaveValue(earlierDraft);
   await expect(page.locator('#draft-recovery')).toContainText('Recover an earlier draft (1)');
@@ -241,11 +330,80 @@ test('ITCC45 attempt and repair phases stay synchronized with source and output'
   await page.goto('/visualizer.html?course=itcc45&activity=itcc45-classes-shared-mutable');
   await expect(page.getByText('Attempt', { exact: true }).first()).toBeVisible();
   const slider = page.locator('#step-slider');
-  await slider.fill('2');
+  await slider.fill('4');
   await expect(page.getByText('Repair', { exact: true }).first()).toBeVisible();
-  await slider.fill('3');
+  await expect(page.getByLabel('Rendered program output')).toContainText('shared second: Notebook');
+  await slider.fill('5');
   await expect(page.getByLabel('Rendered program output')).toContainText('fixed second: empty');
   await expect(page.getByLabel('Concept evidence')).toContainText('Per-instance owner');
+});
+
+test('Classes source and rendered output advance together through both print statements', async ({ page }) => {
+  await page.goto('/visualizer.html?course=itcc45&activity=itcc45-classes-blueprint');
+  const slider = page.locator('#step-slider');
+  await slider.fill('7');
+  await expect(page.locator('.source-line.is-current')).toContainText('print(Student.school)');
+  await expect(page.getByLabel('Rendered program output')).toContainText('CMU');
+  await expect(page.getByLabel('Rendered program output')).not.toContainText('Ana studies BSIT');
+  await slider.fill(await slider.getAttribute('max'));
+  await expect(page.locator('.source-line.is-current')).toContainText('print(student.describe())');
+  await expect(page.getByLabel('Rendered program output')).toContainText('Ana studies BSIT');
+});
+
+test('Classes model grows members and fields with semantic change labels', async ({ page }) => {
+  await page.goto('/visualizer.html?course=itcc45&activity=itcc45-classes-blueprint');
+  const slider = page.locator('#step-slider');
+  const studentClass = page.locator('[data-class-id="class:Student"]');
+  await expect(studentClass).toBeVisible();
+  await expect(studentClass.locator('.object-class-member')).toHaveCount(0);
+  await slider.fill('1');
+  await expect(studentClass.locator('.member-attribute')).toContainText('school = "CMU"');
+  await slider.fill('3');
+  await expect(studentClass.locator('.member-method')).toHaveCount(2);
+  await slider.fill('4');
+  const studentObject = page.locator('[data-object-id="student:1"]');
+  await expect(studentObject).toBeVisible();
+  await expect(studentObject.locator('[data-field-name]')).toHaveCount(0);
+  await slider.fill('5');
+  await expect(studentObject.locator('[data-field-name="name"]')).toContainText('new');
+  await slider.fill('6');
+  await expect(studentObject.locator('[data-field-name="program"]')).toContainText('new');
+  await expect(studentObject.locator('[data-field-name="name"]')).not.toContainText('new');
+});
+
+test('ITCC45 Motion animates blueprint growth, object creation, and field updates', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone');
+  await page.goto('/visualizer.html?course=itcc45&activity=itcc45-classes-blueprint');
+  await page.getByLabel('Motion preference').selectOption('on');
+  await installITCC45MotionProbe(page);
+  const slider = page.locator('#step-slider');
+  const step = page.getByRole('button', { name: 'Step', exact: true });
+
+  await step.click();
+  const schoolMember = page.locator('[data-class-id="class:Student"] .member-attribute');
+  await expect(schoolMember).toBeVisible();
+  await expectRecordedMotion(page, 'member', 'school = "CMU"');
+
+  await expect(step).toBeEnabled({ timeout: 1600 });
+  await slider.fill('3');
+  await page.evaluate(() => { window.__itcc45MotionSamples = []; });
+  await step.click();
+  const studentObject = page.locator('[data-object-id="student:1"]');
+  await expect(studentObject).toBeVisible();
+  await expectRecordedMotion(page, 'object', 'student:1');
+
+  await page.goto('/visualizer.html?course=itcc45&activity=itcc45-encapsulation-property');
+  await page.getByRole('button', { name: 'Edit scenario' }).click();
+  await page.getByLabel('Proposed score').fill('92');
+  await page.getByRole('button', { name: 'Apply scenario' }).click();
+  const encapsulationSlider = page.locator('#step-slider');
+  await encapsulationSlider.fill('2');
+  const scoreField = page.locator('[data-object-id="record:1"] [data-field-name="_score"]');
+  await expect(scoreField.locator('code')).toHaveText('88');
+  await installITCC45MotionProbe(page);
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expectRecordedMotion(page, 'field', '92');
+  await expect(scoreField).toContainText('updated');
 });
 
 test('Python Object Lab synchronizes source, object state, lookup, output, and editable inputs', async ({ page }, testInfo) => {
@@ -312,6 +470,39 @@ test('ITCC45 desktop workspace resizes, focuses panels, and preserves playback',
   await expect(page.getByLabel('Rendered program output')).toContainText('Ana studies BSIT');
   await page.getByRole('button', { name: 'Expand output' }).click();
   await expect(page.getByLabel('Rendered program output').locator('pre')).toContainText('CMU');
+});
+
+test('ITCC45 source fills the lab stage at short desktop heights', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone');
+  await page.setViewportSize({ width: 1600, height: 520 });
+  const url = process.platform === 'win32'
+    ? `file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}?course=itcc45&activity=itcc45-classes-blueprint`
+    : '/visualizer.html?course=itcc45&activity=itcc45-classes-blueprint';
+  await page.goto(url);
+
+  const geometry = await page.evaluate(() => {
+    const sourcePane = document.querySelector('.itcc45-source-pane');
+    const sourcePanel = sourcePane?.querySelector('.source-panel');
+    const modelPane = document.querySelector('.itcc45-model-pane');
+    if (!sourcePane || !sourcePanel || !modelPane) return null;
+    const sourcePaneRect = sourcePane.getBoundingClientRect();
+    const sourcePanelRect = sourcePanel.getBoundingClientRect();
+    const modelPaneRect = modelPane.getBoundingClientRect();
+    return {
+      sourcePaneHeight: sourcePaneRect.height,
+      sourcePanelHeight: sourcePanelRect.height,
+      modelPaneHeight: modelPaneRect.height,
+      sourceClientHeight: sourcePanel.clientHeight,
+      sourceScrollHeight: sourcePanel.scrollHeight,
+      sourceMaxHeight: getComputedStyle(sourcePanel).maxHeight,
+    };
+  });
+
+  expect(geometry).not.toBeNull();
+  expect(geometry.sourceMaxHeight).toBe('none');
+  expect(Math.abs(geometry.sourcePaneHeight - geometry.modelPaneHeight)).toBeLessThanOrEqual(1);
+  expect(Math.abs(geometry.sourcePanelHeight - geometry.sourcePaneHeight)).toBeLessThanOrEqual(1);
+  expect(geometry.sourceScrollHeight).toBeGreaterThan(geometry.sourceClientHeight);
 });
 
 test('ITCC45 evidence rail uses adaptive defaults and remembers learner choice', async ({ page }, testInfo) => {
@@ -404,7 +595,7 @@ test('Visualize opens the activity menu instead of defaulting to Bubble Sort', a
 });
 
 test('sorting can step, play, pause, and scrub backward', async ({ page }) => {
-  await page.goto('/visualizer.html?activity=bubble-sort');
+  await page.goto('/visualizer.html?activity=bubble-sort&preview=1');
   await (await visualizerMotion(page)).selectOption('off');
   const slider = await visualizerTimeline(page);
   await page.getByRole('button', { name: 'Step', exact: true }).click();
@@ -417,7 +608,7 @@ test('sorting can step, play, pause, and scrub backward', async ({ page }) => {
 });
 
 test('binary search explains its sorted copy before searching', async ({ page }) => {
-  await page.goto('/visualizer.html?activity=binary-search');
+  await page.goto('/visualizer.html?activity=binary-search&preview=1');
   await expect(page.locator('#result-caption')).toContainText('Set target');
   await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(page.locator('#result-caption')).toContainText('sorted copy');
@@ -465,7 +656,7 @@ for (const [activity, steps, title, labels] of teachingShellCases) {
 }
 
 test('ITCC47 integrates playback and remembers the evidence rail', async ({ page }, testInfo) => {
-  await page.goto('/visualizer.html?activity=selection-sort');
+  await page.goto('/visualizer.html?activity=selection-sort&preview=1');
   await expect(page.locator('.playback-dock')).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
   if (testInfo.project.name === 'phone') {
@@ -505,7 +696,7 @@ test('array-list removal shows setup, loop entry, and the target to remove', asy
 });
 
 test('custom signed data is rendered and oversized data is rejected inline', async ({ page }) => {
-  await page.goto('/visualizer.html?activity=bubble-sort');
+  await page.goto('/visualizer.html?activity=bubble-sort&preview=1');
   const controls = page.getByText('Data and inputs', { exact: true });
   if (!(await page.locator('.data-controls').evaluate((element) => element.open))) await controls.click();
   const input = page.getByLabel('Custom values (comma-separated)');
@@ -630,7 +821,7 @@ test('scope lines anchor to their slots while the legend stays in an accessible 
 });
 
 test('Motion swaps stable entities and gates rapid structural steps', async ({ page }) => {
-  await page.goto('/visualizer.html?activity=bubble-sort');
+  await page.goto('/visualizer.html?activity=bubble-sort&preview=1');
   await (await visualizerMotion(page)).selectOption('on');
   const slider = await visualizerTimeline(page);
   await slider.fill('4');
@@ -661,7 +852,7 @@ test('array-list shifts identify the moving value and its exact destination', as
 });
 
 test('Motion duration follows speed while direct seeking stays immediate', async ({ page }) => {
-  await page.goto('/visualizer.html?activity=bubble-sort');
+  await page.goto('/visualizer.html?activity=bubble-sort&preview=1');
   await (await visualizerMotion(page)).selectOption('on');
   const speed = await visualizerSpeed(page);
   await speed.selectOption('3');
@@ -675,7 +866,7 @@ test('Motion duration follows speed while direct seeking stays immediate', async
 });
 
 test('motion preferences persist, reduce, turn off, and reset to the device', async ({ page }) => {
-  await page.goto('/visualizer.html?activity=bubble-sort');
+  await page.goto('/visualizer.html?activity=bubble-sort&preview=1');
   let control = await visualizerMotion(page);
   await control.selectOption('reduced');
   await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-reduced/);
@@ -690,8 +881,9 @@ test('motion preferences persist, reduce, turn off, and reset to the device', as
 
 test('OS reduced motion becomes the default when no override is saved', async ({ browser }) => {
   const context = await browser.newContext({ reducedMotion: 'reduce' });
+  await context.addInitScript(() => localStorage.setItem('itcc47.release-preview:v1', JSON.stringify({ schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 3, currentCheckpointId: 'm8-dp' })));
   const page = await context.newPage();
-  await page.goto('/visualizer.html?activity=bubble-sort');
+  await page.goto('/visualizer.html?activity=bubble-sort&preview=1');
   await expect(await visualizerMotion(page)).toHaveValue('device');
   await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-reduced/);
   await context.close();
@@ -755,7 +947,7 @@ WRITE alias = head`);
 
 test('mobile visualizer tabs replace the central surface without resetting playback', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone');
-  await page.goto('/visualizer.html?activity=bubble-sort');
+  await page.goto('/visualizer.html?activity=bubble-sort&preview=1');
   await page.getByRole('button', { name: 'Step' }).click();
   await expect(await visualizerTimeline(page)).toHaveValue('1');
   await page.getByRole('tab', { name: 'Code' }).click();
@@ -774,6 +966,33 @@ test('tracer runs and its result tabs work from the keyboard', async ({ page }) 
   await traceTab.focus();
   await traceTab.press('ArrowRight');
   await expect(page.getByRole('tab', { name: /operations/i })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('tracer delegates editor and trace overflow to their parent surfaces', async ({ page }, testInfo) => {
+  await page.goto('/tracer.html');
+  const source = ['x <- 0', ...Array.from({ length: 48 }, () => 'x <- x + 1'), 'WRITE x'].join('\n');
+  await page.getByLabel('Pseudocode editor').fill(source);
+  const editorScroll = await page.evaluate(() => {
+    const editor = document.querySelector('#code-box');
+    const parent = document.querySelector('.editor-card');
+    return {
+      editorOverflow: getComputedStyle(editor).overflowY,
+      editorClient: editor.clientHeight,
+      editorScroll: editor.scrollHeight,
+      parentOverflow: getComputedStyle(parent).overflowY,
+    };
+  });
+  expect(editorScroll.editorOverflow).toBe('hidden');
+  expect(editorScroll.editorScroll).toBeLessThanOrEqual(editorScroll.editorClient + 2);
+  expect(editorScroll.parentOverflow).toBe(testInfo.project.name === 'phone' ? 'visible' : 'auto');
+
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  const traceScroll = await page.evaluate(() => ({
+    panel: getComputedStyle(document.querySelector('#panel-trace')).overflowY,
+    table: getComputedStyle(document.querySelector('#panel-trace .trace-table-wrap')).overflowY,
+  }));
+  expect(traceScroll.table).toBe('visible');
+  expect(traceScroll.panel).toBe(testInfo.project.name === 'phone' ? 'visible' : 'auto');
 });
 
 test('tracer explains exact symbolic FOR-loop counts and explicit control costs', async ({ page }) => {
@@ -844,13 +1063,14 @@ test('problem work tabs reach code and results on a phone', async ({ page }, tes
   await expect(page.locator('#results-body')).toBeVisible();
 });
 
-test('module catalog opens an intermediate problem list before practice', async ({ page }, testInfo) => {
+test('module catalog exposes current practice and retains the full problem list', async ({ page }, testInfo) => {
   await page.goto('/problems.html');
-  await expect(page.getByRole('heading', { name: 'Explore the course' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Choose what to practise' })).toBeVisible();
   await expect(page.locator('.module-card')).toHaveCount(8);
-  await expect(page.locator('.checkpoint-current')).toContainText('Queues and deques');
-  await expect(page.locator('.checkpoint-locked')).not.toHaveCount(0);
-  await page.getByRole('link', { name: /View module resources/ }).first().click();
+  await expect(page.locator('.module-card-current')).toContainText('Algorithmic Thinking');
+  await expect(page.locator('.module-card-locked')).not.toHaveCount(0);
+  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(11);
+  await page.getByRole('link', { name: /Browse all Module 1 practice/ }).click();
   await expect(page).toHaveURL(/problem-list\.html\?module=1$/);
   await expect(page.getByRole('heading', { name: 'Module 1: select a problem' })).toBeVisible();
   await page.locator('.problem-choice-action').first().click();
@@ -862,14 +1082,13 @@ test('module catalog opens an intermediate problem list before practice', async 
   await expect(page.getByRole('link', { name: 'All Problems' })).toHaveCount(0);
 });
 
-test('modules catalog separates problem sets and visualizations without duplicating the visualizer rail', async ({ page }) => {
-  await page.goto('/problems.html?view=visualizations');
+test('modules catalog opens visualizations in the shared navigation shell', async ({ page }) => {
+  await page.goto('/problems.html?view=visualizations&preview=1');
   await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.visualization-card')).toHaveCount(35);
   await page.getByRole('link', { name: /Bubble Sort/ }).click();
-  await expect(page).toHaveURL(/visualizer\.html\?activity=bubble-sort$/);
-  await expect(page.locator('.activity-rail')).toHaveCount(0);
-  await expect(page.locator('.topbar-nav a[href="visualizer.html"]')).toHaveAttribute('aria-current', 'page');
+  await expect(page).toHaveURL(/visualizer\.html\?activity=bubble-sort&preview=1$/);
+  await expect(page.locator('.topbar-nav a', { hasText: 'Visualize' })).toHaveAttribute('aria-current', 'page');
 });
 
 test('difficulty tags use a distinct increasing-intensity palette', async ({ page }) => {
@@ -889,15 +1108,39 @@ test('touch indentation works in both structured and pseudocode editors', async 
   await page.goto('/writer.html');
   const secondStep = page.locator('.step-input').nth(1);
   await secondStep.focus();
-  await page.getByRole('button', { name: 'Indent step' }).click();
+  const writerIndent = page.getByRole('button', { name: 'Indent step' });
+  await writerIndent.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+  const writerScrollBefore = await page.evaluate(() => window.scrollY);
+  await writerIndent.click();
   await expect(page.locator('.step-row').nth(1)).toHaveCSS('padding-left', '20px');
+  expect(await page.evaluate(() => window.scrollY)).toBe(writerScrollBefore);
+  const writerOutdent = page.getByRole('button', { name: 'Outdent step' });
+  const writerOutdentScrollBefore = await page.evaluate(() => window.scrollY);
+  await writerOutdent.click();
+  await expect(page.locator('.step-row').nth(1)).toHaveCSS('padding-left', '6px');
+  expect(await page.evaluate(() => window.scrollY)).toBe(writerOutdentScrollBefore);
 
   await page.goto('/tracer.html');
   const editor = page.locator('#code-box');
-  await editor.fill('IF ready THEN\nWRITE "yes"\nENDIF');
-  await editor.evaluate((element) => { element.setSelectionRange(14, 25); });
+  const longProgram = ['IF ready THEN', ...Array.from({ length: 40 }, () => 'WRITE "yes"'), 'ENDIF'].join('\n');
+  await editor.fill(longProgram);
+  await editor.evaluate((element) => {
+    const endifStart = element.value.lastIndexOf('ENDIF');
+    element.setSelectionRange(endifStart, element.value.length);
+  });
+  await page.evaluate(() => window.scrollTo(0, Math.min(136, document.documentElement.scrollHeight - innerHeight)));
+  const tracerScrollBefore = await page.evaluate(() => window.scrollY);
   await page.getByRole('button', { name: 'Indent', exact: true }).click();
-  await expect(editor).toHaveValue('IF ready THEN\n    WRITE "yes"\nENDIF');
+  expect(await page.evaluate(() => window.scrollY)).toBe(tracerScrollBefore);
+  const toolbarBox = await page.locator('.editor-toolbar').boundingBox();
+  expect(toolbarBox).not.toBeNull();
+  expect(toolbarBox.y).toBeGreaterThanOrEqual(0);
+  expect(toolbarBox.y + toolbarBox.height).toBeLessThanOrEqual(844);
+  expect((await editor.inputValue()).split('\n').at(-1)).toBe('    ENDIF');
+  const tracerOutdentScrollBefore = await page.evaluate(() => window.scrollY);
+  await page.getByRole('button', { name: 'Outdent', exact: true }).click();
+  expect(await page.evaluate(() => window.scrollY)).toBe(tracerOutdentScrollBefore);
+  expect((await editor.inputValue()).split('\n').at(-1)).toBe('ENDIF');
 });
 
 test('all entry pages open from file URLs and permit an interaction', async ({ page }) => {
@@ -907,7 +1150,7 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
     await page.goto(fileUrl);
     await expect(page.locator('body')).toBeVisible();
   }
-  await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}?activity=bubble-sort`);
+  await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}?activity=bubble-sort&preview=1`);
   await (await visualizerMotion(page)).selectOption('off');
   await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(await visualizerTimeline(page)).toHaveValue('1');

@@ -82,14 +82,14 @@ function selectMobilePanel(name, focus = false) {
 function loadProgress() {
   try {
     const stored = JSON.parse(localStorage.getItem(PRACTICE_RECORDS_KEY) || 'null');
-    const legacySolved = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}') || {};
-    const legacyDrafts = JSON.parse(localStorage.getItem(CODE_KEY) || '{}') || {};
+    const previousSolved = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}') || {};
+    const previousDrafts = JSON.parse(localStorage.getItem(CODE_KEY) || '{}') || {};
     pstate.records = stored?.schemaVersion === 2 ? { ...(stored.records || {}) } : {};
     pstate.recovery = stored?.schemaVersion === 2 ? { ...(stored.recovery || {}) } : {};
     PROBLEMS.forEach((problem) => {
       let record = pstate.records[problem.id];
-      if (!record && (Object.prototype.hasOwnProperty.call(legacyDrafts, problem.id) || legacySolved[problem.id])) {
-        record = { contentVersion: 1, draft: legacyDrafts[problem.id] ?? problem.starter, completed: Boolean(legacySolved[problem.id]) };
+      if (!record && (Object.prototype.hasOwnProperty.call(previousDrafts, problem.id) || previousSolved[problem.id])) {
+        record = { contentVersion: 1, draft: previousDrafts[problem.id] ?? problem.starter, completed: Boolean(previousSolved[problem.id]) };
       }
       if (!record) record = { contentVersion: problem.contentVersion, draft: problem.starter, completed: false };
       if (Number(record.contentVersion) !== Number(problem.contentVersion)) {

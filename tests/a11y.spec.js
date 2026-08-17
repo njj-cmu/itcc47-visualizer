@@ -31,8 +31,8 @@ test('ITCC45 scenario and expanded-model dialogs have no serious or critical Axe
 });
 
 test('instructor-preview problem and later-domain activity have no serious or critical Axe violations', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('itcc47.release-preview:v1', JSON.stringify({ schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 2, currentCheckpointId: 'm8-dp' })));
-  for (const entry of ['practice.html?module=3&problem=linked-node-count&preview=1', 'visualizer.html?activity=bfs-shortest-path&preview=1', 'visualizer.html?activity=deque-sliding-window&preview=1']) {
+  await page.addInitScript(() => localStorage.setItem('itcc47.release-preview:v1', JSON.stringify({ schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 3, currentCheckpointId: 'm8-dp' })));
+  for (const entry of ['practice.html?module=3&problem=linked-node-count&preview=1', 'visualizer.html?activity=stack-lifo-basics&preview=1', 'visualizer.html?activity=tree-traversals&preview=1', 'visualizer.html?activity=bfs-shortest-path&preview=1', 'visualizer.html?activity=deque-sliding-window&preview=1']) {
     await page.goto(`/${entry}`);
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
     const important = results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact));

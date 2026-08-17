@@ -117,6 +117,15 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+function syncCodeEditorHeight() {
+  if (!tels.codeBox || tels.codeBox.classList.contains('hidden')) return;
+  tels.codeBox.style.height = 'auto';
+  tels.codeBox.style.height = `${Math.max(tels.codeBox.scrollHeight + 2, 192)}px`;
+}
+
+tels.codeBox.addEventListener('input', syncCodeEditorHeight);
+window.addEventListener('resize', syncCodeEditorHeight);
+
 /**
  * Scroll `container` the minimum amount needed to reveal `el`.
  * scrollIntoView({block:'nearest'}) is unreliable when the container has a
@@ -530,6 +539,7 @@ function exitRunMode() {
   tels.growthResult.classList.add('hidden');
   clearError();
   selectMobileWorkspace('code');
+  requestAnimationFrame(syncCodeEditorHeight);
 }
 
 function selectMobileWorkspace(which) {
@@ -770,3 +780,4 @@ if (activityHandoff) {
   tels.inputsBox.value = PRESETS[0].inputs;
   document.querySelector('#preset-list .algo-btn')?.classList.add('active');
 }
+requestAnimationFrame(syncCodeEditorHeight);

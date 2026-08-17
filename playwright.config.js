@@ -5,6 +5,9 @@ const testPort = Number(process.env.ITCC47_TEST_PORT || 4173);
 module.exports = defineConfig({
   testDir: './tests',
   fullyParallel: true,
+  // The visualizer cases are rendering-heavy; cap parallel browsers so the
+  // longest portfolio audits do not time out under local or CI contention.
+  workers: 4,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: `http://127.0.0.1:${testPort}`,

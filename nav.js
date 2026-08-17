@@ -19,6 +19,7 @@
     back: '<path d="M19 12H5m5-5-5 5 5 5"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>',
     reset: '<path d="M4 4v6h6M5.5 15a7 7 0 1 0 .5-7"/>',
+    lock: '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
     grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
     code: '<path d="m8 9-3 3 3 3m8-3 3 3-3 3m-2-10-4 14"/>',
     terminal: '<path d="m4 7 4 4-4 4m7 0h7"/><rect x="2" y="3" width="20" height="18" rx="2"/>',
@@ -59,8 +60,9 @@
   }
   nav.id = nav.id || 'primary-navigation';
   nav.querySelectorAll('a').forEach((link) => {
-    const href = (link.getAttribute('href') || '').split('?')[0].toLowerCase();
-    const hrefParams = new URLSearchParams((link.getAttribute('href') || '').split('?')[1] || '');
+    const linkUrl = new URL(link.getAttribute('href') || '', location.href);
+    const href = (linkUrl.pathname.split('/').pop() || 'index.html').toLowerCase();
+    const hrefParams = linkUrl.searchParams;
     const active = href === page
       || (courseId === 'itcc47' && ['practice.html', 'problem-list.html'].includes(page) && href === 'problems.html')
       || (courseId === 'itcc45' && page === 'visualizer.html' && href === 'visualizer.html' && hrefParams.get('course') === 'itcc45');

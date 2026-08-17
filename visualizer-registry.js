@@ -39,5 +39,5 @@ const ITCC47VisualizerRegistry = (() => {
     registerEvidenceView, getEvidenceView, rendererDomains, evidenceIds });
 })();
 
-/* Course-neutral name; the legacy global remains available to existing tools. */
+/* Course-neutral name with the ITCC47 global retained as a compatibility facade. */
 const BSITVisualizerRegistry = ITCC47VisualizerRegistry;

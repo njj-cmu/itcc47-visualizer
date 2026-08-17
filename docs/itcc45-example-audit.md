@@ -27,6 +27,13 @@ misconception.
    inheritance Shape, standalone bank-transfer failure, and polymorphic Shape
    candidates were removed because they repeated stronger retained evidence or
    blurred boundaries between topics.
+4. **Source/model synchronization audit:** every retained `print()` statement
+   now owns an explicit timeline step, rendered output is append-only, and
+   object fields appear only after the assignment being explained. The Classes
+   introduction separately traces class members, `self` assignments,
+   `Student.school`, the `describe()` call and return, and the final print.
+   Minimum, midpoint, maximum, and quote-containing inputs are executed for all
+   18 activities, so 72 Python programs must match their guided timelines.
 
 ## Remaining limits
 

@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AnimatePresence, LayoutGroup, LazyMotion, MotionConfig, domMax, m } from 'motion/react';
+import { AnimatePresence, LayoutGroup, LazyMotion, MotionConfig, domMax, m, useIsPresent } from 'motion/react';
 import './workspace.css';
 import { ConceptDomainRenderer } from './domain-renderers.jsx';
 import { LinearADTRenderer } from './linear-adt-renderer.jsx';
@@ -270,50 +270,114 @@ ITCC47VisualizerRegistry.registerRenderer('linked-list', LinkedListRenderer);
 ITCC47VisualizerRegistry.registerRenderer('concept', ConceptDomainRenderer);
 ITCC47VisualizerRegistry.registerRenderer('linear-adt', LinearADTRenderer);
 
-const ObjectModelRenderer = memo(function ObjectModelRenderer({ frame }) {
+const AnimatedClassMember = memo(function AnimatedClassMember({ kind, value, duration, motionMode }) {
+  const label = kind === 'attribute' ? 'attr' : kind === 'abstract' ? 'required' : 'method';
+  return <m.code layout className={`object-class-member member-${kind}`} aria-label={`${label} ${value}`}
+    initial={motionMode === 'on' ? { opacity: 0, height: 0, y: -6 } : false}
+    animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -4 }}
+    transition={{ layout: { duration }, opacity: { duration: Math.min(duration, .22) }, height: { duration: Math.min(duration, .34) } }}>
+    <small aria-hidden="true">{label}</small><span>{value}</span>
+  </m.code>;
+});
+
+const AnimatedClassCard = memo(function AnimatedClassCard({ item, lookupIndex, duration, motionMode, scope }) {
+  const members = [
+    ...item.attributes.map((value) => ({ kind: 'attribute', value })),
+    ...item.methods.map((value) => ({ kind: 'method', value })),
+    ...item.abstractMethods.map((value) => ({ kind: 'abstract', value })),
+  ];
+  const lookupDelay = lookupIndex >= 0 && motionMode === 'on' ? lookupIndex * Math.min(duration * .22, .12) : 0;
+  return <m.article layout layoutId={`${scope}:class:${item.id}`} data-class-id={item.id} data-lookup-order={lookupIndex >= 0 ? lookupIndex + 1 : undefined}
+    className={`object-class-card status-${item.status || 'ready'} ${lookupIndex >= 0 ? 'is-lookup' : ''}`}
+    aria-label={`${item.name} class${item.bases.length ? `, inherits ${item.bases.join(', ')}` : ''}${lookupIndex >= 0 ? `, lookup position ${lookupIndex + 1}` : ''}`}
+    initial={motionMode === 'on' ? { opacity: 0, scale: .92, y: 10 } : false}
+    animate={{ opacity: 1, scale: lookupIndex >= 0 && motionMode === 'on' ? [1, 1.018, 1] : 1, y: 0 }} exit={{ opacity: 0, scale: .94, y: -6 }}
+    transition={{ layout: { duration, ease: [0.22, 0.75, 0.28, 1] }, opacity: { duration: Math.min(duration, .22) }, scale: { duration: Math.min(duration, .38), delay: lookupDelay } }}>
+    <header><span>class</span><strong>{item.name}</strong>{item.status === 'abstract' ? <em>abstract</em> : null}</header>
+    <AnimatePresence initial={false} mode="sync">
+      {item.bases.length ? <m.p layout className="object-bases" key={`bases:${item.bases.join('|')}`} initial={motionMode === 'on' ? { opacity: 0, height: 0 } : false} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} transition={{ duration: Math.min(duration, .3) }}>inherits {item.bases.map((id) => id.replace('class:', '')).join(', ')}</m.p> : null}
+      {members.map((member) => <AnimatedClassMember {...member} duration={duration} motionMode={motionMode} key={`${member.kind}:${member.value}`}/>) }
+    </AnimatePresence>
+  </m.article>;
+});
+
+const AnimatedReference = memo(function AnimatedReference({ name, scope, duration, motionMode }) {
+  return <m.span layout layoutId={`${scope}:reference:${name}`} data-reference-name={name}
+    initial={motionMode === 'on' ? { opacity: 0, scale: .86, x: -6 } : false} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: .88, x: 6 }}
+    transition={{ layout: { duration, ease: [0.22, 0.75, 0.28, 1] }, opacity: { duration: Math.min(duration, .2) }, scale: { duration: Math.min(duration, .25) } }}>{name} →</m.span>;
+});
+
+const AnimatedObjectField = memo(function AnimatedObjectField({ objectId, name, value, change, duration, motionMode, scope, trackChanges }) {
+  const serialized = JSON.stringify(value);
+  const isPresent = useIsPresent();
+  const semanticChange = !isPresent ? 'removed' : trackChanges ? change : null;
+  return <m.div layout layoutId={`${scope}:field:${objectId}:${name}`} data-field-name={name} className={semanticChange ? `field-${semanticChange}` : ''} aria-label={`${name} field${semanticChange ? `, ${semanticChange}` : ''}`}
+    initial={motionMode === 'on' ? { opacity: 0, height: 0, x: -8 } : false}
+    animate={{ opacity: 1, height: 'auto', x: 0 }} exit={{ opacity: 0, height: 0, x: -10 }}
+    transition={{ layout: { duration }, opacity: { duration: Math.min(duration, .2) }, height: { duration: Math.min(duration, .3) } }}>
+    <dt>{name}</dt><dd><AnimatePresence initial={false} mode="popLayout"><m.code key={serialized} initial={motionMode === 'on' ? { opacity: 0, y: -5 } : false} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 5 }} transition={{ duration: Math.min(duration, .24) }}>{serialized}</m.code></AnimatePresence>{semanticChange ? <small className="object-field-change">{semanticChange}</small> : null}</dd>
+  </m.div>;
+});
+
+const AnimatedObjectCard = memo(function AnimatedObjectCard({ item, previousFields, referenceNames, active, duration, motionMode, scope }) {
+  return <m.article layout layoutId={`${scope}:object:${item.id}`} data-object-id={item.id}
+    className={`object-instance-card status-${item.status || 'ready'} ${active ? 'is-current' : ''}`} aria-label={`${item.id}, ${item.classId.replace('class:', '')} object`}
+    initial={motionMode === 'on' ? { opacity: 0, scale: .88, y: 12 } : false} animate={{ opacity: 1, scale: 1, y: active && motionMode === 'on' ? [0, -3, 0] : 0 }} exit={{ opacity: 0, scale: .9, y: -8 }}
+    transition={{ layout: { duration, ease: [0.22, 0.75, 0.28, 1] }, opacity: { duration: Math.min(duration, .22) }, scale: { duration: Math.min(duration, .34) }, y: { duration: Math.min(duration, .34) } }}>
+    <div className="object-reference-labels"><AnimatePresence initial={motionMode === 'on'} mode="sync">{referenceNames.map((name) => <AnimatedReference name={name} scope={scope} duration={duration} motionMode={motionMode} key={name}/>)}</AnimatePresence></div>
+    <header><span>{item.id}</span><strong>{item.label}</strong><small>{item.classId.replace('class:', '')}</small></header>
+    <dl><AnimatePresence initial={motionMode === 'on'} mode="sync">{Object.entries(item.fields).map(([name, value]) => {
+      const existed = Object.prototype.hasOwnProperty.call(previousFields, name);
+      const change = !existed ? 'new' : JSON.stringify(previousFields[name]) === JSON.stringify(value) ? null : 'updated';
+      return <AnimatedObjectField objectId={item.id} name={name} value={value} change={change} duration={duration} motionMode={motionMode} scope={scope} trackChanges={scope === 'stage'} key={`${item.id}:${name}`}/>;
+    })}</AnimatePresence></dl>
+  </m.article>;
+});
+
+const AnimatedActiveCall = memo(function AnimatedActiveCall({ active, duration, motionMode }) {
+  if (!active) return null;
+  return <m.aside layout className="object-active-call" aria-label="Current method call" initial={motionMode === 'on' ? { opacity: 0, y: 8 } : false} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: Math.min(duration, .3) }}>
+    <span>Current call</span><strong>{active.method}</strong>{active.receiverId ? <small>receiver: {active.receiverId}</small> : null}
+    <ol className="object-lookup-path" aria-label={`Lookup path: ${active.lookupPath.map((id) => id.replace('class:', '')).join(', then ')}`}>
+      {active.lookupPath.map((id, index) => <m.li key={id} initial={motionMode === 'on' ? { opacity: 0, x: -5 } : false} animate={{ opacity: 1, x: 0 }} transition={{ duration: Math.min(duration, .22), delay: motionMode === 'on' ? index * Math.min(duration * .22, .12) : 0 }}><b aria-hidden="true">{index + 1}</b>{id.replace('class:', '')}</m.li>)}
+    </ol>
+  </m.aside>;
+});
+
+const ObjectModelRenderer = memo(function ObjectModelRenderer({ frame, previousFrame, event, duration = 0, motionMode = 'off', scope = 'main' }) {
   const classes = frame?.classes || [];
   const objects = frame?.objects || [];
+  const previousObjects = Object.fromEntries((previousFrame?.objects || []).map((item) => [item.id, item]));
   const references = Object.entries(frame?.references || {}).reduce((grouped, [name, objectId]) => {
     grouped[objectId] = [...(grouped[objectId] || []), name];
     return grouped;
   }, {});
-  return <div className="object-canvas" aria-label="Python classes, objects, and references">
+  const lookupPath = frame?.active?.lookupPath || [];
+  return <LayoutGroup id={`object-model-${scope}`}><div className="object-canvas" aria-label="Python classes, objects, and references">
     <section className="object-class-region" aria-label="Class blueprints">
       <h2>Class blueprints</h2>
-      <div className="object-class-grid">{classes.map((item) => <article className={`object-class-card status-${item.status || 'ready'}`} key={item.id} aria-label={`${item.name} class${item.bases.length ? `, inherits ${item.bases.join(', ')}` : ''}`}>
-        <header><span>class</span><strong>{item.name}</strong>{item.status === 'abstract' ? <em>abstract</em> : null}</header>
-        {item.bases.length ? <p className="object-bases">inherits {item.bases.map((id) => id.replace('class:', '')).join(', ')}</p> : null}
-        {item.attributes.map((attribute) => <code key={attribute}>{attribute}</code>)}
-        {item.methods.map((method) => <code key={method}>{method}</code>)}
-        {item.abstractMethods.map((method) => <code className="is-abstract" key={method}>required: {method}</code>)}
-      </article>)}</div>
+      <div className="object-class-grid"><AnimatePresence initial={motionMode === 'on'} mode="sync">{classes.map((item) => <AnimatedClassCard item={item} lookupIndex={lookupPath.indexOf(item.id)} duration={duration} motionMode={motionMode} scope={scope} key={item.id}/>)}</AnimatePresence></div>
     </section>
     <section className="object-instance-region" aria-label="Object instances">
       <h2>Instances and references</h2>
-      {objects.length ? <div className="object-instance-grid">{objects.map((item) => {
-        const active = frame?.active?.receiverId === item.id || item.status === 'active';
-        return <article className={`object-instance-card status-${item.status || 'ready'} ${active ? 'is-current' : ''}`} key={item.id} aria-label={`${item.id}, ${item.classId.replace('class:', '')} object`}>
-          <div className="object-reference-labels">{(references[item.id] || []).map((name) => <span key={name}>{name} →</span>)}</div>
-          <header><span>{item.id}</span><strong>{item.label}</strong><small>{item.classId.replace('class:', '')}</small></header>
-          <dl>{Object.entries(item.fields).map(([name, value]) => <div key={name}><dt>{name}</dt><dd><code>{JSON.stringify(value)}</code></dd></div>)}</dl>
-        </article>;
-      })}</div> : <p className="object-empty">No instance has been allocated yet. The class blueprint exists on its own.</p>}
+      <AnimatePresence initial={motionMode === 'on'} mode="wait">{objects.length ? <m.div layout className="object-instance-grid" key="objects"><AnimatePresence initial={motionMode === 'on'} mode="sync">{objects.map((item) => <AnimatedObjectCard item={item} previousFields={previousObjects[item.id]?.fields || {}} referenceNames={references[item.id] || []} active={frame?.active?.receiverId === item.id || item.status === 'active'} duration={duration} motionMode={motionMode} scope={scope} key={item.id}/>)}</AnimatePresence></m.div> : <m.p className="object-empty" key="empty" initial={motionMode === 'on' ? { opacity: 0 } : false} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: Math.min(duration, .2) }}>No instance has been allocated yet. The class blueprint exists on its own.</m.p>}</AnimatePresence>
     </section>
-    {frame?.active ? <aside className="object-active-call" aria-label="Current method call"><span>Current call</span><strong>{frame.active.method}</strong><small>lookup: {frame.active.lookupPath.map((id) => id.replace('class:', '')).join(' → ')}</small></aside> : null}
-    {frame?.annotations?.length ? <dl className="object-concept-annotations" aria-label="Concept evidence">{frame.annotations.map((item, index) => <div key={`${item.label}:${index}`}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl> : null}
-    {frame?.notice ? <p className="object-notice">{frame.notice}</p> : null}
-  </div>;
+    <AnimatePresence initial={false} mode="wait">{frame?.active ? <AnimatedActiveCall active={frame.active} duration={duration} motionMode={motionMode} key={`${frame.active.receiverId}:${frame.active.method}`}/> : null}</AnimatePresence>
+    <AnimatePresence initial={false}>{frame?.annotations?.length ? <m.dl layout className="object-concept-annotations" aria-label="Concept evidence" initial={motionMode === 'on' ? { opacity: 0, y: 5 } : false} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: Math.min(duration, .24) }}>{frame.annotations.map((item, index) => <div key={`${item.label}:${index}`}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</m.dl> : null}</AnimatePresence>
+    <AnimatePresence initial={false}>{frame?.notice ? <m.p layout className="object-notice" initial={motionMode === 'on' ? { opacity: 0 } : false} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: Math.min(duration, .22) }}>{frame.notice}</m.p> : null}</AnimatePresence>
+  </div></LayoutGroup>;
 });
 
 BSITVisualizerRegistry.registerRenderer('object-model', ObjectModelRenderer);
 
-const ObjectOutputConsole = memo(function ObjectOutputConsole({ output = [] }) {
+const ObjectOutputConsole = memo(function ObjectOutputConsole({ output = [], duration = 0, motionMode = 'off' }) {
   const [expanded, setExpanded] = useState(false);
   const latest = output.length ? output.at(-1) : 'No output yet — advance to a print() step.';
+  const summary = expanded && output.length ? output.join(' · ') : latest;
   return <section className={`object-output-console ${expanded ? 'is-expanded' : 'is-compact'} ${output.length ? 'has-output' : 'is-waiting'}`} aria-label="Rendered program output">
     <header>
       <span aria-hidden="true">&gt;_</span><strong>Rendered output</strong>
-      <code aria-live="polite">{expanded && output.length ? output.join(' · ') : latest}</code>
+      <code aria-live="polite"><AnimatePresence initial={false} mode="wait"><m.span key={summary} initial={motionMode === 'on' ? { opacity: 0, y: -4 } : false} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }} transition={{ duration: Math.min(duration, .2) }}>{summary}</m.span></AnimatePresence></code>
       <small>{output.length ? `${output.length} line${output.length === 1 ? '' : 's'}` : 'waiting'}</small>
       <button type="button" aria-expanded={expanded} onClick={() => setExpanded((current) => !current)}>{expanded ? 'Collapse output' : 'Expand output'}</button>
     </header>
@@ -321,7 +385,7 @@ const ObjectOutputConsole = memo(function ObjectOutputConsole({ output = [] }) {
   </section>;
 });
 
-function ObjectModelSurface({ activity, frame, focused, onFocus }) {
+function ObjectModelSurface({ activity, event, frame, previousFrame, focused, onFocus, duration, motionMode }) {
   const dialogRef = useRef(null);
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -334,11 +398,11 @@ function ObjectModelSurface({ activity, frame, focused, onFocus }) {
       <button type="button" className="object-focus-button" aria-pressed={focused} onClick={onFocus}><Icon name="expand" size={15}/>{focused ? 'Exit model focus' : 'Focus model'}</button>
       <button type="button" className="object-expand-button" aria-label="Expand model" aria-haspopup="dialog" onClick={() => setOpen(true)}><Icon name="expand" size={15}/> Full view</button>
     </div></div>
-    <ObjectModelRenderer frame={frame}/>
-    <ObjectOutputConsole output={frame?.output}/>
+    <ObjectModelRenderer frame={frame} previousFrame={previousFrame} event={event} duration={duration} motionMode={motionMode} scope="stage"/>
+    <ObjectOutputConsole output={frame?.output} duration={duration} motionMode={motionMode}/>
     <dialog ref={dialogRef} className="object-model-dialog" aria-labelledby="object-model-dialog-title" onClose={() => setOpen(false)}>
       {open ? <><header><div><span>Full model view</span><h2 id="object-model-dialog-title">{activity.title}</h2></div><button type="button" onClick={() => setOpen(false)} aria-label="Close full model view"><Icon name="close"/></button></header>
-      <div className="object-model-dialog-body"><ObjectModelRenderer frame={frame}/><ObjectOutputConsole output={frame?.output}/></div></> : null}
+      <div className="object-model-dialog-body"><ObjectModelRenderer frame={frame} event={event} duration={duration} motionMode={motionMode} scope="dialog"/><ObjectOutputConsole output={frame?.output} duration={duration} motionMode={motionMode}/></div></> : null}
     </dialog>
   </div>;
 }
@@ -470,26 +534,6 @@ const CollapsibleEvidencePanel = memo(function CollapsibleEvidencePanel({ conten
   </aside>;
 });
 
-function ActivityRail({ activities, selectedId, onSelect }) {
-  const families = [...new Set(activities.map((activity) => activity.family))];
-  return <aside className="activity-rail">
-    <a className="back-module" href="problems.html"><Icon name="back" size={18}/> Back to modules</a>
-    {families.map((family) => <section key={family}>
-      <h2>{family}</h2>
-      {activities.filter((activity) => activity.family === family).map((activity) => <button type="button" className={selectedId === activity.id ? 'active' : ''} onClick={() => onSelect(activity.id)} key={activity.id}>
-        <Icon name={family === 'Array Lists' ? 'list' : 'grid'} /><span>{activity.title}<small>Module {activity.module}</small></span>
-      </button>)}
-    </section>)}
-    <section className="future-topics"><h2>Coming next</h2><p><Icon name="link"/> Linked Lists</p><p>Stacks</p><p>Queues</p></section>
-  </aside>;
-}
-
-function MobileActivityPicker({ activities, selectedId, onSelect }) {
-  return <nav className="mobile-activity-picker" aria-label="Choose an activity">
-    {activities.map((activity) => <button type="button" className={selectedId === activity.id ? 'active' : ''} onClick={() => onSelect(activity.id)} key={activity.id}>{activity.title}</button>)}
-  </nav>;
-}
-
 function ArrayDataControls({ activity, inputs, setInputs, onShuffle }) {
   const [draft, setDraft] = useState(inputs.values.join(', '));
   const [error, setError] = useState('');
@@ -552,6 +596,13 @@ function DataControls(props) {
   return props.activity.input.kind === 'object-model' ? <OOPDataControls {...props}/> : <ArrayDataControls {...props}/>;
 }
 
+function workspaceCompositionFor(activity) {
+  if (activity.family === 'Stacks') return 'split-vertical';
+  if (activity.family === 'Trees') return 'wide-hierarchy';
+  if (activity.renderer === 'array' || activity.renderer === 'linked-list' || activity.renderer === 'linear-adt') return 'stacked-horizontal';
+  return 'stacked';
+}
+
 function PlaybackDock({ state, controller, activity, event, motionPreference }) {
   const visibleMetrics = (activity.metrics || []).slice(0, 2);
   return <footer className="playback-dock">
@@ -588,37 +639,18 @@ function IntegratedPlayback({ state, controller, event, motionPreference }) {
   </section>;
 }
 
-function Header() {
-  return <header className="workspace-header">
-    <a className="workspace-brand" href="index.html"><span className="brand-mark">IT</span><strong>ITCC47 Learning Lab</strong></a>
-    <nav aria-label="Primary"><a href="index.html">Start</a><a href="problems.html">Modules</a><a href="tracer.html">Pseudocode Lab</a><a href="practice.html?module=1">Problem Sets</a></nav>
-    <button type="button" className="workspace-menu" aria-label="Menu"><Icon name="menu"/></button>
-  </header>;
-}
-
-function useITCC45WorkspaceLayout(enabled) {
+function useWorkspaceLayout(enabled, engine, adaptive = false) {
   const [layout, setLayout] = useState(() => enabled
-    ? ITCC45WorkspaceLayout.read(localStorage, window.innerWidth)
-    : ITCC45WorkspaceLayout.defaults(window.innerWidth));
+    ? engine.read(localStorage, adaptive ? window.innerWidth : undefined)
+    : engine.defaults(adaptive ? window.innerWidth : undefined));
   const updateLayout = useCallback((patch) => {
     if (!enabled) return;
-    setLayout((current) => ITCC45WorkspaceLayout.write(localStorage, { ...current, ...patch }, window.innerWidth));
-  }, [enabled]);
+    setLayout((current) => engine.write(localStorage, { ...current, ...patch }, adaptive ? window.innerWidth : undefined));
+  }, [adaptive, enabled, engine]);
   return [layout, updateLayout];
 }
 
-function useITCC47WorkspaceLayout(enabled) {
-  const [layout, setLayout] = useState(() => enabled
-    ? ITCC47WorkspaceLayout.read(localStorage)
-    : ITCC47WorkspaceLayout.defaults());
-  const updateLayout = useCallback((patch) => {
-    if (!enabled) return;
-    setLayout((current) => ITCC47WorkspaceLayout.write(localStorage, { ...current, ...patch }));
-  }, [enabled]);
-  return [layout, updateLayout];
-}
-
-const ITCC45LabStage = memo(function ITCC45LabStage({ activity, event, index, source, mobileTab, layout, onRatioChange }) {
+const ITCC45LabStage = memo(function ITCC45LabStage({ activity, event, previousEvent, index, source, mobileTab, layout, onRatioChange, duration, motionMode }) {
   const stageRef = useRef(null);
   const dragRef = useRef(null);
   const [focus, setFocus] = useState('split');
@@ -691,7 +723,7 @@ const ITCC45LabStage = memo(function ITCC45LabStage({ activity, event, index, so
     <div className="itcc45-stage-separator" role="separator" aria-label="Resize code and model panels" aria-orientation="vertical" aria-valuemin="30" aria-valuemax="65" aria-valuenow={Math.round(displayRatio * 100)} tabIndex="0" onKeyDown={resizeWithKeyboard} onPointerDown={beginResize} onPointerMove={(event) => { if (event.currentTarget.hasPointerCapture(event.pointerId)) updateFromPointer(event); }} onPointerUp={finishResize} onPointerCancel={finishResize}><span aria-hidden="true"/></div>
     <div id="itcc45-model-pane" className="itcc45-model-pane">
       <section className={`visual-canvas mobile-surface ${mobileTab === 'visualize' ? 'mobile-active' : ''}`} tabIndex="0" aria-label={`${activity.title} visualization canvas`}>
-        <ObjectModelSurface activity={activity} frame={event?.frame} focused={focus === 'model'} onFocus={() => toggleFocus('model')}/>
+        <ObjectModelSurface activity={activity} event={event} frame={event?.frame} previousFrame={previousEvent?.frame} focused={focus === 'model'} onFocus={() => toggleFocus('model')} duration={duration} motionMode={motionMode}/>
       </section>
       <p id="result-caption" className="current-step" aria-live="polite"><span>{index + 1}</span>{event?.segment?.label ? <em className={`learning-phase phase-${event.segment.id}`}>{event.segment.label}</em> : null}{event?.message || 'Preparing activity…'}</p>
     </div>
@@ -729,8 +761,8 @@ function LockedVisualizer({ release, requestedId }) {
 
 function VisualizerWorkspace({ params, courseId, requestedId }) {
   const isITCC45 = courseId === 'itcc45';
-  const [itcc45WorkspaceLayout, updateITCC45WorkspaceLayout] = useITCC45WorkspaceLayout(isITCC45);
-  const [itcc47WorkspaceLayout, updateITCC47WorkspaceLayout] = useITCC47WorkspaceLayout(!isITCC45);
+  const [itcc45WorkspaceLayout, updateITCC45WorkspaceLayout] = useWorkspaceLayout(isITCC45, ITCC45WorkspaceLayout, true);
+  const [itcc47WorkspaceLayout, updateITCC47WorkspaceLayout] = useWorkspaceLayout(!isITCC45, ITCC47WorkspaceLayout);
   const workspaceLayout = isITCC45 ? itcc45WorkspaceLayout : itcc47WorkspaceLayout;
   const updateWorkspaceLayout = isITCC45 ? updateITCC45WorkspaceLayout : updateITCC47WorkspaceLayout;
   const activity = useMemo(() => BSITLearningLab.getActivity(courseId, requestedId), [courseId, requestedId]);
@@ -753,9 +785,12 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const result = useMemo(() => activity.run(inputs), [activity, inputs]);
   const source = useMemo(() => activity.sourceFor ? activity.sourceFor(inputs) : activity.source, [activity, inputs]);
   const event = result.events[playback.index] || result.events[0] || null;
+  const previousEvent = playback.index > 0 ? result.events[playback.index - 1] || null : null;
   const onEntityComplete = useTransitionBoundary({ state: playback, event, controller, mode: motionPreference.mode });
   const duration = motionPreference.mode === 'on' ? motionDuration(playback.speed) : (motionPreference.mode === 'reduced' ? 0.16 : 0);
   const visualDuration = playback.navigationSource === 'seek' || playback.navigationSource === 'load' ? 0 : duration;
+  const objectVisualDuration = playback.navigationSource === 'seek' ? 0 : duration;
+  const workspaceComposition = workspaceCompositionFor(activity);
   const [Renderer, setRenderer] = useState(() => activity.renderer === 'object-model' ? ObjectModelRenderer : ArrayRenderer);
 
   useEffect(() => { controller.load(result.events); }, [controller, result]);
@@ -790,12 +825,12 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
     ? ITCC47CurriculumUI.href(`lesson.html?checkpoint=${encodeURIComponent(activity.checkpointId)}`)
     : ITCC47CurriculumUI.href(`tracer.html?activity=${encodeURIComponent(activity.id)}`);
   const itcc47ActionLabel = activity.renderer === 'linear-adt' ? 'Lecture companion' : 'Edit pseudocode';
-  return <LazyMotion features={domMax} strict><MotionConfig reducedMotion={motionPreference.mode === 'on' ? 'never' : 'always'} transition={{ duration }}><div className={`visualizer-workspace course-${courseId} evidence-${workspaceLayout.evidence} motion-${motionPreference.mode} navigation-${playback.navigationSource}`} data-motion-duration={duration}>
+  return <LazyMotion features={domMax} strict><MotionConfig reducedMotion={motionPreference.mode === 'on' ? 'never' : 'always'} transition={{ duration }}><div className={`visualizer-workspace course-${courseId} evidence-${workspaceLayout.evidence} motion-${motionPreference.mode} navigation-${playback.navigationSource} composition-${workspaceComposition}`} data-motion-duration={duration} data-workspace-composition={workspaceComposition}>
     <main className="workspace-main">
       <div className="activity-heading"><div><p><a href={isITCC45 ? backHref : ITCC47CurriculumUI.href(backHref)}><Icon name="back" size={14}/>{backLabel}</a><span>{isITCC45 ? `Topic ${activity.module} / ${activity.topic} / Example ${exampleIndex + 1} of ${topicActivities.length}` : `Module ${activity.module} / ${activity.topic}${activity.exampleKind ? ` / ${activity.exampleKind}` : ''}`}</span></p><h1>{activity.title}</h1>{isITCC45 ? <span className="activity-learning-goal"><em>{activity.context}</em>{activity.learningGoal}</span> : <span>{activity.subtitle}</span>}</div><div className="activity-action-stack">{isITCC45 ? <nav className="activity-example-nav" aria-label="Examples in this topic">{previousExample ? <a href={exampleHref(previousExample)} aria-label={`Previous example: ${previousExample.title}`}><Icon name="back" size={14}/>Previous</a> : <span aria-disabled="true"><Icon name="back" size={14}/>Previous</span>}{nextExample ? <a href={exampleHref(nextExample)} aria-label={`Next example: ${nextExample.title}`}>Next<Icon name="next" size={14}/></a> : <span aria-disabled="true">Next<Icon name="next" size={14}/></span>}</nav> : null}<div className="activity-actions">{isITCC45 ? <OOPDataControls activity={activity} inputs={inputs} setInputs={setInputs}/> : null}<a className="edit-code" href={isITCC45 ? `itcc45-practice.html?topic=${activity.topicId}` : itcc47ActionHref}><Icon name={isITCC45 ? 'list' : activity.renderer === 'linear-adt' ? 'grid' : 'code'} size={17}/>{isITCC45 ? 'Practice this topic' : itcc47ActionLabel}</a></div></div></div>
       {!isITCC45 ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} onShuffle={shuffle}/> : null}
       <div className="mobile-surface-tabs" role="tablist" aria-label="Workspace view">{mobileTabs.map(([id, icon, label]) => <button type="button" role="tab" aria-selected={mobileTab === id} className={mobileTab === id ? 'active' : ''} onClick={() => setMobileTab(id)} key={id}><Icon name={icon}/>{label}</button>)}</div>
-      {isITCC45 ? <ITCC45LabStage activity={activity} event={event} index={playback.index} source={source} mobileTab={mobileTab} layout={workspaceLayout} onRatioChange={(sourceRatio) => updateWorkspaceLayout({ sourceRatio })}/> : <div className="itcc47-workbench">
+      {isITCC45 ? <ITCC45LabStage activity={activity} event={event} previousEvent={previousEvent} index={playback.index} source={source} mobileTab={mobileTab} layout={workspaceLayout} onRatioChange={(sourceRatio) => updateWorkspaceLayout({ sourceRatio })} duration={objectVisualDuration} motionMode={motionPreference.mode}/> : <div className="itcc47-workbench">
         <div className={`desktop-source mobile-surface ${mobileTab === 'code' ? 'mobile-active' : ''}`}><SourcePanel activity={activity} event={event} source={source}/></div>
         <div className="itcc47-visual-shell">
           <section className={`visual-canvas mobile-surface ${mobileTab === 'visualize' ? 'mobile-active' : ''}`} tabIndex="0" aria-label={`${activity.title} visualization canvas`}><Renderer frame={event?.frame} event={event} activity={activity} motionMode={motionPreference.mode} duration={visualDuration} onEntityComplete={onEntityComplete}/></section>

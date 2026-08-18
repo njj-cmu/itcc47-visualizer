@@ -893,6 +893,117 @@ ok('practice storage rejects outdated and malformed state',
   ComputerArchitecturePractice.normalize({ contentVersion: 0, solvedIds: ['fetch-order'] }).solvedIds.length === 0
   && ComputerArchitecturePractice.normalize(null).contentVersion === 1);
 
+section('computer networking teaching machine');
+const computerNetworkingEngine = load([
+  'course-catalog.js', 'playback.js', 'computer-networking-machine.js',
+  'computer-networking-activities.js',
+], { setTimeout, clearTimeout });
+const ComputerNetworking = computerNetworkingEngine.get('ComputerNetworkingMachine');
+const ComputerNetworkingCatalog = computerNetworkingEngine.get('ComputerNetworkingActivities');
+const ComputerNetworkingCourses = computerNetworkingEngine.get('BSITLearningLab');
+const networkingPreset = ComputerNetworking.PRESETS[0];
+const networkingFirst = ComputerNetworking.run(networkingPreset.id);
+const networkingSecond = ComputerNetworking.run(networkingPreset.id);
+const networkingMicro = ComputerNetworking.run(networkingPreset.id, { granularity: 'micro' });
+const networkingEvents = networkingFirst.events;
+const networkingFrames = networkingEvents.map((event) => event.frame);
+const networkingFinal = networkingFrames.at(-1);
+
+ok('networking course and ARP activity expose the planned public contracts', (() => {
+  const course = ComputerNetworkingCourses.getCourse('computer-networking');
+  const activity = ComputerNetworkingCatalog.get('networking-arp-neighbor-discovery');
+  const registered = ComputerNetworkingCourses.getActivity('computer-networking', activity.id);
+  return course.code === 'NET' && course.title === 'Introduction to Networking'
+    && course.shortTitle === 'Network Lab' && course.home === 'computer-networking.html'
+    && ComputerNetworkingCourses.listActivities('computer-networking').length === 1 && registered === activity
+    && activity.contentVersion === 1 && activity.engine === 'guided-network-model'
+    && activity.renderer === 'network-topology' && activity.workspaceKind === 'network-lab'
+    && activity.input.kind === 'network-preset' && !activity.input.editable
+    && activity.evidenceViews.join(',') === 'packet-inspector,network-decisions,arp-table,mac-table';
+})());
+ok('canonical ARP preset is valid, curated, and stays on one /24 LAN',
+  ComputerNetworking.PRESETS.length === 1 && ComputerNetworking.validatePreset(networkingPreset)
+  && networkingPreset.hostA.ip === '192.168.10.10' && networkingPreset.hostB.ip === '192.168.10.20'
+  && networkingPreset.prefixLength === 24
+  && ComputerNetworking.sameSubnet(networkingPreset.hostA.ip, networkingPreset.hostB.ip, 24)
+  && !ComputerNetworking.sameSubnet(networkingPreset.hostA.ip, '192.168.11.20', 24));
+ok('ARP model emits eight deterministic immutable decision frames',
+  networkingEvents.length === 8 && JSON.stringify(networkingFirst) === JSON.stringify(networkingSecond)
+  && networkingEvents.every((event) => Object.isFrozen(event) && Object.isFrozen(event.frame)
+    && Object.isFrozen(event.frame.topology.devices) && Object.isFrozen(event.frame.packets)
+    && Object.isFrozen(event.frame.tables.arp) && Object.isFrozen(event.frame.tables.mac)));
+ok('ARP decision order follows local choice, cache miss, request, flood, reply, forwarding, learning, and readiness',
+  networkingEvents.map((event) => event.type).join(',')
+    === 'evaluate-subnet,check-arp-cache,build-arp-request,switch-flood-request,host-b-build-reply,switch-forward-reply,host-a-learn-arp,ready-for-ipv4');
+ok('all topology, packet, and table identities remain stable across the timeline', networkingFrames.every((frame) =>
+  frame.topology.devices.map((item) => item.id).join(',') === ComputerNetworking.ENTITY_IDS.devices.join(',')
+  && frame.topology.devices.flatMap((item) => item.interfaces).map((item) => item.id).join(',') === ComputerNetworking.ENTITY_IDS.interfaces.join(',')
+  && frame.topology.links.map((item) => item.id).join(',') === ComputerNetworking.ENTITY_IDS.links.join(',')
+  && frame.packets.map((item) => item.id).join(',') === ComputerNetworking.ENTITY_IDS.packets.join(',')
+  && frame.tables.arp.map((item) => item.id).join(',') === ComputerNetworking.ENTITY_IDS.arpEntries.join(',')
+  && frame.tables.mac.map((item) => item.id).join(',') === ComputerNetworking.ENTITY_IDS.macEntries.join(',')));
+ok('ARP Request uses Ethernet broadcast while its unknown target MAC remains zero', (() => {
+  const request = networkingFrames[2].packets.find((packet) => packet.id === 'arp-request-1');
+  return request.status === 'prepared'
+    && request.ethernet.source === networkingPreset.hostA.mac
+    && request.ethernet.destination === ComputerNetworking.BROADCAST_MAC
+    && request.ethernet.etherType === ComputerNetworking.ETHER_TYPE_ARP
+    && request.arp.operationCode === 1
+    && request.arp.targetMac === ComputerNetworking.UNKNOWN_MAC
+    && request.arp.targetIp === networkingPreset.hostB.ip;
+})());
+ok('switch learns Host A from the request source and floods only the non-ingress port', (() => {
+  const frame = networkingFrames[3];
+  const learned = frame.tables.mac.find((entry) => entry.id === 'switch-1-mac-host-a');
+  const unknown = frame.tables.mac.find((entry) => entry.id === 'switch-1-mac-host-b');
+  const activeLinks = frame.topology.links.filter((link) => link.active);
+  return learned.state === 'confirmed' && learned.interfaceId === 'switch-1-p1'
+    && learned.learnedFromPacketId === 'arp-request-1' && unknown.state === 'absent'
+    && activeLinks.length === 1 && activeLinks[0].id === 'link-switch-host-b'
+    && activeLinks[0].direction === 'switch-1-to-host-b';
+})());
+ok('ARP Reply is unicast only after Switch 1 has a learned Host A destination', (() => {
+  const frame = networkingFrames[5];
+  const reply = frame.packets.find((packet) => packet.id === 'arp-reply-1');
+  const hostAEntry = frame.tables.mac.find((entry) => entry.id === 'switch-1-mac-host-a');
+  const hostBEntry = frame.tables.mac.find((entry) => entry.id === 'switch-1-mac-host-b');
+  const activeLinks = frame.topology.links.filter((link) => link.active);
+  return reply.status === 'in-transit' && reply.ethernet.destination === networkingPreset.hostA.mac
+    && reply.arp.operationCode === 2 && hostAEntry.state === 'confirmed'
+    && hostBEntry.state === 'confirmed' && hostBEntry.interfaceId === 'switch-1-p2'
+    && hostBEntry.learnedFromPacketId === 'arp-reply-1'
+    && activeLinks.length === 1 && activeLinks[0].id === 'link-host-a-switch'
+    && activeLinks[0].direction === 'switch-1-to-host-a';
+})());
+ok('Host A learns no target mapping before the reply and ends with one confirmed stable row', (() => {
+  const before = networkingFrames.slice(0, 6).map((frame) => frame.tables.arp.find((entry) => entry.id === 'host-a-arp-host-b'));
+  const learned = networkingFrames[6].tables.arp.find((entry) => entry.id === 'host-a-arp-host-b');
+  const final = networkingFinal.tables.arp.filter((entry) => entry.id === 'host-a-arp-host-b');
+  return before.every((entry) => entry.state === 'absent')
+    && learned.state === 'confirmed' && learned.changed && learned.learnedFromPacketId === 'arp-reply-1'
+    && final.length === 1 && final[0].ip === '192.168.10.20' && final[0].mac === '02:00:00:00:10:14';
+})());
+ok('operation and micro playback finish with equal networking state without duplicate identities',
+  JSON.stringify(networkingFinal.topology) === JSON.stringify(networkingMicro.result.finalFrame.topology)
+  && JSON.stringify(networkingFinal.packets) === JSON.stringify(networkingMicro.result.finalFrame.packets)
+  && JSON.stringify(networkingFinal.tables) === JSON.stringify(networkingMicro.result.finalFrame.tables)
+  && networkingMicro.events.every((event) => event.frame.playbackGranularity === 'micro'));
+ok('backward timeline inspection restores the earlier empty cache without mutating the final frame', (() => {
+  const earlier = networkingEvents[1].frame;
+  const earlierHostA = earlier.tables.arp.find((entry) => entry.id === 'host-a-arp-host-b');
+  const finalHostA = networkingFinal.tables.arp.find((entry) => entry.id === 'host-a-arp-host-b');
+  return earlierHostA.state === 'absent' && finalHostA.state === 'confirmed'
+    && networkingFrames.every((frame) => frame.tables.arp.length === 2 && frame.tables.mac.length === 2);
+})());
+ok('networking activity delegates to the canonical deterministic model', (() => {
+  const activity = ComputerNetworkingCatalog.get('networking-arp-neighbor-discovery');
+  const run = activity.run();
+  return ComputerNetworkingCatalog.list().length === 1
+    && activity.input.defaultPreset === 'arp-same-lan'
+    && activity.source.length === 8
+    && run.result.finalFrame.phase.id === 'ready-for-ipv4';
+})());
+
 const oopEngine = load(['course-catalog.js', 'playback.js', 'itcc45-activities.js', 'itcc45-practice-data.js'], { setTimeout, clearTimeout });
 const Courses = oopEngine.get('BSITLearningLab');
 const OOPActivities = oopEngine.get('ITCC45Activities');

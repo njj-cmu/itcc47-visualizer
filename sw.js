@@ -35,6 +35,8 @@ const PRECACHE = [
   'computer-architecture-practice.html',
   'computer-architecture-practice.js',
   'computer-architecture.html',
+  'computer-networking-activities.js',
+  'computer-networking-machine.js',
   'course-catalog.js',
   'curriculum-ui.js',
   'curriculum.data.js',

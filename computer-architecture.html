@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Computer Architecture</title><link rel="icon" href="data:,"><link rel="stylesheet" href="styles.css">
+</head>
+<body class="ca-course-page ca-home" data-course="computer-architecture">
+<header class="topbar"><div class="topbar-title">Computer Architecture</div><nav class="topbar-nav"></nav></header>
+<main class="ca-home-main">
+  <section class="ca-home-hero">
+    <div class="ca-home-copy"><h1>Watch one instruction travel through the CPU.</h1><p>Start with the fetch path and connect each register, bus, memory response, and control signal to a visible state change.</p><div class="start-actions"><a class="btn ca-primary" href="visualizer.html?course=computer-architecture&amp;activity=architecture-fetch-cycle" data-icon="play">Fetch one instruction</a><a class="btn ca-secondary" href="computer-architecture-modules.html" data-icon="modules">View module roadmap</a></div></div>
+    <div class="ca-fetch-preview" tabindex="0" aria-label="Instruction fetch path from PC to MAR, memory, MDR, and IR">
+      <div class="ca-preview-node"><small>8-bit</small><strong>PC</strong><code>0x12</code></div><i aria-hidden="true">→</i>
+      <div class="ca-preview-node"><small>8-bit</small><strong>MAR</strong><code>0x12</code></div><i aria-hidden="true">→</i>
+      <div class="ca-preview-memory"><small>PROGRAM MEMORY</small><code>[0x12] 0x31A4</code></div><i aria-hidden="true">→</i>
+      <div class="ca-preview-node"><small>16-bit</small><strong>MDR</strong><code>0x31A4</code></div><i aria-hidden="true">→</i>
+      <div class="ca-preview-node is-ir"><small>16-bit</small><strong>IR</strong><code>0x31A4</code></div>
+    </div>
+  </section>
+  <ol class="ca-learning-path" aria-label="Computer Architecture learning path">
+    <li class="is-current"><b>01</b><span><strong>CPU and Instruction Flow</strong>Trace PC → MAR → memory → MDR → IR, then execute 5 + 13 in the ALU.</span><em>Available now</em></li>
+    <li><b>02</b><span><strong>Performance and Pipelining</strong>Compare throughput, latency, and overlapping stages.</span><em>Planned</em></li>
+    <li><b>03</b><span><strong>Memory and Cache</strong>Relate locality, levels, and effective access time.</span><em>Planned</em></li>
+  </ol>
+</main>
+<script src="course-catalog.js"></script><script src="nav.js"></script><script src="sw-register.js" defer></script>
+</body>
+</html>

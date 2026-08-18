@@ -55,10 +55,22 @@ const BSITLearningLab = (() => {
     shortTitle: 'Learning Lab', home: 'itcc47.html', accent: 'blue',
     nav: [
       { href: 'itcc47.html', label: 'Start', icon: 'start' },
-      { href: 'visualizer.html', label: 'Visualize', icon: 'visualize' },
+      { href: 'problems.html?view=visualizations', label: 'Visualize', icon: 'visualize' },
       { href: 'writer.html', label: 'Algorithm Writer', icon: 'writer' },
       { href: 'tracer.html', label: 'Pseudocode Tracer', icon: 'tracer' },
       { href: 'problems.html', label: 'Modules', icon: 'problems' },
+      { href: 'index.html', label: 'All Subjects', icon: 'grid' },
+    ],
+  });
+  registerCourse({
+    id: 'computer-architecture', code: 'CA', title: 'Computer Architecture',
+    brandLabel: 'Computer Architecture', shortTitle: 'CPU Lab',
+    home: 'computer-architecture.html', accent: 'cyan',
+    nav: [
+      { href: 'computer-architecture.html', label: 'Home', icon: 'start' },
+      { href: 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', label: 'CPU Lab', icon: 'cpu' },
+      { href: 'computer-architecture-modules.html', label: 'Modules', icon: 'modules' },
+      { href: 'computer-architecture-practice.html', label: 'Practice', icon: 'problems' },
       { href: 'index.html', label: 'All Subjects', icon: 'grid' },
     ],
   });

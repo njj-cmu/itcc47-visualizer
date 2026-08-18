@@ -1,7 +1,7 @@
 /* GENERATED FILE — edit curriculum.public.json, then run node tools/build-curriculum.js. */
 const ITCC47_CURRICULUM_DATA = {
   "schemaVersion": 2,
-  "contentVersion": "2026.08-m4-practice",
+  "contentVersion": "2026.08-practice-only",
   "courseId": "itcc47",
   "clos": [
     {
@@ -137,7 +137,6 @@ const ITCC47_CURRICULUM_DATA = {
       ],
       "prerequisiteIds": [],
       "sequence": [
-        "lesson:orientation",
         "tool:writer",
         "tool:tracer"
       ]
@@ -158,7 +157,6 @@ const ITCC47_CURRICULUM_DATA = {
         "orientation"
       ],
       "sequence": [
-        "lesson:m1-ipo",
         "tool:writer",
         "problem:sum-two",
         "problem:delivery-fee"
@@ -180,7 +178,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m1-ipo"
       ],
       "sequence": [
-        "lesson:m1-pseudocode",
         "tool:writer",
         "tool:tracer",
         "problem:library-fine"
@@ -202,7 +199,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m1-pseudocode"
       ],
       "sequence": [
-        "lesson:m1-tracing",
         "tool:tracer",
         "problem:parking-fee"
       ]
@@ -223,7 +219,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m1-tracing"
       ],
       "sequence": [
-        "lesson:m1-exact-io",
         "problem:package-class"
       ]
     },
@@ -243,7 +238,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m1-exact-io"
       ],
       "sequence": [
-        "lesson:m1-complexity",
         "tool:tracer",
         "problem:reward-points",
         "problem:CH01-PS05"
@@ -265,7 +259,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m1-complexity"
       ],
       "sequence": [
-        "lesson:m2-arrays",
         "problem:array-total",
         "problem:largest-value",
         "problem:has-duplicate"
@@ -287,7 +280,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m2-arrays"
       ],
       "sequence": [
-        "lesson:m2-linear-search",
         "activity:linear-search",
         "problem:linear-position"
       ]
@@ -308,7 +300,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m2-linear-search"
       ],
       "sequence": [
-        "lesson:m2-binary-search",
         "activity:binary-search",
         "activity:binary-range-search",
         "problem:binary-checks"
@@ -330,7 +321,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m2-arrays"
       ],
       "sequence": [
-        "lesson:m2-bubble-sort",
         "activity:bubble-sort"
       ]
     },
@@ -350,7 +340,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m2-bubble-sort"
       ],
       "sequence": [
-        "lesson:m2-selection-sort",
         "activity:selection-sort"
       ]
     },
@@ -370,7 +359,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m2-selection-sort"
       ],
       "sequence": [
-        "lesson:m2-insertion-sort",
         "activity:insertion-sort",
         "activity:stable-insertion-dispatch"
       ]
@@ -391,9 +379,30 @@ const ITCC47_CURRICULUM_DATA = {
         "m2-insertion-sort"
       ],
       "sequence": [
-        "lesson:m2-array-mutation",
         "activity:array-list-insert",
         "activity:array-list-remove"
+      ]
+    },
+    {
+      "id": "m2-industry-workbench",
+      "moduleId": "m2",
+      "order": 125,
+      "reviewStatus": "reviewed",
+      "title": "Industry data integration",
+      "summary": "Choose an algorithm for a realistic question, inspect compressed records, and connect every decision to its cost.",
+      "goals": [
+        "Reuse stable record identities across dataset views",
+        "Explain compressed operations without hiding their cost",
+        "Choose search, stable insertion, or indexed mutation from the question"
+      ],
+      "prerequisiteIds": [
+        "m2-array-mutation"
+      ],
+      "sequence": [
+        "activity:industry-sla-breach-scan",
+        "activity:industry-priority-range-recall",
+        "activity:industry-stable-priority-dispatch",
+        "activity:industry-review-queue-mutation"
       ]
     },
     {
@@ -409,13 +418,13 @@ const ITCC47_CURRICULUM_DATA = {
         "Compare array and linked storage"
       ],
       "prerequisiteIds": [
-        "m2-array-mutation"
+        "m2-industry-workbench"
       ],
       "sequence": [
-        "lesson:m3-linked-foundations",
         "activity:linked-list-traversal",
         "activity:array-linked-comparison",
-        "problem:linked-node-count"
+        "problem:linked-node-count",
+        "problem:linked-find-value"
       ]
     },
     {
@@ -434,7 +443,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m3-linked-foundations"
       ],
       "sequence": [
-        "lesson:m3-linked-mutation",
         "activity:linked-list-insert-head",
         "activity:linked-list-sorted-insert",
         "activity:linked-list-find-update",
@@ -457,7 +465,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m3-linked-mutation"
       ],
       "sequence": [
-        "lesson:m4-stack",
         "activity:stack-lifo-basics",
         "activity:stack-postfix-evaluator",
         "activity:stack-delimiter-audit",
@@ -481,7 +488,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m4-stack"
       ],
       "sequence": [
-        "lesson:m4-queue-deque",
         "activity:queue-fifo-basics",
         "activity:queue-round-robin",
         "activity:queue-printer-jobs",
@@ -506,7 +512,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m4-queue-deque"
       ],
       "sequence": [
-        "lesson:m5-recursion",
         "activity:recursive-range-search"
       ]
     },
@@ -526,7 +531,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m5-recursion"
       ],
       "sequence": [
-        "lesson:m5-divide-conquer",
         "activity:stable-merge-sort"
       ]
     },
@@ -546,7 +550,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m5-divide-conquer"
       ],
       "sequence": [
-        "lesson:m6-trees",
         "activity:tree-traversals"
       ]
     },
@@ -566,7 +569,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m6-trees"
       ],
       "sequence": [
-        "lesson:m6-bst",
         "activity:bst-insert-search",
         "activity:bst-height-shape"
       ]
@@ -587,7 +589,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m6-bst"
       ],
       "sequence": [
-        "lesson:m7-graphs",
         "activity:graph-representation"
       ]
     },
@@ -607,7 +608,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m7-graphs"
       ],
       "sequence": [
-        "lesson:m7-traversal",
         "activity:bfs-shortest-path",
         "activity:dfs-reachability"
       ]
@@ -628,7 +628,6 @@ const ITCC47_CURRICULUM_DATA = {
         "m7-traversal"
       ],
       "sequence": [
-        "lesson:m8-greedy",
         "activity:greedy-dp-coin-change"
       ]
     },
@@ -648,187 +647,11 @@ const ITCC47_CURRICULUM_DATA = {
         "m8-greedy"
       ],
       "sequence": [
-        "lesson:m8-dp",
         "activity:knapsack-dp"
       ]
     }
   ],
   "resources": [
-    {
-      "kind": "lesson",
-      "id": "orientation",
-      "checkpointId": "orientation",
-      "title": "Course orientation companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m1-ipo",
-      "checkpointId": "m1-ipo",
-      "title": "IPO analysis companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m1-pseudocode",
-      "checkpointId": "m1-pseudocode",
-      "title": "Pseudocode companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m1-tracing",
-      "checkpointId": "m1-tracing",
-      "title": "Manual tracing companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m1-exact-io",
-      "checkpointId": "m1-exact-io",
-      "title": "Exact I/O companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m1-complexity",
-      "checkpointId": "m1-complexity",
-      "title": "Complexity companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m2-arrays",
-      "checkpointId": "m2-arrays",
-      "title": "Arrays and traversal companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m2-linear-search",
-      "checkpointId": "m2-linear-search",
-      "title": "Linear search companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m2-binary-search",
-      "checkpointId": "m2-binary-search",
-      "title": "Binary search companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m2-bubble-sort",
-      "checkpointId": "m2-bubble-sort",
-      "title": "Bubble Sort companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m2-selection-sort",
-      "checkpointId": "m2-selection-sort",
-      "title": "Selection Sort companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m2-insertion-sort",
-      "checkpointId": "m2-insertion-sort",
-      "title": "Insertion Sort companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m2-array-mutation",
-      "checkpointId": "m2-array-mutation",
-      "title": "Array mutation companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m3-linked-foundations",
-      "checkpointId": "m3-linked-foundations",
-      "title": "Linked foundations companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m3-linked-mutation",
-      "checkpointId": "m3-linked-mutation",
-      "title": "Linked mutation companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m4-stack",
-      "checkpointId": "m4-stack",
-      "title": "Stack companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m4-queue-deque",
-      "checkpointId": "m4-queue-deque",
-      "title": "Queue and deque companion",
-      "reviewStatus": "reviewed"
-    },
-    {
-      "kind": "lesson",
-      "id": "m5-recursion",
-      "checkpointId": "m5-recursion",
-      "title": "Recursion companion",
-      "reviewStatus": "draft"
-    },
-    {
-      "kind": "lesson",
-      "id": "m5-divide-conquer",
-      "checkpointId": "m5-divide-conquer",
-      "title": "Divide-and-conquer companion",
-      "reviewStatus": "draft"
-    },
-    {
-      "kind": "lesson",
-      "id": "m6-trees",
-      "checkpointId": "m6-trees",
-      "title": "Tree traversal companion",
-      "reviewStatus": "draft"
-    },
-    {
-      "kind": "lesson",
-      "id": "m6-bst",
-      "checkpointId": "m6-bst",
-      "title": "BST and height companion",
-      "reviewStatus": "draft"
-    },
-    {
-      "kind": "lesson",
-      "id": "m7-graphs",
-      "checkpointId": "m7-graphs",
-      "title": "Graph representation companion",
-      "reviewStatus": "draft"
-    },
-    {
-      "kind": "lesson",
-      "id": "m7-traversal",
-      "checkpointId": "m7-traversal",
-      "title": "Graph traversal companion",
-      "reviewStatus": "draft"
-    },
-    {
-      "kind": "lesson",
-      "id": "m8-greedy",
-      "checkpointId": "m8-greedy",
-      "title": "Greedy algorithms companion",
-      "reviewStatus": "draft"
-    },
-    {
-      "kind": "lesson",
-      "id": "m8-dp",
-      "checkpointId": "m8-dp",
-      "title": "Dynamic programming companion",
-      "reviewStatus": "draft"
-    },
     {
       "kind": "tool",
       "id": "writer",
@@ -897,6 +720,34 @@ const ITCC47_CURRICULUM_DATA = {
       "kind": "activity",
       "id": "array-list-remove",
       "checkpointId": "m2-array-mutation",
+      "reviewStatus": "reviewed"
+    },
+    {
+      "kind": "activity",
+      "id": "industry-sla-breach-scan",
+      "checkpointId": "m2-industry-workbench",
+      "title": "SLA Breach Scan",
+      "reviewStatus": "reviewed"
+    },
+    {
+      "kind": "activity",
+      "id": "industry-priority-range-recall",
+      "checkpointId": "m2-industry-workbench",
+      "title": "Priority Range Recall",
+      "reviewStatus": "reviewed"
+    },
+    {
+      "kind": "activity",
+      "id": "industry-stable-priority-dispatch",
+      "checkpointId": "m2-industry-workbench",
+      "title": "Stable Priority Dispatch",
+      "reviewStatus": "reviewed"
+    },
+    {
+      "kind": "activity",
+      "id": "industry-review-queue-mutation",
+      "checkpointId": "m2-industry-workbench",
+      "title": "Review Queue Mutation",
       "reviewStatus": "reviewed"
     },
     {

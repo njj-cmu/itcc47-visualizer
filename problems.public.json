@@ -26,7 +26,7 @@
         "expected": [
           7
         ],
-        "note": "the example from the lecture"
+        "note": "the worked example"
       },
       {
         "inputs": [
@@ -213,7 +213,7 @@
         "expected": [
           "BULKY_EXPRESS"
         ],
-        "note": "the example from the lecture"
+        "note": "the worked example"
       },
       {
         "inputs": [
@@ -344,7 +344,7 @@
           235,
           1
         ],
-        "note": "the traced example from the lecture"
+        "note": "the traced worked example"
       },
       {
         "inputs": [

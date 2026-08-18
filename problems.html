@@ -14,7 +14,7 @@
   </div>
   <nav class="topbar-nav">
     <a href="index.html" data-icon="start">Start</a>
-    <a href="visualizer.html" data-icon="visualize">Visualize</a>
+    <a href="problems.html?view=visualizations" data-icon="visualize">Visualize</a>
     <a href="writer.html" data-icon="writer">Algorithm Writer</a>
     <a href="tracer.html" data-icon="tracer">Pseudocode Tracer</a>
     <a href="problems.html" data-icon="problems">Modules</a>
@@ -24,13 +24,13 @@
 <main class="catalog-main">
   <header class="catalog-intro">
     <div><p class="eyebrow">Self-paced practice roadmap</p><h1>Choose what to practise</h1>
-    <p>Start with the current problem bank or preview what comes next. Opening an activity never advances the semester.</p></div>
-    <div id="release-controls"></div>
+    <p>Choose a practice bank, focused visualization, or industry workbench sample. Opening an activity never advances the semester.</p></div>
   </header>
 
   <div class="catalog-tabs" role="tablist" aria-label="Module resources">
     <button id="problems-tab" type="button" role="tab" aria-controls="problem-catalog" aria-selected="true" data-catalog-view="problems" data-icon="problemsList">Practice banks</button>
     <button id="visualizations-tab" type="button" role="tab" aria-controls="visualization-catalog" aria-selected="false" tabindex="-1" data-catalog-view="visualizations" data-icon="visualize">Visualizations</button>
+    <button id="workbenches-tab" type="button" role="tab" aria-controls="workbench-catalog" aria-selected="false" tabindex="-1" data-catalog-view="workbenches" data-icon="database">Workbench Samples</button>
   </div>
 
   <section id="problem-catalog" class="catalog-view" role="tabpanel" aria-labelledby="problems-tab">
@@ -44,18 +44,31 @@
   <section id="visualization-catalog" class="catalog-view" role="tabpanel" aria-labelledby="visualizations-tab" hidden>
     <div id="visualization-grid" class="visualization-grid" aria-label="ITCC47 visualizations"></div>
   </section>
+
+  <section id="workbench-catalog" class="catalog-view" role="tabpanel" aria-labelledby="workbenches-tab" hidden>
+    <header class="workbench-catalog-intro">
+      <p class="eyebrow">Industry-level walkthroughs</p>
+      <h2>See how algorithms support real data decisions</h2>
+      <p>Workbench samples use realistic-scale synthetic data to connect focused classroom techniques into a larger operational workflow.</p>
+    </header>
+    <div id="workbench-grid" class="workbench-grid" aria-label="ITCC47 workbench samples"></div>
+  </section>
 </main>
 
 <script src="course-catalog.js"></script>
 <script src="curriculum.data.js"></script>
 <script src="release-profile.js"></script>
+<script src="sha256.js"></script>
+<script src="instructor-access.js"></script>
 <script src="curriculum.js"></script>
 <script src="curriculum-ui.js"></script>
 <script src="nav.js"></script>
+<script src="visualizer-progress.js"></script>
 <script src="playback.js"></script>
 <script src="algorithms.js"></script>
 <script src="activity-catalog.js"></script>
 <script src="linear-adt-activities.js"></script>
+<script src="industry-workbench.js"></script>
 <script src="problems.data.js"></script>
 <script src="future-problems.js"></script>
 <script>ITCC47FutureProblems.register(PROBLEMS);</script>

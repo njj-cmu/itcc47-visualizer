@@ -100,4 +100,30 @@
     read: readITCC47,
     write: writeITCC47,
   });
+
+  const COMPUTER_ARCHITECTURE_STORAGE_KEY = 'computer-architecture.workspace-layout:v1';
+  function computerArchitectureDefaults() {
+    return { version: VERSION, evidence: 'expanded' };
+  }
+  function normalizeComputerArchitecture(value) {
+    const fallback = computerArchitectureDefaults();
+    if (!value || value.version !== VERSION) return fallback;
+    return { version: VERSION, evidence: normalizeEvidence(value.evidence, fallback.evidence) };
+  }
+  function readComputerArchitecture(storage) {
+    return readStored(storage, COMPUTER_ARCHITECTURE_STORAGE_KEY, computerArchitectureDefaults, normalizeComputerArchitecture);
+  }
+  function writeComputerArchitecture(storage, value) {
+    const next = normalizeComputerArchitecture({ ...value, version: VERSION });
+    return writeStored(storage, COMPUTER_ARCHITECTURE_STORAGE_KEY, next);
+  }
+
+  root.ComputerArchitectureWorkspaceLayout = Object.freeze({
+    VERSION,
+    STORAGE_KEY: COMPUTER_ARCHITECTURE_STORAGE_KEY,
+    defaults: computerArchitectureDefaults,
+    normalize: normalizeComputerArchitecture,
+    read: readComputerArchitecture,
+    write: writeComputerArchitecture,
+  });
 })(typeof window !== 'undefined' ? window : globalThis);

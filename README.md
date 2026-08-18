@@ -31,11 +31,31 @@ root learning page is now [`itcc47.html`](itcc47.html).
 
 | Page | Purpose |
 |---|---|
-| [`visualizer.html`](visualizer.html) | Synchronized algorithm and data-structure workspace |
+| [`problems.html?view=visualizations`](problems.html?view=visualizations) | Canonical algorithm and data-structure visualization catalog |
+| [`problems.html?view=workbenches`](problems.html?view=workbenches) | Industry-scale workbench samples |
+| [`visualizer.html?activity=bubble-sort`](visualizer.html?activity=bubble-sort) | Synchronized workspace for a selected activity |
 | [`writer.html`](writer.html) | Plain-language algorithm writer |
 | [`tracer.html`](tracer.html) | Pseudocode execution, counting, and recurrence lab |
-| [`problems.html`](problems.html) | ITCC47 module catalog |
+| [`problems.html`](problems.html) | Practice-first ITCC47 module catalog and visualization index |
 | [`practice.html`](practice.html) | Pseudocode problem practice |
+
+### Computer Architecture
+
+The CPU Lab uses a deterministic 16-bit teaching machine with an 8-bit address
+space. Its first production activity follows one instruction through
+`PC → MAR → memory → MDR → IR`, including the memory handshake, control
+signals, and PC increment. A second guided activity fetches `ADDI R1, #13`,
+routes `5 + 13` through the ALU, and writes `18` back to R1. Three curated
+fetch presets, HEX/BIN/DEC views, textual evidence, and three local practice
+checks work without an account or network.
+
+| Page | Purpose |
+|---|---|
+| [`computer-architecture.html`](computer-architecture.html) | Subject home and learning path |
+| [`computer-architecture-modules.html`](computer-architecture-modules.html) | Current and planned module roadmap |
+| [`visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle`](visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle) | Fetch-cycle CPU Lab |
+| [`visualizer.html?course=computer-architecture&activity=architecture-add-immediate`](visualizer.html?course=computer-architecture&activity=architecture-add-immediate) | Guided `5 + 13` fetch-and-execute CPU Lab |
+| [`computer-architecture-practice.html`](computer-architecture-practice.html) | Three local fetch-cycle checks |
 
 The root [`index.html`](index.html) is the **BSIT Learning Lab** subject chooser.
 
@@ -58,12 +78,25 @@ npm run check                   # complete release check
 node tools/build-sw.js          # regenerate the offline precache list
 ```
 
+### Private instructor preview
+
+Student pages never show preview controls, and adding `?preview=1` does not unlock
+future resources. On the instructor computer, run `npm run setup:instructor-preview`
+once. Open the gitignored `.instructor-preview-token`, then visit
+`problems.html?instructorKey=YOUR_TOKEN`. The app removes the token from the URL,
+stores a browser-local capability, and opens the private preview controls. Use
+**Exit instructor mode** before handing that browser profile to someone else.
+
+This is a local capability boundary for the static/offline app, not account-based
+authentication. Anyone with source-editing or browser-devtools control can alter a
+client-only application; server-trusted identity would require a hosted login.
+
 `tools/build-problems.js` still requires the instructor-only,
 gitignored `problems.hidden.json`; see [`tools/README.md`](tools/README.md).
 
 ## Setup check
 
-[`setup/`](setup/) checks Python 3, Git, and an editor for both subjects. Its
+[`setup/`](setup/) checks Python 3, Git, and an editor for the programming subjects. Its
 optional laboratory-package verification remains specifically for the
 ITCC47 laboratory package.
 
@@ -81,6 +114,18 @@ visualizer assets are committed so previewing a branch never requires a build.
 The versioned `BSITLearningLab` registry owns course metadata and activity
 catalogs. `BSITPlayback` and `BSITVisualizerRegistry` are course-neutral shared
 contracts; the original `ITCC47*` globals remain compatibility APIs.
+
+Computer Architecture adds a framework-neutral `ComputerArchitectureMachine`
+and uses registered `cpu-datapath` rendering, evidence-view metadata, and
+`cpu-preset` input controls. A shared hierarchical graph produces six fetch
+operations or ten guided-addition operations, plus 22 or 37 optional micro
+phases. Compound timing, presentation coordinates, and React state remain
+separate from committed machine state.
+
+CPU cues pause at their source, pulse the emitting value or signal, travel over
+collision-free SVG routes, and remain latched with the active path until the
+next micro phase. The same settled evidence is available with reduced or
+disabled motion.
 
 This repository is public practice, not an academic record. It stores no
 identity, grades, timestamps, authentication, or authoritative submissions.

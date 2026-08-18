@@ -45,7 +45,7 @@ const PROBLEMS = [
         "expected": [
           7
         ],
-        "note": "the example from the lecture"
+        "note": "the worked example"
       },
       {
         "inputs": [
@@ -355,7 +355,7 @@ const PROBLEMS = [
         "expected": [
           "BULKY_EXPRESS"
         ],
-        "note": "the example from the lecture"
+        "note": "the worked example"
       },
       {
         "inputs": [
@@ -568,7 +568,7 @@ const PROBLEMS = [
           235,
           1
         ],
-        "note": "the traced example from the lecture"
+        "note": "the traced worked example"
       },
       {
         "inputs": [

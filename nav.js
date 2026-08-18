@@ -20,9 +20,13 @@
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>',
     reset: '<path d="M4 4v6h6M5.5 15a7 7 0 1 0 .5-7"/>',
     lock: '<rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+    check: '<path d="m5 12 4 4L19 6"/>',
     grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',
     code: '<path d="m8 9-3 3 3 3m8-3 3 3-3 3m-2-10-4 14"/>',
     terminal: '<path d="m4 7 4 4-4 4m7 0h7"/><rect x="2" y="3" width="20" height="18" rx="2"/>',
+    database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
+    cpu: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v5m6-5v5M9 18v5m6-5v5M1 9h5m-5 6h5m12-6h5m-5 6h5M10 10h4v4h-4z"/>',
+    memory: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h8"/>',
   };
 
   function svg(name) {
@@ -41,21 +45,29 @@
   if (!nav) return;
   const page = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
   const requestedCourse = new URLSearchParams(location.search).get('course');
-  const inferredCourse = requestedCourse === 'itcc45' || page.startsWith('itcc45-') || page === 'itcc45.html' ? 'itcc45' : 'itcc47';
+  const declaredCourse = document.body.dataset.course;
+  const inferredCourse = requestedCourse
+    || declaredCourse
+    || (page.startsWith('computer-architecture') ? 'computer-architecture' : null)
+    || (page.startsWith('itcc45-') || page === 'itcc45.html' ? 'itcc45' : 'itcc47');
   const courseId = typeof BSITLearningLab === 'undefined' ? inferredCourse : BSITLearningLab.resolveCourse(inferredCourse);
   document.body.dataset.course = courseId;
 
   if (typeof BSITLearningLab !== 'undefined') {
     const course = BSITLearningLab.getCourse(courseId);
     nav.innerHTML = course.nav.map((item) => `<a href="${item.href}" data-icon="${item.icon}">${item.label}</a>`).join('');
-    if (page === 'visualizer.html' && courseId === 'itcc45') {
+    if (page === 'visualizer.html') {
       const title = document.querySelector('.topbar-title');
-      if (title) title.innerHTML = '<span class="topbar-code">ITCC45</span> Python Object Lab';
-      document.title = 'ITCC45 Python Object Lab';
+      if (title) title.innerHTML = courseId === 'computer-architecture'
+        ? 'Computer Architecture'
+        : `<span class="topbar-code">${course.code}</span> ${course.shortTitle || course.brandLabel || course.title}`;
+      if (courseId === 'itcc45') document.title = 'ITCC45 Python Object Lab';
+      else if (courseId === 'computer-architecture') document.title = 'Computer Architecture CPU Lab';
     }
     nav.querySelectorAll('[data-icon]').forEach((element) => element.insertAdjacentHTML('afterbegin', svg(element.dataset.icon)));
   }
-  if (courseId === 'itcc47' && new URLSearchParams(location.search).get('preview') === '1') {
+  const currentParams = new URLSearchParams(location.search);
+  if (courseId === 'itcc47' && typeof ITCC47Curriculum !== 'undefined' && ITCC47Curriculum.isPreviewRequested()) {
     nav.querySelectorAll('a').forEach((link) => { const url = new URL(link.href, location.href); url.searchParams.set('preview', '1'); link.href = url.href; });
   }
   nav.id = nav.id || 'primary-navigation';
@@ -63,9 +75,18 @@
     const linkUrl = new URL(link.getAttribute('href') || '', location.href);
     const href = (linkUrl.pathname.split('/').pop() || 'index.html').toLowerCase();
     const hrefParams = linkUrl.searchParams;
-    const active = href === page
+    const requestedCatalogView = currentParams.get('view');
+    const currentCatalogView = ['visualizations', 'workbenches'].includes(requestedCatalogView) ? requestedCatalogView : 'problems';
+    const isITCC47CatalogPage = courseId === 'itcc47' && page === 'problems.html';
+    const isITCC47CatalogLink = courseId === 'itcc47' && href === 'problems.html';
+    const isVisualizerLink = isITCC47CatalogLink && hrefParams.get('view') === 'visualizations';
+    const isModulesLink = isITCC47CatalogLink && !hrefParams.get('view');
+    const active = (href === page && !isITCC47CatalogPage)
+      || (isITCC47CatalogPage && isVisualizerLink && ['visualizations', 'workbenches'].includes(currentCatalogView))
+      || (isITCC47CatalogPage && isModulesLink && currentCatalogView === 'problems')
       || (courseId === 'itcc47' && ['practice.html', 'problem-list.html'].includes(page) && href === 'problems.html')
-      || (courseId === 'itcc45' && page === 'visualizer.html' && href === 'visualizer.html' && hrefParams.get('course') === 'itcc45');
+      || (courseId === 'itcc47' && ['visualizer.html', 'industry-workbench.html'].includes(page) && isVisualizerLink)
+      || (page === 'visualizer.html' && href === 'visualizer.html' && hrefParams.get('course') === courseId);
     link.classList.toggle('active', active);
     if (active) link.setAttribute('aria-current', 'page');
     else link.removeAttribute('aria-current');

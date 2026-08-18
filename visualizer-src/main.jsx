@@ -4,6 +4,8 @@ import { AnimatePresence, LayoutGroup, LazyMotion, MotionConfig, domMax, m, useI
 import './workspace.css';
 import { ConceptDomainRenderer } from './domain-renderers.jsx';
 import { LinearADTRenderer } from './linear-adt-renderer.jsx';
+import { IndustryWorkbenchApp } from './industry-workbench.jsx';
+import { CpuDatapathRenderer, MainMemoryPane } from './cpu-datapath.jsx';
 
 const MAX_VISUAL_VALUES = 18;
 const DEFAULT_SPEED = 6;
@@ -11,6 +13,22 @@ const MOTION_STORAGE_KEY = 'itcc47:visualizer-motion:v1';
 const MOTION_DURATIONS = Object.freeze({ 3: 0.8, 6: 0.52, 9: 0.3 });
 
 function motionDuration(speed) { return MOTION_DURATIONS[speed] || 0.52; }
+
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    if (media.addEventListener) media.addEventListener('change', update);
+    else media.addListener?.(update);
+    return () => {
+      if (media.removeEventListener) media.removeEventListener('change', update);
+      else media.removeListener?.(update);
+    };
+  }, [query]);
+  return matches;
+}
 
 function useMotionPreference() {
   const [override, setOverride] = useState(() => {
@@ -37,22 +55,51 @@ function useTransitionBoundary({ state, event, controller, mode }) {
   const expected = useMemo(() => new Set([
     ...(event?.transition?.moves || []).map((move) => move.entityId),
     ...(event?.transition?.enter || []), ...(event?.transition?.exit || []),
+    ...(event?.transition?.sequenceId ? [event.transition.sequenceId] : []),
   ]), [event]);
   useEffect(() => {
     completed.current = new Set();
     if (!state.transitioning || !state.transitionToken) return undefined;
-    if (mode !== 'on' || expected.size === 0) {
+    const hasSequence = !!event?.transition?.sequenceId;
+    if (mode === 'off' || expected.size === 0 || (mode === 'reduced' && !hasSequence)) {
       controller.completeTransition(state.transitionToken);
       return undefined;
     }
-    const timeout = setTimeout(() => controller.completeTransition(state.transitionToken), motionDuration(state.speed) * 1000 + 100);
+    const duration = mode === 'reduced' ? .16 : motionDuration(state.speed);
+    const durationUnits = Number(event?.transition?.durationUnits) || 1;
+    const timeout = setTimeout(() => controller.completeTransition(state.transitionToken), duration * durationUnits * 1000 + 140);
     return () => clearTimeout(timeout);
-  }, [controller, event?.id, expected, mode, state.speed, state.transitionToken, state.transitioning]);
+  }, [controller, event?.id, event?.transition?.durationUnits, event?.transition?.sequenceId, expected, mode, state.speed, state.transitionToken, state.transitioning]);
   return useCallback((entityId) => {
     if (!state.transitioning || !state.transitionToken || !expected.has(entityId)) return;
     completed.current.add(entityId);
     if ([...expected].every((id) => completed.current.has(id))) controller.completeTransition(state.transitionToken);
   }, [controller, expected, state.transitionToken, state.transitioning]);
+}
+
+function useCpuSequenceFrame({ enabled, event, frame, duration, onSequenceComplete }) {
+  const sequence = enabled ? event?.transition?.phases : null;
+  const sequenceId = enabled ? event?.transition?.sequenceId : null;
+  const [position, setPosition] = useState({ sequenceId: null, index: 0 });
+  const completionRef = useRef(onSequenceComplete);
+  useEffect(() => { completionRef.current = onSequenceComplete; }, [onSequenceComplete]);
+  const activeIndex = sequenceId && position.sequenceId === sequenceId ? position.index : 0;
+  const animatedFrame = duration > 0 && sequence?.length ? sequence[Math.min(activeIndex, sequence.length - 1)]?.frame : null;
+
+  useEffect(() => {
+    if (!enabled || !sequenceId || !sequence?.length || duration <= 0) return undefined;
+    setPosition({ sequenceId, index: 0 });
+    const timers = [];
+    let elapsed = 0;
+    sequence.forEach((item, index) => {
+      if (index > 0) timers.push(setTimeout(() => setPosition({ sequenceId, index }), elapsed * 1000));
+      elapsed += duration * (Number(item.durationWeight) || 1);
+    });
+    timers.push(setTimeout(() => completionRef.current(sequenceId), elapsed * 1000));
+    return () => timers.forEach(clearTimeout);
+  }, [duration, enabled, sequence, sequenceId]);
+
+  return animatedFrame || frame;
 }
 
 function Icon({ name, size = 20 }) {
@@ -74,6 +121,19 @@ function Icon({ name, size = 20 }) {
     next: <><path d="M18 5v14"/><path d="m6 6 9 6-9 6Z"/></>,
     shuffle: <><path d="M3 7h3c4 0 5 10 9 10h6"/><path d="m18 14 3 3-3 3"/><path d="M3 17h3c1.5 0 2.6-1.4 3.6-3"/><path d="M14.4 10c1-1.6 2.1-3 3.6-3h3"/><path d="m18 4 3 3-3 3"/></>,
     settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6 1.7 1.7 0 0 0-.4 1.08V21h-4v-.08A1.7 1.7 0 0 0 8.6 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1 1.7 1.7 0 0 0-1.08-.4H3v-4h.08A1.7 1.7 0 0 0 4.6 8.6a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6A1.7 1.7 0 0 0 10.4 3.08V3h4v.08A1.7 1.7 0 0 0 15.4 4a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.14.38.36.72.66 1 .3.28.68.42 1.08.4H21v4h-.08a1.7 1.7 0 0 0-1.52.6Z"/></>,
+    arrow: <><path d="M5 12h14"/><path d="m14 7 5 5-5 5"/></>,
+    database: <><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></>,
+    key: <><circle cx="8" cy="15" r="4"/><path d="m11 12 8-8M15 8l3 3M17 6l3 3"/></>,
+    target: <><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></>,
+    algorithm: <><circle cx="6" cy="5" r="2"/><circle cx="18" cy="12" r="2"/><circle cx="6" cy="19" r="2"/><path d="M8 5h3a3 3 0 0 1 3 3v1a3 3 0 0 0 2 3M8 19h3a3 3 0 0 0 3-3v-1a3 3 0 0 1 2-3"/></>,
+    clock: <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+    lock: <><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>,
+    check: <path d="m5 12 4 4L19 6"/>,
+    compress: <><path d="m8 3 4 4 4-4M12 7V2M8 21l4-4 4 4M12 17v5"/></>,
+    cpu: <><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v5m6-5v5M9 18v5m6-5v5M1 9h5m-5 6h5m12-6h5m-5 6h5M10 10h4v4h-4z"/></>,
+    memory: <><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h8"/></>,
+    registers: <><rect x="3" y="5" width="18" height="5" rx="1"/><rect x="3" y="14" width="18" height="5" rx="1"/><path d="M7 7.5h4M7 16.5h4"/></>,
+    bus: <><path d="M3 7h18M3 17h18"/><path d="m17 3 4 4-4 4M7 13l-4 4 4 4"/></>,
   };
   return <svg className="vw-icon" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
@@ -157,6 +217,7 @@ const VisualizationLegend = memo(function VisualizationLegend({ items, note }) {
 });
 
 const ArrayRenderer = memo(function ArrayRenderer({ frame, event, activity, motionMode, duration, onEntityComplete }) {
+  const canvasRef = useRef(null);
   const values = frame?.array || [];
   const fallbackEntities = (frame?.items || []).map((item, index) => ({ id: item.id, value: values[index] }));
   const presentation = frame?.presentation || { entities: fallbackEntities, slots: fallbackEntities.map((entity) => entity.id), held: null };
@@ -175,6 +236,13 @@ const ArrayRenderer = memo(function ArrayRenderer({ frame, event, activity, moti
   const teaching = frame?.markers?.teaching || null;
   const teachingTargets = new Map((teaching?.annotations || []).flatMap((annotation) => annotation.target?.kind === 'slot'
     ? [[annotation.target.index, annotation.tone || 'primary']] : []));
+  const highlightedIndexes = [
+    ...(frame?.highlight?.compare || []), ...(frame?.highlight?.swap || []), ...(frame?.highlight?.move || []),
+    frame?.highlight?.mid, frame?.highlight?.active, frame?.highlight?.found,
+  ].filter(Number.isInteger);
+  const followIndex = structuralMove
+    ? moveTo
+    : [...teachingTargets.keys()].at(-1) ?? highlightedIndexes.at(-1) ?? (Number.isInteger(frame?.markers?.index) ? frame.markers.index : null);
   const indexMarkerLabel = activity?.id === 'array-list-remove' ? 'remove here' : activity?.id === 'array-list-insert' ? 'insert here' : 'index';
   const loopBoundary = frame?.markers?.boundary;
   const boundaryStartIndex = loopBoundary ? Math.max(0, Math.min(slots.length - 1, loopBoundary.start)) : 0;
@@ -182,8 +250,24 @@ const ArrayRenderer = memo(function ArrayRenderer({ frame, event, activity, moti
   const actionLabel = event?.transition?.kind === 'swap'
     ? `swap [${Math.min(...action)}] ↔ [${Math.max(...action)}]`
     : structuralMove ? `shift ${movingValue}: [${moveFrom}] → [${moveTo}]` : 'move';
-  return <div className="array-canvas" aria-label="Array visualization">
+  useEffect(() => {
+    if (!Number.isInteger(followIndex) || !window.matchMedia('(max-width: 1000px)').matches) return undefined;
+    const animationFrame = requestAnimationFrame(() => {
+      const target = canvasRef.current?.querySelector(`[data-slot="slot:${followIndex}"]`);
+      const viewport = canvasRef.current?.closest('.visual-canvas');
+      if (!target || !viewport || viewport.scrollWidth <= viewport.clientWidth) return;
+      const targetRect = target.getBoundingClientRect();
+      const viewportRect = viewport.getBoundingClientRect();
+      const margin = 24;
+      if (targetRect.left >= viewportRect.left + margin && targetRect.right <= viewportRect.right - margin) return;
+      const centeredLeft = viewport.scrollLeft + targetRect.left - viewportRect.left - (viewportRect.width - targetRect.width) / 2;
+      viewport.scrollTo({ left: Math.max(0, centeredLeft), behavior: motionMode === 'on' ? 'smooth' : 'auto' });
+    });
+    return () => cancelAnimationFrame(animationFrame);
+  }, [event?.id, followIndex, motionMode]);
+  return <div ref={canvasRef} className="array-canvas" aria-label="Array visualization">
     <VisualizationLegend items={ARRAY_LEGEND_ITEMS} note="Cells stay in index order; their height does not represent value."/>
+    <span className="array-scroll-hint" aria-hidden="true">Swipe to follow active values <b>↔</b></span>
     <LayoutGroup id="array-layout">
     <div className={`array-stage ${heldEntity ? 'has-insert-value' : ''} ${teaching ? 'has-teaching' : ''}`} style={{ '--array-count': slots.length }}>
     <TeachingStrip teaching={teaching} slotCount={slots.length}/>
@@ -198,7 +282,7 @@ const ArrayRenderer = memo(function ArrayRenderer({ frame, event, activity, moti
         const motionRole = structuralMove && index === moveFrom ? 'source' : structuralMove && index === moveTo ? 'destination' : null;
         const lifted = ['compare', 'mid', 'active', 'swap', 'move'].includes(state);
         const teachingTone = teachingTargets.get(index);
-        return <div className={`array-item ${marker ? 'has-marker' : ''} ${motionRole ? `is-${motionRole}` : ''} ${teachingTone ? `teaching-target tone-${teachingTone}` : ''}`} data-slot={`slot:${index}`} key={`slot:${index}`}>
+        return <div className={`array-item ${marker ? 'has-marker' : ''} ${motionRole ? `is-${motionRole}` : ''} ${teachingTone ? `teaching-target tone-${teachingTone}` : ''}`} data-slot={`slot:${index}`} data-follow-target={index === followIndex ? 'true' : undefined} key={`slot:${index}`}>
           {marker ? <span className="array-marker"><span>{indexMarkerLabel}</span><i aria-hidden="true">↓</i></span> : null}
           <div className={`array-cell-slot ${entity ? '' : 'is-empty'}`} aria-label={`Index ${index}, ${entity ? `value ${entity.value}` : 'temporarily empty'}, ${state}`}>
             <AnimatePresence initial={false}>{entity ? <m.div layout layoutId={entity.id} data-entity-id={entity.id} className={`array-cell bar-${state}`}
@@ -231,8 +315,11 @@ const ArrayRenderer = memo(function ArrayRenderer({ frame, event, activity, moti
 
 ITCC47VisualizerRegistry.registerRenderer('array', ArrayRenderer);
 
-const LinkedListRenderer = memo(function LinkedListRenderer({ frame, event, duration, onEntityComplete }) {
+const LinkedListRenderer = memo(function LinkedListRenderer({ frame, event, duration, motionMode, onEntityComplete }) {
+  const canvasRef = useRef(null);
   const nodes = frame?.nodes || [];
+  const hasCurrentPointer = Object.prototype.hasOwnProperty.call(frame?.pointers || {}, 'current');
+  const currentNodeId = hasCurrentPointer ? frame.pointers.current : undefined;
   const pointersByNode = Object.entries(frame?.pointers || {}).reduce((grouped, [name, id]) => {
     const key = id || 'NULL';
     grouped[key] = [...(grouped[key] || []), name];
@@ -240,7 +327,25 @@ const LinkedListRenderer = memo(function LinkedListRenderer({ frame, event, dura
   }, {});
   const teaching = frame?.markers?.teaching || null;
   const visited = new Set(teaching?.visited || []);
-  return <div className="linked-canvas" aria-label="Singly linked list visualization">
+  useEffect(() => {
+    if (!hasCurrentPointer || !window.matchMedia('(max-width: 1000px)').matches) return undefined;
+    const animationFrame = requestAnimationFrame(() => {
+      const canvas = canvasRef.current;
+      if (!canvas || canvas.scrollWidth <= canvas.clientWidth + 1) return;
+      const target = currentNodeId
+        ? [...canvas.querySelectorAll('[data-node-id]')].find((node) => node.dataset.nodeId === currentNodeId)
+        : canvas.querySelector('.linked-null');
+      if (!target) return;
+      const canvasRect = canvas.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const margin = 24;
+      if (targetRect.left < canvasRect.left + margin || targetRect.right > canvasRect.right - margin) {
+        canvas.scrollTo({ left: Math.max(0, canvas.scrollLeft + targetRect.left - canvasRect.left - (canvasRect.width - targetRect.width) / 2), top: canvas.scrollTop, behavior: motionMode === 'on' ? 'smooth' : 'auto' });
+      }
+    });
+    return () => cancelAnimationFrame(animationFrame);
+  }, [event?.id, hasCurrentPointer, currentNodeId, motionMode]);
+  return <div ref={canvasRef} className="linked-canvas" aria-label="Singly linked list visualization">
     <VisualizationLegend items={LINKED_LIST_LEGEND_ITEMS} note="Pointer labels identify references; arrows show next links between node identities."/>
     <LayoutGroup id="linked-layout">
     <TeachingStrip teaching={teaching} linked/>
@@ -248,7 +353,7 @@ const LinkedListRenderer = memo(function LinkedListRenderer({ frame, event, dura
     <div className="linked-structure">
     <div className="linked-chain">
       {nodes.map((node, index) => <React.Fragment key={node.id}>
-        <m.div layout layoutId={`node:${node.id}`} data-node-id={node.id} className={`linked-node-wrap ${pointersByNode[node.id]?.includes('head') ? 'has-head' : ''} ${pointersByNode[node.id]?.includes('current') ? 'is-current' : ''} ${visited.has(node.id) ? 'is-visited' : ''} ${frame.detached?.includes(node.id) ? 'is-detached' : ''}`} initial={event?.transition?.enter?.includes(node.id) ? { opacity: 0, scale: .72 } : false} animate={{ opacity: 1, scale: 1, y: pointersByNode[node.id]?.includes('current') ? -7 : 0 }} exit={{ opacity: 0, scale: .72 }} transition={{ layout: { duration }, opacity: { duration: Math.min(duration, .18) } }} onLayoutAnimationComplete={() => onEntityComplete(node.id)} onAnimationComplete={() => onEntityComplete(node.id)}>
+        <m.div layout layoutId={`node:${node.id}`} data-node-id={node.id} data-follow-target={currentNodeId === node.id ? 'true' : undefined} className={`linked-node-wrap ${pointersByNode[node.id]?.includes('head') ? 'has-head' : ''} ${pointersByNode[node.id]?.includes('current') ? 'is-current' : ''} ${visited.has(node.id) ? 'is-visited' : ''} ${frame.detached?.includes(node.id) ? 'is-detached' : ''}`} initial={event?.transition?.enter?.includes(node.id) ? { opacity: 0, scale: .72 } : false} animate={{ opacity: 1, scale: 1, y: pointersByNode[node.id]?.includes('current') ? -7 : 0 }} exit={{ opacity: 0, scale: .72 }} transition={{ layout: { duration }, opacity: { duration: Math.min(duration, .18) } }} onLayoutAnimationComplete={() => onEntityComplete(node.id)} onAnimationComplete={() => onEntityComplete(node.id)}>
           <div className="pointer-labels">{(pointersByNode[node.id] || []).map((name) => <m.span layout layoutId={`pointer:${name}`} data-pointer-name={name} className={`pointer-${name.toLowerCase()}`} transition={{ layout: { duration } }} onLayoutAnimationComplete={() => onEntityComplete(`pointer:${name}`)} key={name}>{name}</m.span>)}</div>
           <div className="linked-node" aria-label={`${node.id}, value ${node.value}${pointersByNode[node.id]?.includes('current') ? ', current node' : ''}${pointersByNode[node.id]?.includes('head') ? ', head node' : ''}`}>
             <strong>{node.value}</strong><span className={frame.highlightedEdges?.some((edge) => edge.from === node.id) ? 'is-highlighted' : ''}>●</span>
@@ -259,7 +364,7 @@ const LinkedListRenderer = memo(function LinkedListRenderer({ frame, event, dura
           ? <m.div layout data-edge-id={`edge:${node.id}->${nodes[index + 1].id}`} initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }} transition={{ duration }} onAnimationComplete={() => onEntityComplete(`edge:${node.id}->${nodes[index + 1].id}`)} className={`linked-arrow ${frame.highlightedEdges?.some((edge) => edge.from === node.id && edge.to === nodes[index + 1].id) ? 'is-highlighted' : ''}`} aria-hidden="true">→</m.div>
           : index < nodes.length - 1 ? <div className="linked-chain-gap" aria-hidden="true"/> : null}
       </React.Fragment>)}
-      <div className="linked-null"><span>NULL</span>{(pointersByNode.NULL || []).map((name) => <m.small layout layoutId={`pointer:${name}`} data-pointer-name={name} className={`pointer-${name.toLowerCase()}`} transition={{ layout: { duration } }} onLayoutAnimationComplete={() => onEntityComplete(`pointer:${name}`)} key={name}>{name}</m.small>)}</div>
+      <div className="linked-null" data-follow-target={hasCurrentPointer && currentNodeId == null ? 'true' : undefined}><span>NULL</span>{(pointersByNode.NULL || []).map((name) => <m.small layout layoutId={`pointer:${name}`} data-pointer-name={name} className={`pointer-${name.toLowerCase()}`} transition={{ layout: { duration } }} onLayoutAnimationComplete={() => onEntityComplete(`pointer:${name}`)} key={name}>{name}</m.small>)}</div>
     </div>
     {frame?.invariants ? <div className="linked-invariants" aria-label="Linked-list invariants"><span className={frame.invariants.cycleFree ? 'passes' : 'fails'}>cycle-free</span><span className={frame.invariants.sorted ? 'passes' : 'fails'}>sorted</span><span>{frame.invariants.reachable} reachable</span>{frame.detached?.length ? <span className="detached-fact">{frame.detached.length} detached</span> : null}{frame.pointerWrite ? <code>{frame.pointerWrite.code}</code> : null}</div> : null}
     </div>
@@ -497,40 +602,41 @@ function OutputView({ event, result }) {
   return <div className="output-view"><span>Current explanation</span><strong>{event?.message || 'Choose an activity to begin.'}</strong><pre className={output.length ? '' : 'is-waiting'} aria-label="Program output">{output.length ? output.join('\n') : 'No output yet — advance to a print() step.'}</pre>{result?.removed != null ? <p>Removed value: {result.removed}</p> : null}</div>;
 }
 
-ITCC47VisualizerRegistry.registerEvidenceView('trace', TraceView);
-ITCC47VisualizerRegistry.registerEvidenceView('variables', VariablesView);
-ITCC47VisualizerRegistry.registerEvidenceView('operations', OperationsView);
-ITCC47VisualizerRegistry.registerEvidenceView('output', OutputView);
+ITCC47VisualizerRegistry.registerEvidenceView('trace', TraceView, { label: 'Trace', icon: 'list' });
+ITCC47VisualizerRegistry.registerEvidenceView('steps', TraceView, { label: 'Steps', icon: 'list' });
+ITCC47VisualizerRegistry.registerEvidenceView('variables', VariablesView, { label: 'Variables', icon: 'grid' });
+ITCC47VisualizerRegistry.registerEvidenceView('objects', ObjectStateView, { label: 'Object state', icon: 'grid' });
+ITCC47VisualizerRegistry.registerEvidenceView('operations', OperationsView, { label: 'Operations', icon: 'more' });
+ITCC47VisualizerRegistry.registerEvidenceView('calls', CallPathView, { label: 'Call path', icon: 'link' });
+ITCC47VisualizerRegistry.registerEvidenceView('output', OutputView, { label: 'Output', icon: 'code' });
 
-const EVIDENCE_LABELS = Object.freeze({ trace: 'Trace', variables: 'Variables', operations: 'Operations', output: 'Output', steps: 'Steps', objects: 'Object state', calls: 'Call path' });
-const EVIDENCE_ICONS = Object.freeze({ trace: 'list', steps: 'list', variables: 'grid', objects: 'grid', operations: 'more', calls: 'link', output: 'code' });
+function evidenceDefinition(id) {
+  return BSITVisualizerRegistry.getEvidenceDefinition(id) || Object.freeze({ id, label: id, icon: 'more', view: null });
+}
 
-function EvidenceDrawer({ tab, setTab, activity, result, event, index, controller, inputs, id, onCollapse = null, showCurrentLabel = true }) {
+function EvidenceDrawer({ tab, setTab, activity, result, event, index, controller, inputs, viewOptions, setViewOptions, id, onCollapse = null, showCurrentLabel = true }) {
   const tabs = activity.evidenceViews || ['trace', 'variables', 'operations', 'output'];
+  const definition = evidenceDefinition(tab);
+  const EvidenceView = definition.view;
   return <aside className="evidence-drawer" id={id}>
-    {onCollapse ? <header className="evidence-heading"><div>{showCurrentLabel ? <><span>Learning evidence</span><strong>{EVIDENCE_LABELS[tab] || tab}</strong></> : <strong>Learning evidence</strong>}</div><button type="button" aria-label="Collapse learning evidence" aria-expanded="true" aria-controls={id} onClick={onCollapse}><Icon name="collapse" size={18}/></button></header> : null}
+    {onCollapse ? <header className="evidence-heading"><div>{showCurrentLabel ? <><span>Learning evidence</span><strong>{definition.label}</strong></> : <strong>Learning evidence</strong>}</div><button type="button" aria-label="Collapse learning evidence" aria-expanded="true" aria-controls={id} onClick={onCollapse}><Icon name="collapse" size={18}/></button></header> : null}
     <div className="evidence-tabs" role="tablist" aria-label="Learning evidence">
-      {tabs.map((tabId) => <button type="button" role="tab" aria-selected={tab === tabId} className={tab === tabId ? 'active' : ''} onClick={() => setTab(tabId)} key={tabId}>{EVIDENCE_LABELS[tabId] || tabId}</button>)}
+      {tabs.map((tabId) => { const item = evidenceDefinition(tabId); return <button type="button" role="tab" aria-selected={tab === tabId} className={tab === tabId ? 'active' : ''} onClick={() => setTab(tabId)} key={tabId}>{item.label}</button>; })}
     </div>
     <div className="evidence-content" role="tabpanel">
-      {tab === 'trace' || tab === 'steps' ? <TraceView events={result.events} currentIndex={index} onSelect={controller.seek} /> : null}
-      {tab === 'variables' ? <VariablesView frame={event?.frame} inputs={inputs} /> : null}
-      {tab === 'objects' ? <ObjectStateView frame={event?.frame} /> : null}
-      {tab === 'calls' ? <CallPathView frame={event?.frame} /> : null}
-      {tab === 'operations' ? <OperationsView activity={activity} event={event} /> : null}
-      {tab === 'output' ? <OutputView event={event} result={result.result} /> : null}
+      {EvidenceView ? <EvidenceView activity={activity} result={result.result} events={result.events} event={event} frame={event?.frame} currentIndex={index} index={index} onSelect={controller.seek} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : <p className="model-note">No evidence view is registered for this activity.</p>}
     </div>
   </aside>;
 }
 
-const CollapsibleEvidencePanel = memo(function CollapsibleEvidencePanel({ contentId, expanded, onExpandedChange, tab, setTab, activity, result, event, index, controller, inputs, showCurrentLabel = true }) {
+const CollapsibleEvidencePanel = memo(function CollapsibleEvidencePanel({ contentId, expanded, onExpandedChange, tab, setTab, activity, result, event, index, controller, inputs, viewOptions, setViewOptions, showCurrentLabel = true }) {
   const tabs = activity.evidenceViews || (activity.renderer === 'object-model'
     ? ['steps', 'objects', 'calls', 'output'] : ['trace', 'variables', 'operations', 'output']);
   function selectFromRail(tabId) { setTab(tabId); onExpandedChange(true); }
-  if (expanded) return <EvidenceDrawer id={contentId} onCollapse={() => onExpandedChange(false)} showCurrentLabel={showCurrentLabel} tab={tab} setTab={setTab} activity={activity} result={result} event={event} index={index} controller={controller} inputs={inputs}/>;
+  if (expanded) return <EvidenceDrawer id={contentId} onCollapse={() => onExpandedChange(false)} showCurrentLabel={showCurrentLabel} tab={tab} setTab={setTab} activity={activity} result={result} event={event} index={index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/>;
   return <aside className="evidence-rail" id={contentId} aria-label="Collapsed learning evidence">
     <button type="button" className="evidence-rail-toggle" aria-label="Expand learning evidence" aria-expanded="false" aria-controls={contentId} onClick={() => onExpandedChange(true)}><Icon name="expandPanel" size={18}/></button>
-    <div role="tablist" aria-label="Learning evidence" aria-orientation="vertical">{tabs.map((tabId) => <button type="button" role="tab" title={EVIDENCE_LABELS[tabId] || tabId} aria-label={EVIDENCE_LABELS[tabId] || tabId} aria-selected={tab === tabId} className={tab === tabId ? 'active' : ''} onClick={() => selectFromRail(tabId)} key={tabId}><Icon name={EVIDENCE_ICONS[tabId] || 'more'} size={18}/><span>{EVIDENCE_LABELS[tabId] || tabId}</span></button>)}</div>
+    <div role="tablist" aria-label="Learning evidence" aria-orientation="vertical">{tabs.map((tabId) => { const item = evidenceDefinition(tabId); return <button type="button" role="tab" title={item.label} aria-label={item.label} aria-selected={tab === tabId} className={tab === tabId ? 'active' : ''} onClick={() => selectFromRail(tabId)} key={tabId}><Icon name={item.icon} size={18}/><span>{item.label}</span></button>; })}</div>
   </aside>;
 });
 
@@ -593,10 +699,13 @@ function OOPDataControls({ activity, inputs, setInputs }) {
 }
 
 function DataControls(props) {
+  const RegisteredControls = BSITVisualizerRegistry.getInputControls(props.activity.input.kind);
+  if (RegisteredControls) return <RegisteredControls {...props}/>;
   return props.activity.input.kind === 'object-model' ? <OOPDataControls {...props}/> : <ArrayDataControls {...props}/>;
 }
 
 function workspaceCompositionFor(activity) {
+  if (activity.workspaceComposition) return activity.workspaceComposition;
   if (activity.family === 'Stacks') return 'split-vertical';
   if (activity.family === 'Trees') return 'wide-hierarchy';
   if (activity.renderer === 'array' || activity.renderer === 'linked-list' || activity.renderer === 'linear-adt') return 'stacked-horizontal';
@@ -618,16 +727,26 @@ function PlaybackDock({ state, controller, activity, event, motionPreference }) 
   </footer>;
 }
 
-function PlaybackSettings({ state, controller, motionPreference, mobile = false }) {
+function GranularityControl({ value, onChange, mobile = false }) {
+  if (!onChange) return null;
+  return <fieldset className={`granularity-control ${mobile ? 'is-mobile' : ''}`}>
+    <legend>Step size</legend>
+    {['operation', 'micro'].map((item) => <button type="button" aria-pressed={value === item} onClick={() => onChange(item)} key={item}>{item === 'operation' ? 'Operation' : 'Micro'}</button>)}
+  </fieldset>;
+}
+
+function PlaybackSettings({ state, controller, motionPreference, mobile = false, granularity, onGranularityChange }) {
   return <div className={`playback-settings-fields ${mobile ? 'is-mobile' : ''}`}>
+    {mobile ? <GranularityControl value={granularity} onChange={onGranularityChange} mobile/> : null}
     <label className="speed-control">{mobile ? 'Mobile speed' : 'Speed'}<select value={state.speed} onChange={(e) => controller.setSpeed(e.target.value)}><option value="3">0.5×</option><option value="6">1×</option><option value="9">2×</option></select></label>
     <label className="motion-control">{mobile ? 'Mobile motion' : 'Motion'}<select aria-label={mobile ? 'Mobile motion' : 'Motion preference'} value={motionPreference.override || 'device'} onChange={(e) => motionPreference.update(e.target.value)}><option value="device">Use device setting</option><option value="on">On</option><option value="reduced">Reduced</option><option value="off">Off</option></select></label>
   </div>;
 }
 
-function IntegratedPlayback({ state, controller, event, motionPreference }) {
+function IntegratedPlayback({ state, controller, event, motionPreference, granularity, onGranularityChange }) {
   return <section className="integrated-playback" aria-label="Playback controls">
     <div id="result-caption" className="integrated-step" aria-live="polite"><strong>{state.total ? state.index + 1 : 0} / {state.total}</strong><span>{event?.message || 'Preparing activity…'}</span></div>
+    <GranularityControl value={granularity} onChange={onGranularityChange}/>
     <div className="transport">
       <button type="button" aria-label="Previous" onClick={() => controller.step(-1)} disabled={state.index === 0 || state.transitioning}><Icon name="previous"/></button>
       <button type="button" className="primary" aria-label={state.status === 'playing' ? 'Pause' : 'Play'} onClick={controller.toggle} disabled={state.atEnd}><Icon name={state.status === 'playing' ? 'pause' : 'play'}/><span>{state.status === 'playing' ? 'Pause' : 'Play'}</span></button>
@@ -635,7 +754,7 @@ function IntegratedPlayback({ state, controller, event, motionPreference }) {
     </div>
     <div className="timeline-control integrated-timeline"><input id="step-slider" type="range" min="0" max={Math.max(state.total - 1, 0)} value={state.index} onChange={(e) => controller.seek(Number(e.target.value))} aria-label="Timeline step"/></div>
     <details className="playback-settings"><summary aria-label="Playback settings"><Icon name="settings" size={18}/><span>Settings</span></summary><PlaybackSettings state={state} controller={controller} motionPreference={motionPreference}/></details>
-    <details className="mobile-playback-details"><summary>Timeline and settings</summary><input type="range" min="0" max={Math.max(state.total - 1, 0)} value={state.index} onChange={(e) => controller.seek(Number(e.target.value))} aria-label="Mobile timeline step"/><PlaybackSettings state={state} controller={controller} motionPreference={motionPreference} mobile/></details>
+    <details className="mobile-playback-details"><summary><Icon name="settings" size={18}/><span>Timeline and settings</span></summary><input type="range" min="0" max={Math.max(state.total - 1, 0)} value={state.index} onChange={(e) => controller.seek(Number(e.target.value))} aria-label="Mobile timeline step"/><PlaybackSettings state={state} controller={controller} motionPreference={motionPreference} granularity={granularity} onGranularityChange={onGranularityChange} mobile/></details>
   </section>;
 }
 
@@ -730,59 +849,58 @@ const ITCC45LabStage = memo(function ITCC45LabStage({ activity, event, previousE
   </div>;
 });
 
-function VisualizerMenu() {
-  const activities = useMemo(() => BSITLearningLab.listActivities('itcc47'), []);
-  const families = useMemo(() => [...new Set(activities.map((activity) => activity.family))], [activities]);
-  return <main className="visualizer-menu" aria-labelledby="visualizer-menu-title">
-    <header className="visualizer-menu-heading">
-      <div><a href="itcc47.html"><Icon name="back" size={15}/>Back to ITCC47</a><h1 id="visualizer-menu-title">Choose a visualization.</h1><p>Open a focused lesson, then step through the code and data together.</p></div>
-      <span>{activities.length} interactive lessons</span>
-    </header>
-    <div className="visualizer-menu-families">
-      {families.map((family) => <section className="visualizer-menu-family" key={family} aria-labelledby={`family-${family.replace(/\W+/g, '-').toLowerCase()}`}>
-        <header><h2 id={`family-${family.replace(/\W+/g, '-').toLowerCase()}`}>{family}</h2><span>{activities.filter((activity) => activity.family === family).length}</span></header>
-        <div className="visualizer-menu-list">
-          {activities.filter((activity) => activity.family === family).map((activity) => {
-            const release = ITCC47Curriculum.stateForResource('activity', activity.id, ITCC47CurriculumUI.previewOptions());
-            return <a href={ITCC47CurriculumUI.href(`visualizer.html?activity=${encodeURIComponent(activity.id)}`)} className={`visualizer-menu-item release-item-${release.state}`} key={activity.id}>
-              <span className="visualizer-menu-module">Module {activity.module} · {activity.exampleKind ? `${activity.exampleKind} · ` : ''}{release.state}</span><strong>{activity.title}</strong><span>{activity.subtitle}</span><Icon name="next" size={19}/>
-            </a>;
-          })}
-        </div>
-      </section>)}
-    </div>
-  </main>;
+function VisualizerCatalogRedirect() {
+  useEffect(() => {
+    location.replace(ITCC47CurriculumUI.href('problems.html?view=visualizations'));
+  }, []);
+  return <main className="visualizer-locked"><section className="curriculum-lock" role="status"><p className="eyebrow">Opening catalog</p><h1>Moving to visualizations…</h1></section></main>;
+}
+
+function IndustryAliasRedirect({ scenarioId }) {
+  useEffect(() => {
+    location.replace(ITCC47CurriculumUI.href(`industry-workbench.html?scenario=${encodeURIComponent(scenarioId)}`));
+  }, [scenarioId]);
+  return <main className="visualizer-locked"><section className="curriculum-lock" role="status"><p className="eyebrow">Opening workbench</p><h1>Moving to the scenario workspace…</h1></section></main>;
 }
 
 function LockedVisualizer({ release, requestedId }) {
   const title = release.resource?.title || BSITLearningLab.listActivities('itcc47').find((item) => item.id === requestedId)?.title || 'Visualization';
-  return <main className="visualizer-locked" dangerouslySetInnerHTML={{ __html: ITCC47CurriculumUI.lockedPanel(release, { title: `${title} is not released yet` }) }}/>;
+  return <main className="visualizer-locked" dangerouslySetInnerHTML={{ __html: ITCC47CurriculumUI.lockedPanel(release, { title: `${title} is coming later` }) }}/>;
 }
 
 function VisualizerWorkspace({ params, courseId, requestedId }) {
   const isITCC45 = courseId === 'itcc45';
+  const isComputerArchitecture = courseId === 'computer-architecture';
+  const isITCC47 = courseId === 'itcc47';
+  const usesCompactWorkspace = useMediaQuery('(max-width: 1000px)');
   const [itcc45WorkspaceLayout, updateITCC45WorkspaceLayout] = useWorkspaceLayout(isITCC45, ITCC45WorkspaceLayout, true);
-  const [itcc47WorkspaceLayout, updateITCC47WorkspaceLayout] = useWorkspaceLayout(!isITCC45, ITCC47WorkspaceLayout);
-  const workspaceLayout = isITCC45 ? itcc45WorkspaceLayout : itcc47WorkspaceLayout;
-  const updateWorkspaceLayout = isITCC45 ? updateITCC45WorkspaceLayout : updateITCC47WorkspaceLayout;
+  const [itcc47WorkspaceLayout, updateITCC47WorkspaceLayout] = useWorkspaceLayout(isITCC47, ITCC47WorkspaceLayout);
+  const [computerArchitectureWorkspaceLayout, updateComputerArchitectureWorkspaceLayout] = useWorkspaceLayout(isComputerArchitecture, ComputerArchitectureWorkspaceLayout);
+  const workspaceLayout = isITCC45 ? itcc45WorkspaceLayout : isComputerArchitecture ? computerArchitectureWorkspaceLayout : itcc47WorkspaceLayout;
+  const updateWorkspaceLayout = isITCC45 ? updateITCC45WorkspaceLayout : isComputerArchitecture ? updateComputerArchitectureWorkspaceLayout : updateITCC47WorkspaceLayout;
   const activity = useMemo(() => BSITLearningLab.getActivity(courseId, requestedId), [courseId, requestedId]);
   const initialInputs = useCallback((nextActivity) => {
     if (nextActivity.input.defaults) return { ...nextActivity.input.defaults };
+    if (nextActivity.input.kind === 'cpu-preset') return { preset: nextActivity.input.defaultPreset };
     return {
-      values: [...nextActivity.input.defaultValues],
+      values: [...(nextActivity.input.defaultValues || [])],
       target: nextActivity.input.needsTarget ? nextActivity.input.defaultValues[Math.floor(nextActivity.input.defaultValues.length / 2)] : null,
       index: nextActivity.input.index ?? null, value: nextActivity.input.value ?? null,
       preset: nextActivity.input.presets?.[0]?.id || null,
     };
   }, []);
   const [inputs, setInputs] = useState(() => initialInputs(activity));
+  const [viewOptions, setViewOptions] = useState({ numberFormat: 'hex' });
+  const [cpuGranularity, setCpuGranularity] = useState('operation');
+  const pendingGranularityMap = useRef(null);
   const primaryEvidence = activity.evidenceViews?.[0] || 'trace';
   const [evidenceTab, setEvidenceTab] = useState(primaryEvidence);
-  const [mobileTab, setMobileTab] = useState('visualize');
+  const [mobileTab, setMobileTab] = useState(() => activity.mobileViews?.[0]?.id || 'visualize');
   const controller = useMemo(() => BSITPlayback.createController({ speed: DEFAULT_SPEED, delayForSpeed: (speed) => 1250 - speed * 110 }), []);
   const playback = usePlayback(controller);
+  const recordsStudentProgress = isITCC47 && !ITCC47Curriculum.isPreviewRequested();
   const motionPreference = useMotionPreference();
-  const result = useMemo(() => activity.run(inputs), [activity, inputs]);
+  const result = useMemo(() => activity.run(inputs, { granularity: isComputerArchitecture ? cpuGranularity : 'operation' }), [activity, cpuGranularity, inputs, isComputerArchitecture]);
   const source = useMemo(() => activity.sourceFor ? activity.sourceFor(inputs) : activity.source, [activity, inputs]);
   const event = result.events[playback.index] || result.events[0] || null;
   const previousEvent = playback.index > 0 ? result.events[playback.index - 1] || null : null;
@@ -790,14 +908,31 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const duration = motionPreference.mode === 'on' ? motionDuration(playback.speed) : (motionPreference.mode === 'reduced' ? 0.16 : 0);
   const visualDuration = playback.navigationSource === 'seek' || playback.navigationSource === 'load' ? 0 : duration;
   const objectVisualDuration = playback.navigationSource === 'seek' ? 0 : duration;
+  const cpuFrame = useCpuSequenceFrame({ enabled: isComputerArchitecture, event, frame: event?.frame, duration: visualDuration, onSequenceComplete: onEntityComplete });
   const workspaceComposition = workspaceCompositionFor(activity);
-  const [Renderer, setRenderer] = useState(() => activity.renderer === 'object-model' ? ObjectModelRenderer : ArrayRenderer);
+  const [Renderer, setRenderer] = useState(() => activity.renderer === 'object-model' ? ObjectModelRenderer : activity.renderer === 'cpu-datapath' ? CpuDatapathRenderer : ArrayRenderer);
 
-  useEffect(() => { controller.load(result.events); }, [controller, result]);
+  useEffect(() => {
+    const mapping = pendingGranularityMap.current;
+    let startIndex = 0;
+    if (isComputerArchitecture && mapping?.operationId) {
+      startIndex = result.events.findIndex((item) => item.frame?.operation?.id === mapping.operationId);
+      if (startIndex < 0) startIndex = 0;
+      pendingGranularityMap.current = null;
+    }
+    controller.load(result.events, startIndex);
+  }, [controller, isComputerArchitecture, result]);
+  useEffect(() => { setEvidenceTab(activity.evidenceViews?.[0] || 'trace'); setMobileTab(activity.mobileViews?.[0]?.id || 'visualize'); }, [activity.id, activity.evidenceViews, activity.mobileViews]);
   useEffect(() => () => controller.dispose(), [controller]);
   useEffect(() => {
+    if (recordsStudentProgress && typeof ITCC47VisualizerProgress !== 'undefined') ITCC47VisualizerProgress.markVisited(activity.id);
+  }, [activity.id, recordsStudentProgress]);
+  useEffect(() => {
+    if (recordsStudentProgress && playback.atEnd && playback.total > 0 && typeof ITCC47VisualizerProgress !== 'undefined') ITCC47VisualizerProgress.markReviewed(activity.id);
+  }, [activity.id, playback.atEnd, playback.total, recordsStudentProgress]);
+  useEffect(() => {
     document.body.dataset.course = courseId;
-    if (courseId === 'itcc45' || (params.get('activity') && params.get('activity') !== activity.id)) {
+    if (courseId !== 'itcc47' || (params.get('activity') && params.get('activity') !== activity.id)) {
       const url = new URL(location.href); url.searchParams.set('course', courseId); url.searchParams.set('activity', activity.id); history.replaceState({}, '', url);
     }
   }, [activity.id, courseId, params]);
@@ -813,50 +948,68 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
     setInputs((current) => ({ ...current, values, target: activity.input.needsTarget ? values[Math.floor(values.length / 2)] : current.target }));
   }
 
-  const mobileTabs = [['visualize', 'grid', 'Visualize'], ['code', 'code', 'Code'], ['trace', 'list', courseId === 'itcc45' ? 'Steps' : 'Trace'], ['more', 'more', 'More']];
-  const backHref = courseId === 'itcc45' ? 'itcc45-topics.html' : 'problems.html?view=visualizations';
-  const backLabel = courseId === 'itcc45' ? 'All examples' : 'All visualizations';
+  function changeCpuGranularity(next) {
+    if (!isComputerArchitecture || next === cpuGranularity || !['operation', 'micro'].includes(next)) return;
+    controller.pause();
+    pendingGranularityMap.current = { operationId: event?.frame?.operation?.id || 'locate-pc' };
+    setCpuGranularity(next);
+  }
+
+  const mobileTabs = activity.mobileViews?.map((item) => [item.id, item.icon, item.label]) || [['visualize', 'grid', 'Visualize'], ['code', 'code', 'Code'], ['trace', 'list', courseId === 'itcc45' ? 'Steps' : 'Trace'], ['more', 'more', 'More']];
+  const backHref = isComputerArchitecture ? 'computer-architecture-modules.html' : courseId === 'itcc45' ? 'itcc45-topics.html' : 'problems.html?view=visualizations';
+  const backLabel = isComputerArchitecture ? 'Module roadmap' : courseId === 'itcc45' ? 'All examples' : 'All visualizations';
   const topicActivities = useMemo(() => isITCC45 ? BSITLearningLab.listActivities(courseId).filter((item) => item.topicId === activity.topicId) : [], [activity.topicId, courseId, isITCC45]);
   const exampleIndex = isITCC45 ? Math.max(0, topicActivities.findIndex((item) => item.id === activity.id)) : 0;
   const previousExample = exampleIndex > 0 ? topicActivities[exampleIndex - 1] : null;
   const nextExample = exampleIndex < topicActivities.length - 1 ? topicActivities[exampleIndex + 1] : null;
   const exampleHref = (item) => item ? `visualizer.html?course=itcc45&activity=${encodeURIComponent(item.id)}` : null;
   const itcc47ActionHref = activity.renderer === 'linear-adt'
-    ? ITCC47CurriculumUI.href(`lesson.html?checkpoint=${encodeURIComponent(activity.checkpointId)}`)
+    ? ITCC47CurriculumUI.href(`problem-list.html?module=${encodeURIComponent(activity.module)}`)
     : ITCC47CurriculumUI.href(`tracer.html?activity=${encodeURIComponent(activity.id)}`);
-  const itcc47ActionLabel = activity.renderer === 'linear-adt' ? 'Lecture companion' : 'Edit pseudocode';
+  const itcc47ActionLabel = activity.renderer === 'linear-adt' ? 'Practice this module' : 'Edit pseudocode';
+  const mobileEvidenceActive = mobileTab === 'trace' || mobileTab === 'steps' || mobileTab === 'more';
   return <LazyMotion features={domMax} strict><MotionConfig reducedMotion={motionPreference.mode === 'on' ? 'never' : 'always'} transition={{ duration }}><div className={`visualizer-workspace course-${courseId} evidence-${workspaceLayout.evidence} motion-${motionPreference.mode} navigation-${playback.navigationSource} composition-${workspaceComposition}`} data-motion-duration={duration} data-workspace-composition={workspaceComposition}>
     <main className="workspace-main">
-      <div className="activity-heading"><div><p><a href={isITCC45 ? backHref : ITCC47CurriculumUI.href(backHref)}><Icon name="back" size={14}/>{backLabel}</a><span>{isITCC45 ? `Topic ${activity.module} / ${activity.topic} / Example ${exampleIndex + 1} of ${topicActivities.length}` : `Module ${activity.module} / ${activity.topic}${activity.exampleKind ? ` / ${activity.exampleKind}` : ''}`}</span></p><h1>{activity.title}</h1>{isITCC45 ? <span className="activity-learning-goal"><em>{activity.context}</em>{activity.learningGoal}</span> : <span>{activity.subtitle}</span>}</div><div className="activity-action-stack">{isITCC45 ? <nav className="activity-example-nav" aria-label="Examples in this topic">{previousExample ? <a href={exampleHref(previousExample)} aria-label={`Previous example: ${previousExample.title}`}><Icon name="back" size={14}/>Previous</a> : <span aria-disabled="true"><Icon name="back" size={14}/>Previous</span>}{nextExample ? <a href={exampleHref(nextExample)} aria-label={`Next example: ${nextExample.title}`}>Next<Icon name="next" size={14}/></a> : <span aria-disabled="true">Next<Icon name="next" size={14}/></span>}</nav> : null}<div className="activity-actions">{isITCC45 ? <OOPDataControls activity={activity} inputs={inputs} setInputs={setInputs}/> : null}<a className="edit-code" href={isITCC45 ? `itcc45-practice.html?topic=${activity.topicId}` : itcc47ActionHref}><Icon name={isITCC45 ? 'list' : activity.renderer === 'linear-adt' ? 'grid' : 'code'} size={17}/>{isITCC45 ? 'Practice this topic' : itcc47ActionLabel}</a></div></div></div>
-      {!isITCC45 ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} onShuffle={shuffle}/> : null}
+      <div className="activity-heading"><div>{!isComputerArchitecture ? <p><a href={isITCC45 ? backHref : ITCC47CurriculumUI.href(backHref)}><Icon name="back" size={14}/>{backLabel}</a><span>{isITCC45 ? `Topic ${activity.module} / ${activity.topic} / Example ${exampleIndex + 1} of ${topicActivities.length}` : `Module ${activity.module} / ${activity.topic}${activity.exampleKind ? ` / ${activity.exampleKind}` : ''}`}</span></p> : null}<h1>{activity.title}</h1>{isITCC45 ? <span className="activity-learning-goal"><em>{activity.context}</em>{activity.learningGoal}</span> : <span>{activity.subtitle}</span>}</div><div className="activity-action-stack">{isITCC45 ? <nav className="activity-example-nav" aria-label="Examples in this topic">{previousExample ? <a href={exampleHref(previousExample)} aria-label={`Previous example: ${previousExample.title}`}><Icon name="back" size={14}/>Previous</a> : <span aria-disabled="true"><Icon name="back" size={14}/>Previous</span>}{nextExample ? <a href={exampleHref(nextExample)} aria-label={`Next example: ${nextExample.title}`}>Next<Icon name="next" size={14}/></a> : <span aria-disabled="true">Next<Icon name="next" size={14}/></span>}</nav> : null}<div className="activity-actions">{isITCC45 ? <OOPDataControls activity={activity} inputs={inputs} setInputs={setInputs}/> : isComputerArchitecture ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : <a className="edit-code" href={itcc47ActionHref}><Icon name={activity.renderer === 'linear-adt' ? 'grid' : 'code'} size={17}/>{itcc47ActionLabel}</a>}</div></div></div>
+      {!isITCC45 && !isComputerArchitecture ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} onShuffle={shuffle} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : null}
       <div className="mobile-surface-tabs" role="tablist" aria-label="Workspace view">{mobileTabs.map(([id, icon, label]) => <button type="button" role="tab" aria-selected={mobileTab === id} className={mobileTab === id ? 'active' : ''} onClick={() => setMobileTab(id)} key={id}><Icon name={icon}/>{label}</button>)}</div>
-      {isITCC45 ? <ITCC45LabStage activity={activity} event={event} previousEvent={previousEvent} index={playback.index} source={source} mobileTab={mobileTab} layout={workspaceLayout} onRatioChange={(sourceRatio) => updateWorkspaceLayout({ sourceRatio })} duration={objectVisualDuration} motionMode={motionPreference.mode}/> : <div className="itcc47-workbench">
+      {isITCC45 ? <ITCC45LabStage activity={activity} event={event} previousEvent={previousEvent} index={playback.index} source={source} mobileTab={mobileTab} layout={workspaceLayout} onRatioChange={(sourceRatio) => updateWorkspaceLayout({ sourceRatio })} duration={objectVisualDuration} motionMode={motionPreference.mode}/> : isComputerArchitecture ? <div className="cpu-workbench">
+        <div className={`cpu-memory-surface mobile-surface ${mobileTab === 'memory' ? 'mobile-active' : ''}`}><MainMemoryPane frame={cpuFrame} numberFormat={viewOptions.numberFormat}/></div>
+        <div className="cpu-visual-shell">
+          <header className="cpu-canvas-heading"><strong>CPU datapath</strong><span><b>Operation {cpuFrame?.operation?.index || 1} / {cpuFrame?.operation?.total || 1}</b><em>{cpuFrame?.microStep?.index || 1} / {cpuFrame?.microStep?.total || 1} · {cpuFrame?.microStep?.label || 'Find the source'}</em></span></header>
+          <section className={`cpu-visual-canvas mobile-surface ${mobileTab === 'datapath' ? 'mobile-active' : ''}`} tabIndex="0" aria-label={`${activity.title} teaching CPU datapath`}><Renderer frame={cpuFrame} event={event} activity={activity} numberFormat={viewOptions.numberFormat} motionMode={motionPreference.mode} duration={visualDuration * (cpuFrame?.microStep?.durationWeight || 1)}/></section>
+        </div>
+      </div> : <div className="itcc47-workbench">
         <div className={`desktop-source mobile-surface ${mobileTab === 'code' ? 'mobile-active' : ''}`}><SourcePanel activity={activity} event={event} source={source}/></div>
         <div className="itcc47-visual-shell">
           <section className={`visual-canvas mobile-surface ${mobileTab === 'visualize' ? 'mobile-active' : ''}`} tabIndex="0" aria-label={`${activity.title} visualization canvas`}><Renderer frame={event?.frame} event={event} activity={activity} motionMode={motionPreference.mode} duration={visualDuration} onEntityComplete={onEntityComplete}/></section>
           <IntegratedPlayback state={playback} controller={controller} event={event} motionPreference={motionPreference}/>
         </div>
       </div>}
-      <div className={`mobile-evidence mobile-surface ${mobileTab === 'trace' || mobileTab === 'more' ? 'mobile-active' : ''}`}>
-        <EvidenceDrawer tab={mobileTab === 'trace' ? primaryEvidence : evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs}/>
-      </div>
+      {usesCompactWorkspace && mobileEvidenceActive ? <div className="mobile-evidence mobile-surface mobile-active">
+        <EvidenceDrawer tab={mobileTab === 'trace' || mobileTab === 'steps' ? primaryEvidence : evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/>
+      </div> : null}
     </main>
-    <div className="desktop-evidence"><CollapsibleEvidencePanel contentId={isITCC45 ? 'itcc45-learning-evidence' : 'itcc47-learning-evidence'} expanded={workspaceLayout.evidence === 'expanded'} onExpandedChange={(expanded) => updateWorkspaceLayout({ evidence: expanded ? 'expanded' : 'collapsed' })} showCurrentLabel={isITCC45} tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs}/></div>
+    {!usesCompactWorkspace ? <div className="desktop-evidence"><CollapsibleEvidencePanel contentId={isITCC45 ? 'itcc45-learning-evidence' : isComputerArchitecture ? 'computer-architecture-learning-evidence' : 'itcc47-learning-evidence'} expanded={workspaceLayout.evidence === 'expanded'} onExpandedChange={(expanded) => updateWorkspaceLayout({ evidence: expanded ? 'expanded' : 'collapsed' })} showCurrentLabel={isITCC45 || isComputerArchitecture} tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/></div> : null}
+    {isComputerArchitecture ? <IntegratedPlayback state={playback} controller={controller} event={event} motionPreference={motionPreference} granularity={cpuGranularity} onGranularityChange={changeCpuGranularity}/> : null}
     {isITCC45 ? <PlaybackDock state={playback} controller={controller} activity={activity} event={event} motionPreference={motionPreference}/> : null}
   </div></MotionConfig></LazyMotion>;
 }
 
 function App() {
   const params = useMemo(() => new URLSearchParams(location.search), []);
+  if (document.body.dataset.experience === 'industry-data-workbench') return <IndustryWorkbenchApp Icon={Icon} usePlaybackHook={usePlayback} IntegratedPlaybackComponent={IntegratedPlayback} useMotionPreferenceHook={useMotionPreference} useTransitionBoundaryHook={useTransitionBoundary} motionDurationForSpeed={motionDuration}/>;
   const requestedCourse = params.get('course') || 'itcc47';
   const courseId = BSITLearningLab.resolveCourse(requestedCourse);
   const requestedActivity = params.get('activity');
-  if (courseId === 'itcc47' && !requestedActivity) return <VisualizerMenu/>;
+  if (courseId === 'itcc47' && !requestedActivity) return <VisualizerCatalogRedirect/>;
   if (courseId === 'itcc47' && requestedActivity) {
+    if (ITCC47IndustryWorkbench.getScenario(requestedActivity)) return <IndustryAliasRedirect scenarioId={requestedActivity}/>;
     const release = ITCC47Curriculum.stateForResource('activity', requestedActivity, ITCC47CurriculumUI.previewOptions());
     if (!['available', 'current'].includes(release.state)) return <LockedVisualizer release={release} requestedId={requestedActivity}/>;
   }
-  return <VisualizerWorkspace params={params} courseId={courseId} requestedId={requestedActivity || 'itcc45-classes-blueprint'}/>;
+  const defaultActivity = courseId === 'computer-architecture' ? 'architecture-fetch-cycle' : 'itcc45-classes-blueprint';
+  return <VisualizerWorkspace params={params} courseId={courseId} requestedId={requestedActivity || defaultActivity}/>;
 }
 
 const root = document.getElementById('visualizer-root');

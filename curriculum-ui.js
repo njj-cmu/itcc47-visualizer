@@ -20,32 +20,33 @@ const ITCC47CurriculumUI = (() => {
   }
 
   function requirement(result) {
-    if (result.state === 'planned') return 'This resource is visible on the roadmap but is not in the deployed course build yet.';
-    return `Complete the lecture sequence through ${result.checkpoint ? esc(result.checkpoint.title) : 'its mapped checkpoint'} before using this resource.`;
+    if (result.state === 'planned') return 'This topic is listed in the roadmap and is still being prepared.';
+    return 'This topic is scheduled for a later module. You can keep working through the available topics in the meantime.';
   }
 
   function lockedPanel(result, options = {}) {
-    const current = result.current?.title || 'the current lecture';
+    const current = result.current?.title || 'the current module';
+    const currentModule = String(result.current?.moduleId || 'm1').replace(/^m/, '');
     return `<section class="curriculum-lock" role="status" aria-labelledby="curriculum-lock-title">
-      ${badge(result.state)}
-      <p class="eyebrow">Lecture-aligned access</p>
-      <h1 id="curriculum-lock-title">${esc(options.title || 'This resource is not released yet')}</h1>
+      <h1 id="curriculum-lock-title">${esc(options.title || 'This topic is coming later')}</h1>
       <p>${requirement(result)}</p>
-      <dl><div><dt>Current checkpoint</dt><dd>${esc(current)}</dd></div><div><dt>Required checkpoint</dt><dd>${esc(result.checkpoint?.title || 'Curriculum review')}</dd></div></dl>
-      <div class="curriculum-lock-actions"><a class="btn btn-primary" href="${href(`lesson.html?checkpoint=${encodeURIComponent(result.current?.id || 'orientation')}`)}">Continue current lecture</a><a class="btn" href="${href('problems.html')}">View roadmap</a></div>
-      <p class="curriculum-lock-note">Your saved drafts and practice progress remain in this browser while this resource is locked.</p>
+      <div class="curriculum-lock-requirement"><span aria-hidden="true">→</span><div><small>Available after</small><strong>${esc(result.checkpoint?.title || 'Curriculum review')}</strong></div></div>
+      <div class="curriculum-lock-actions"><a class="btn btn-primary" href="${href(`problem-list.html?module=${encodeURIComponent(currentModule)}`)}">Continue with Module ${esc(currentModule)} <span aria-hidden="true">→</span></a><a class="btn" href="${href('problems.html?view=visualizations')}">Explore available visualizations</a></div>
+      <p class="curriculum-lock-note">Currently studying: ${esc(current)}. Your saved practice remains in this browser.</p>
     </section>`;
   }
 
   function mountPreviewControls(target) {
-    if (!target) return;
+    if (!target || !ITCC47Curriculum.hasInstructorAccess() || target.querySelector('.release-preview')) return;
     const active = ITCC47Curriculum.activeProfile(previewOptions());
+    const controls = document.createElement('div');
+    controls.id = 'release-controls';
     const details = document.createElement('details');
     details.className = 'release-preview';
     details.innerHTML = `<summary>Instructor preview</summary><div class="release-preview-body">
-      <p>Preview changes only this browser. It never advances the deployed semester profile.</p>
+      <p>Private preview changes only this authorized browser. It never advances the deployed semester profile.</p>
       <label>Preview checkpoint<select></select></label>
-      <div><button type="button" data-preview-apply>Apply preview</button><button type="button" data-preview-clear>Use deployed profile</button></div>
+      <div><button type="button" data-preview-apply>Apply preview</button><button type="button" data-preview-exit>Exit instructor mode</button></div>
       <small>${active.preview ? `Previewing through ${esc(active.currentCheckpointId)}` : 'Preview mode is off.'}</small>
     </div>`;
     const select = details.querySelector('select');
@@ -59,10 +60,12 @@ const ITCC47CurriculumUI = (() => {
       ITCC47Curriculum.writePreview(select.value);
       const url = new URL(location.href); url.searchParams.set('preview', '1'); location.href = url.href;
     });
-    details.querySelector('[data-preview-clear]').addEventListener('click', () => {
-      ITCC47Curriculum.clearPreview(); const url = new URL(location.href); url.searchParams.delete('preview'); location.href = url.href;
+    details.querySelector('[data-preview-exit]').addEventListener('click', () => {
+      ITCC47Curriculum.revokeInstructorAccess();
+      const url = new URL(location.href); url.searchParams.delete('preview'); url.searchParams.delete(ITCC47Curriculum.INSTRUCTOR_QUERY_KEY); location.href = url.href;
     });
-    target.appendChild(details);
+    controls.appendChild(details);
+    target.appendChild(controls);
   }
 
   function mountDraftPreviewIndicator() {

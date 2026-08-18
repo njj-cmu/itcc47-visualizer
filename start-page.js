@@ -2,11 +2,11 @@
 (function () {
   const current = typeof ITCC47Curriculum === 'undefined' ? null : ITCC47Curriculum.activeProfile();
   const checkpoint = current ? ITCC47Curriculum.getCheckpoint(current.currentCheckpointId) : null;
-  const continueLink = document.getElementById('continue-lecture');
+  const practiceLink = document.getElementById('open-current-practice');
   const currentCard = document.getElementById('current-checkpoint');
-  if (checkpoint && continueLink && currentCard) {
-    continueLink.href = `lesson.html?checkpoint=${encodeURIComponent(checkpoint.id)}`;
-    currentCard.innerHTML = `<span>Current lecture</span><strong>${ITCC47CurriculumUI.esc(checkpoint.title)}</strong><small>${ITCC47CurriculumUI.esc(checkpoint.summary)}</small>`;
+  if (checkpoint && practiceLink && currentCard) {
+    practiceLink.href = `problem-list.html?module=${encodeURIComponent(checkpoint.moduleId.replace(/^m/, ''))}`;
+    currentCard.innerHTML = `<span>Current module</span><strong>${ITCC47CurriculumUI.esc(checkpoint.title)}</strong><small>${ITCC47CurriculumUI.esc(checkpoint.summary)}</small>`;
   }
   const link = document.getElementById('explore-tools');
   const section = document.getElementById('tools');

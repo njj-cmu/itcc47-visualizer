@@ -7,7 +7,7 @@ const ROOT = path.join(__dirname, '..');
 const SOURCE = path.join(ROOT, 'curriculum.public.json');
 const OUTPUT = path.join(ROOT, 'curriculum.data.js');
 const PROFILE = path.join(ROOT, 'release-profile.js');
-const PUBLIC_KINDS = new Set(['lesson', 'tool', 'activity', 'problem']);
+const PUBLIC_KINDS = new Set(['tool', 'activity', 'problem']);
 const REVIEW_STATUSES = new Set(['reviewed', 'draft']);
 
 function readReleaseProfile() {
@@ -66,7 +66,7 @@ function validate(data) {
 
 function validateRelease(data, profile) {
   const failures = [];
-  if (!profile || profile.schemaVersion !== 2 || profile.profileVersion !== 3) failures.push('release profile schemaVersion 2 and profileVersion 3 are required');
+  if (!profile || profile.schemaVersion !== 2 || profile.profileVersion !== 5) failures.push('release profile schemaVersion 2 and profileVersion 5 are required');
   if ('finalProjectId' in (profile || {})) failures.push('finalProjectId is not supported by the practice-only release profile');
   const checkpoints = new Map(data.checkpoints.map((item) => [item.id, item]));
   const current = checkpoints.get(profile?.currentCheckpointId);

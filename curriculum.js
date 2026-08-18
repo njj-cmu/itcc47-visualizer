@@ -2,6 +2,8 @@
 const ITCC47Curriculum = (() => {
   const SCHEMA_VERSION = 2;
   const PREVIEW_STORAGE_KEY = 'itcc47.release-preview:v1';
+  const INSTRUCTOR_ACCESS_STORAGE_KEY = 'itcc47.instructor-access:v1';
+  const INSTRUCTOR_QUERY_KEY = 'instructorKey';
   const VALID_STATES = new Set(['available', 'current', 'locked', 'planned']);
   const data = ITCC47_CURRICULUM_DATA;
   const checkpoints = Object.freeze([...(data.checkpoints || [])]);
@@ -25,6 +27,77 @@ const ITCC47Curriculum = (() => {
       && checkpointById.has(profile.currentCheckpointId);
   }
 
+  function equalHash(left, right) {
+    if (typeof left !== 'string' || typeof right !== 'string' || left.length !== right.length) return false;
+    let difference = 0;
+    for (let index = 0; index < left.length; index++) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
+    return difference === 0;
+  }
+
+  function accessConfigIsValid() {
+    return typeof ITCC47_INSTRUCTOR_ACCESS !== 'undefined'
+      && ITCC47_INSTRUCTOR_ACCESS.schemaVersion === 1
+      && ITCC47_INSTRUCTOR_ACCESS.profileId === ITCC47_RELEASE_PROFILE.profileId
+      && ITCC47_INSTRUCTOR_ACCESS.profileVersion === ITCC47_RELEASE_PROFILE.profileVersion
+      && /^[0-9a-f]{64}$/.test(ITCC47_INSTRUCTOR_ACCESS.tokenHash)
+      && !/^0+$/.test(ITCC47_INSTRUCTOR_ACCESS.tokenHash);
+  }
+
+  function readInstructorAccess(storage = localStorage) {
+    if (!accessConfigIsValid() || typeof Hash === 'undefined') return null;
+    try {
+      const value = JSON.parse(storage.getItem(INSTRUCTOR_ACCESS_STORAGE_KEY) || 'null');
+      if (!value || value.schemaVersion !== ITCC47_INSTRUCTOR_ACCESS.schemaVersion
+        || value.profileId !== ITCC47_INSTRUCTOR_ACCESS.profileId
+        || value.profileVersion !== ITCC47_INSTRUCTOR_ACCESS.profileVersion
+        || typeof value.token !== 'string'
+        || !equalHash(Hash.hex(value.token), ITCC47_INSTRUCTOR_ACCESS.tokenHash)) return null;
+      return value;
+    } catch { return null; }
+  }
+
+  function hasInstructorAccess(storage = localStorage) {
+    return !!readInstructorAccess(storage);
+  }
+
+  function grantInstructorAccess(token, storage = localStorage) {
+    if (!accessConfigIsValid() || typeof Hash === 'undefined' || typeof token !== 'string') return null;
+    const normalizedToken = token.trim();
+    const tokenHash = Hash.hex(normalizedToken);
+    if (!equalHash(tokenHash, ITCC47_INSTRUCTOR_ACCESS.tokenHash)) return null;
+    const value = Object.freeze({
+      schemaVersion: ITCC47_INSTRUCTOR_ACCESS.schemaVersion,
+      profileId: ITCC47_INSTRUCTOR_ACCESS.profileId,
+      profileVersion: ITCC47_INSTRUCTOR_ACCESS.profileVersion,
+      token: normalizedToken,
+    });
+    try { storage.setItem(INSTRUCTOR_ACCESS_STORAGE_KEY, JSON.stringify(value)); } catch { return null; }
+    return value;
+  }
+
+  function revokeInstructorAccess(storage = localStorage) {
+    try {
+      storage.removeItem(INSTRUCTOR_ACCESS_STORAGE_KEY);
+      storage.removeItem(PREVIEW_STORAGE_KEY);
+    } catch { /* Optional local instructor state. */ }
+  }
+
+  function consumeInstructorAccessRequest(search = location.search, storage = localStorage) {
+    const params = new URLSearchParams(search || '');
+    const token = params.get(INSTRUCTOR_QUERY_KEY);
+    if (!token) return false;
+    const granted = !!grantInstructorAccess(token, storage);
+    params.delete(INSTRUCTOR_QUERY_KEY);
+    if (granted) params.set('preview', '1');
+    else params.delete('preview');
+    try {
+      const page = (location.pathname || '').split('/').pop() || '';
+      const query = params.toString();
+      history.replaceState({}, '', `${page}${query ? `?${query}` : ''}${location.hash || ''}`);
+    } catch { /* URL cleanup is best-effort in embedded file viewers. */ }
+    return granted;
+  }
+
   function readPreview(storage = localStorage) {
     try {
       const value = JSON.parse(storage.getItem(PREVIEW_STORAGE_KEY) || 'null');
@@ -37,7 +110,7 @@ const ITCC47Curriculum = (() => {
   }
 
   function writePreview(checkpointId, storage = localStorage) {
-    if (!checkpointById.has(checkpointId)) return null;
+    if (!hasInstructorAccess(storage) || !checkpointById.has(checkpointId)) return null;
     const value = Object.freeze({
       schemaVersion: SCHEMA_VERSION,
       profileId: ITCC47_RELEASE_PROFILE.profileId,
@@ -52,16 +125,18 @@ const ITCC47Curriculum = (() => {
     try { storage.removeItem(PREVIEW_STORAGE_KEY); } catch { /* optional storage */ }
   }
 
-  function isPreviewRequested(search = location.search) {
-    return new URLSearchParams(search || '').get('preview') === '1';
+  function isPreviewRequested(search = location.search, storage = localStorage) {
+    return new URLSearchParams(search || '').get('preview') === '1' && hasInstructorAccess(storage);
   }
 
   function activeProfile(options = {}) {
     const base = validateProfile(ITCC47_RELEASE_PROFILE)
       ? ITCC47_RELEASE_PROFILE
       : { schemaVersion: SCHEMA_VERSION, profileId: 'safe-fallback', profileVersion: 1, currentCheckpointId: 'orientation' };
-    if (!options.preview && !isPreviewRequested(options.search)) return Object.freeze({ ...base, preview: false });
-    const preview = readPreview(options.storage);
+    const storage = options.storage || localStorage;
+    const requested = Boolean(options.preview) || new URLSearchParams(options.search ?? location.search ?? '').get('preview') === '1';
+    if (!requested || !hasInstructorAccess(storage)) return Object.freeze({ ...base, preview: false });
+    const preview = readPreview(storage);
     return Object.freeze({ ...base, currentCheckpointId: preview?.currentCheckpointId || base.currentCheckpointId, preview: true });
   }
 
@@ -101,10 +176,13 @@ const ITCC47Curriculum = (() => {
     return state;
   }
 
+  if (typeof location !== 'undefined' && typeof localStorage !== 'undefined') consumeInstructorAccessRequest(location.search, localStorage);
+
   return Object.freeze({
-    SCHEMA_VERSION, PREVIEW_STORAGE_KEY, data, clos, modules, checkpoints,
+    SCHEMA_VERSION, PREVIEW_STORAGE_KEY, INSTRUCTOR_ACCESS_STORAGE_KEY, INSTRUCTOR_QUERY_KEY, data, clos, modules, checkpoints,
     getCheckpoint, getModule, getResource, listResources, resourcesForCheckpoint,
-    validateProfile, readPreview, writePreview, clearPreview, isPreviewRequested,
+    validateProfile, readInstructorAccess, hasInstructorAccess, grantInstructorAccess, revokeInstructorAccess,
+    consumeInstructorAccessRequest, readPreview, writePreview, clearPreview, isPreviewRequested,
     activeProfile, stateForCheckpoint, stateForResource, isOpen, assertState,
   });
 })();

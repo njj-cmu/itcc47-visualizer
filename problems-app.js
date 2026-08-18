@@ -448,7 +448,7 @@ document.querySelectorAll('dialog.dlg').forEach((dlg) => {
 
 loadProgress();
 if (!requestedIsOpen) {
-  document.querySelector('.layout').innerHTML = ITCC47CurriculumUI.lockedPanel(requestedRelease, { title: `${requestedProblemRecord?.title || requestedRelease.resource?.title || 'This problem'} is not released yet` });
+  document.querySelector('.layout').innerHTML = ITCC47CurriculumUI.lockedPanel(requestedRelease, { title: `${requestedProblemRecord?.title || requestedRelease.resource?.title || 'This problem'} is coming later` });
   document.title = 'Locked resource · ITCC47';
 } else if (moduleProblems.length) {
   selectProblem(moduleProblems.find((problem) => problem.id === requestedProblem) || moduleProblems[0]);

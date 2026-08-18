@@ -1,5 +1,15 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ITCC47 Lecture Companion</title><link rel="stylesheet" href="styles.css"></head>
-<body class="lesson-page" data-course="itcc47"><header class="topbar"><div class="topbar-title"><span class="topbar-code">ITCC47</span> Lecture Companion</div><nav class="topbar-nav"></nav></header>
-<main id="lesson-root" class="lesson-main"></main>
-<script src="course-catalog.js"></script><script src="curriculum.data.js"></script><script src="release-profile.js"></script><script src="curriculum.js"></script><script src="curriculum-ui.js"></script><script src="checkpoint-companions.js"></script><script src="nav.js"></script><script src="lesson-app.js"></script><script src="sw-register.js" defer></script></body></html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Opening ITCC47 Practice</title><link rel="stylesheet" href="styles.css"></head>
+<body data-course="itcc47"><main class="visualizer-locked"><section class="curriculum-lock" role="status"><p class="eyebrow">Practice bank</p><h1>Opening module practice…</h1><p>The former checkpoint guide has moved into the self-paced practice experience.</p><p><a id="practice-fallback" class="btn btn-primary" href="problem-list.html?module=1">Open Module 1 practice</a></p></section></main>
+<script>
+(() => {
+  const params = new URLSearchParams(location.search);
+  const match = /^m([1-8])(?:-|$)/.exec(params.get('checkpoint') || '');
+  const moduleNumber = match ? match[1] : '1';
+  const target = new URL('problem-list.html', location.href);
+  target.searchParams.set('module', moduleNumber);
+  if (params.get('preview') === '1') target.searchParams.set('preview', '1');
+  document.getElementById('practice-fallback').href = target.href;
+  location.replace(target.href);
+})();
+</script></body></html>

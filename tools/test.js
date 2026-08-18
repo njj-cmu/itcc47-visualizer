@@ -520,15 +520,70 @@ ok('presentation identities remain deterministic with duplicate values', duplica
 ok('swap metadata moves stable entities between slots', duplicateSwap.transition.kind === 'swap' && duplicateSwap.transition.moves.length === 2 && duplicateSwap.transition.wait);
 const insertionEvents = ALGORITHMS.insertion.run([3, -1, 2]);
 ok('insertion presentation keeps a single held entity and explicit hole', insertionEvents.some((event) => event.frame.presentation.held && event.frame.presentation.holes.length === 1) && insertionEvents.every((event) => new Set([...event.frame.presentation.slots.filter(Boolean), event.frame.presentation.held?.entityId].filter(Boolean)).size === 3));
-const appSource = fs.readFileSync(path.join(ROOT, 'app.js'), 'utf8');
-ok('visual input uses one 18-value limit', appSource.includes('const MAX_VISUAL_VALUES = 18') && /parsed\.length > MAX_VISUAL_VALUES/.test(appSource));
+const visualizerSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'main.jsx'), 'utf8');
+ok('visual input uses one 18-value limit', visualizerSource.includes('const MAX_VISUAL_VALUES = 18') && /parts\.length > MAX_VISUAL_VALUES/.test(visualizerSource));
 
-const workspaceEngine = load(['interpreter.js', 'playback.js', 'complexity.js', 'algorithms.js', 'activity-catalog.js', 'linear-adt-activities.js', 'visualizer-registry.js'], { setTimeout, clearTimeout });
+const workspaceEngine = load(['interpreter.js', 'playback.js', 'complexity.js', 'algorithms.js', 'activity-catalog.js', 'linear-adt-activities.js', 'industry-workbench.js', 'visualizer-registry.js'], { setTimeout, clearTimeout });
 const Activities = workspaceEngine.get('ITCC47Activities');
 const Registry = workspaceEngine.get('ITCC47VisualizerRegistry');
+const IndustryWorkbench = workspaceEngine.get('ITCC47IndustryWorkbench');
 ok('activity catalog is versioned', Activities.SCHEMA_VERSION === 1 && /^\d{4}\.\d{2}(?:-[a-z0-9-]+)?$/.test(Activities.CONTENT_VERSION));
 ['bubble-sort', 'selection-sort', 'insertion-sort', 'linear-search', 'binary-search', 'array-list-insert', 'array-list-remove', 'linked-list-traversal', 'linked-list-insert-head']
   .forEach((id) => ok(`activity catalog contains ${id}`, Activities.list().some((activity) => activity.id === id)));
+const industryScenarios = IndustryWorkbench.listScenarios();
+ok('industry workbench registers four visualization-only activities', industryScenarios.length === 4 && industryScenarios.every((scenario) => scenario.experienceId === 'industry-data-workbench' && scenario.workspaceMode === 'industry-dataset' && scenario.source === null && scenario.views.join(',') === 'visualize'));
+const supportDataset = IndustryWorkbench.dataset;
+const arrivalIds = Array.from({ length: supportDataset.logicalLength }, (_, index) => supportDataset.recordAt('arrival', index).ticketId);
+ok('support dataset generates 12,400 unique stable IDs from a fixed seed', Number.isInteger(supportDataset.seed) && arrivalIds.length === 12400 && new Set(arrivalIds).size === 12400 && arrivalIds[0] === 'TCK-000001' && arrivalIds.at(-1) === 'TCK-012400');
+ok('dataset generation is deterministic across named views', [0, 27, 620, 3719, 3720, 12399].every((index) => supportDataset.recordAt('priority', index) === supportDataset.recordAt('priority', index)) && supportDataset.recordAt('arrival', 27).ticketId === 'TCK-000028');
+const priorityBands = [['P1', 0, 619], ['P2', 620, 3719], ['P3', 3720, 8679], ['P4', 8680, 12399]];
+ok('priority view has exact stable bands and preserves identity order inside each band', priorityBands.every(([priority, start, end]) => {
+  let previousEntity = -1;
+  for (let index = start; index <= end; index += 1) {
+    const record = supportDataset.recordAt('priority', index);
+    if (record.priority !== priority || record.entityIndex <= previousEntity) return false;
+    previousEntity = record.entityIndex;
+  }
+  return true;
+}));
+ok('manual-review view contains 2,048 unique dataset members', new Set(Array.from({ length: supportDataset.views.review.length }, (_, index) => supportDataset.recordAt('review', index).ticketId)).size === 2048);
+
+function validIndustryFrame(event) {
+  const frame = event.frame;
+  if (frame.kind !== 'industry-dataset' || frame.datasetId !== supportDataset.id || frame.logicalLength < 1) return false;
+  let cursor = 0;
+  for (const token of frame.tokens) {
+    const start = token.kind === 'gap' ? token.start : token.index;
+    const end = token.kind === 'gap' ? token.end : token.index;
+    if (start !== cursor || end < start || end >= frame.logicalLength) return false;
+    if (token.kind === 'gap' && (token.count !== end - start + 1 || !token.reason)) return false;
+    if (token.kind === 'record' && (!token.entityId || token.record.ticketId !== token.entityId)) return false;
+    cursor = end + 1;
+  }
+  if (cursor !== frame.logicalLength) return false;
+  const validRange = (range) => Array.isArray(range) && range.length === 2 && range[0] >= 0 && range[0] <= range[1] && range[1] < frame.logicalLength;
+  if (frame.activeRange && !validRange(frame.activeRange)) return false;
+  if (frame.scannedRange && !validRange(frame.scannedRange)) return false;
+  if (!frame.discardedRanges.every(validRange)) return false;
+  if (!frame.pointers.every((pointer) => Number.isInteger(pointer.index) && pointer.index >= 0 && pointer.index < frame.logicalLength && frame.tokens.some((token) => token.kind !== 'gap' && token.index === pointer.index))) return false;
+  if (frame.selectedRecord && !frame.tokens.some((token) => token.kind === 'record' && token.index === frame.selectedRecord.index && token.entityId === frame.selectedRecord.entityId)) return false;
+  if (frame.transition && (![frame.transition.from, frame.transition.to].every((index) => Number.isInteger(index) && index >= 0 && index < frame.logicalLength) || !frame.transition.entityId)) return false;
+  if (frame.transition && (!event.transition?.wait || event.transition.moves?.[0]?.entityId !== frame.transition.entityId)) return false;
+  if (frame.operationSpan && (frame.operationSpan.count !== frame.operationSpan.end - frame.operationSpan.start + 1 || !frame.operationSpan.reason)) return false;
+  return !frame.comparison || typeof frame.comparison.outcome === 'boolean';
+}
+
+const industryRuns = Object.fromEntries(industryScenarios.map((scenario) => [scenario.id, scenario.run()]));
+industryScenarios.forEach((scenario) => {
+  const result = industryRuns[scenario.id];
+  ok(`${scenario.id} timeline is deterministic and terminal`, JSON.stringify(result) === JSON.stringify(scenario.run()) && result.events[0].type === 'initialize' && result.events.at(-1).terminal);
+  ok(`${scenario.id} frames fully explain every logical span`, result.events.every(validIndustryFrame));
+  ok(`${scenario.id} exposes initialization, active work, phase exit, and return`, result.events.some((event) => ['comparison', 'mutation', 'compressed-mutation'].includes(event.type)) && result.events.some((event) => event.boundary) && result.events.at(-1).type === 'return');
+});
+ok('SLA scan returns the known first breach after every earlier comparison', industryRuns['industry-sla-breach-scan'].result.index === 27 && industryRuns['industry-sla-breach-scan'].result.ticketId === 'TCK-000028' && industryRuns['industry-sla-breach-scan'].events.filter((event) => event.type === 'comparison').length === 28);
+ok('priority recall returns the exact half-open P2 bounds', JSON.stringify(industryRuns['industry-priority-range-recall'].result) === JSON.stringify({ lower: 620, upper: 3720, count: 3100 }));
+ok('stable dispatch preserves P2 order and accounts for all 8,680 shifts', industryRuns['industry-stable-priority-dispatch'].result.index === 3720 && industryRuns['industry-stable-priority-dispatch'].result.moves === 8680 && industryRuns['industry-stable-priority-dispatch'].events.some((event) => event.frame.operationSpan?.count === 8678));
+ok('review mutation exposes exact insertion and removal costs', industryRuns['industry-review-queue-mutation'].result.insertedIndex === 640 && industryRuns['industry-review-queue-mutation'].result.removedIndex === 1520 && industryRuns['industry-review-queue-mutation'].result.insertMoves === 1408 && industryRuns['industry-review-queue-mutation'].result.removalMoves === 528 && industryRuns['industry-review-queue-mutation'].result.totalMoves === 1936);
 const insertResultA = Activities.get('array-list-insert').run({ values: [18, 7, 31, 12], index: 2, value: 24 });
 const insertResultB = Activities.get('array-list-insert').run({ values: [18, 7, 31, 12], index: 2, value: 24 });
 ok('array-list insertion timeline is deterministic', JSON.stringify(insertResultA) === JSON.stringify(insertResultB));
@@ -554,6 +609,19 @@ const linkedTraversalA = Activities.get('linked-list-traversal').run();
 const linkedTraversalB = Activities.get('linked-list-traversal').run();
 ok('linked-list traversal timeline is deterministic', JSON.stringify(linkedTraversalA) === JSON.stringify(linkedTraversalB));
 ok('linked-list traversal follows every node to NULL', linkedTraversalA.outcome === 'complete' && linkedTraversalA.events.at(-1).frame.nodes.map((node) => node.value).join(',') === '18,7,31' && linkedTraversalA.events.at(-1).metrics.nodeVisits === 3);
+const traversalActivity = Activities.get('linked-list-traversal');
+ok('linked-list traversal exposes default, singleton, and empty presets', traversalActivity.input.presets.map((preset) => preset.id).join(',') === 'default,singleton,empty');
+[
+  ['default', 3, '18,7,31'],
+  ['singleton', 1, '7'],
+  ['empty', 0, ''],
+].forEach(([preset, visits, values]) => {
+  const result = traversalActivity.run({ preset });
+  const source = traversalActivity.sourceFor({ preset });
+  ok(`linked-list traversal ${preset} is deterministic and reaches NULL`, JSON.stringify(result) === JSON.stringify(traversalActivity.run({ preset })) && result.outcome === 'complete' && result.events.at(-1).metrics.nodeVisits === visits && result.events.at(-1).frame.nodes.map((node) => node.value).join(',') === values && result.events.at(-1).frame.pointers.current === null);
+  ok(`linked-list traversal ${preset} keeps source lines synchronized`, result.events.every((event) => event.source?.code.trim() === source[event.source.line - 1].trim()));
+  ok(`linked-list traversal ${preset} keeps stable node identities`, result.events.every((event) => event.frame.nodes.every((node) => /^node:\d+$/.test(node.id))));
+});
 const linkedInsert = Activities.get('linked-list-insert-head').run();
 ok('head insertion preserves the old chain after the new node', linkedInsert.events.at(-1).frame.nodes.map((node) => node.value).join(',') === '24,18,7' && linkedInsert.events.at(-1).metrics.pointerWrites === 2);
 ok('linked transitions preserve pointer and edge identities', linkedInsert.events.some((event) => event.transition?.moves?.some((move) => move.entityId === 'pointer:head')) && linkedInsert.events.some((event) => event.frame.links.every((link) => link.id === `edge:${link.from}->${link.to}`)));
@@ -633,7 +701,8 @@ const extensionActivity = { id: 'test-extension', input: {}, run() { return Play
 ok('activity catalog accepts later adapters', Activities.register(extensionActivity) && Activities.list().some((activity) => activity.id === extensionActivity.id));
 Registry.registerRenderer('test', function TestRenderer() {});
 Registry.registerEvidenceView('test-trace', function TestEvidence() {});
-ok('visualizer registries report renderers and evidence views', Registry.rendererDomains().includes('test') && Registry.evidenceIds().includes('test-trace'));
+Registry.registerInputControls('test-input', function TestInput() {});
+ok('visualizer registries report renderers, evidence metadata, and input controls', Registry.rendererDomains().includes('test') && Registry.evidenceIds().includes('test-trace') && Registry.getEvidenceDefinition('test-trace').label === 'test-trace' && Registry.inputKinds().includes('test-input'));
 ok('algorithm metrics remain separate from primitive-operation analysis', !fs.readFileSync(path.join(ROOT, 'visualizer-src', 'main.jsx'), 'utf8').includes('primitiveTotal +'));
 
 section('multi-course catalog and ITCC45 OOP');
@@ -671,12 +740,165 @@ ok('ITCC47 evidence choice persists under a separate versioned key', ITCC47Layou
 savedLayout.set(ITCC47Layout.STORAGE_KEY, JSON.stringify({ version: 0, evidence: 'collapsed' }));
 ok('ITCC47 ignores outdated layout storage', ITCC47Layout.read(layoutStorage).evidence === 'expanded');
 
+section('computer architecture teaching machine');
+const computerArchitectureEngine = load([
+  'course-catalog.js', 'playback.js', 'computer-architecture-machine.js',
+  'computer-architecture-activities.js', 'visualizer-registry.js',
+  'computer-architecture-practice-data.js',
+], { setTimeout, clearTimeout });
+const ComputerArchitecture = computerArchitectureEngine.get('ComputerArchitectureMachine');
+const ComputerArchitectureCatalog = computerArchitectureEngine.get('ComputerArchitectureActivities');
+const ComputerArchitectureCourses = computerArchitectureEngine.get('BSITLearningLab');
+const ComputerArchitecturePractice = computerArchitectureEngine.get('ComputerArchitecturePractice');
+const ComputerArchitectureRegistry = computerArchitectureEngine.get('BSITVisualizerRegistry');
+ok('teaching machine declares the required address and word widths',
+  ComputerArchitecture.WIDTHS.PC === 8 && ComputerArchitecture.WIDTHS.MAR === 8
+  && ComputerArchitecture.WIDTHS.addressBus === 8 && ComputerArchitecture.WIDTHS.MDR === 16
+  && ComputerArchitecture.WIDTHS.IR === 16 && ComputerArchitecture.WIDTHS.dataBus === 16
+  && ['R0', 'R1', 'R2', 'R3'].every((id) => ComputerArchitecture.WIDTHS[id] === 16));
+ok('instruction decoding separates 4-bit opcode, 4-bit register, and 8-bit operand', (() => {
+  const decoded = ComputerArchitecture.decodeInstruction(0x31A4);
+  return decoded.opcode === 3 && decoded.register === 1 && decoded.operand === 0xA4
+    && decoded.fields.opcode.bits === '0011' && decoded.fields.register.bits === '0001'
+    && decoded.fields.operand.bits === '10100100' && decoded.mnemonic === 'LOAD R1, [0xA4]';
+})());
+ok('number formats preserve declared width and unsigned decimal values',
+  ComputerArchitecture.formatValue(3, 8, 'hex') === '0x03'
+  && ComputerArchitecture.formatValue(3, 8, 'bin') === '0b00000011'
+  && ComputerArchitecture.formatValue(0xFF, 8, 'dec') === '255');
+ok('CPU cue timing reserves a scaled 0.8 second source hold before movement',
+  ComputerArchitecture.DURATION_WEIGHTS.focus === 0.87
+  && ComputerArchitecture.DURATION_WEIGHTS.arm === 2.79
+  && ComputerArchitecture.DURATION_WEIGHTS.travel === 3.27
+  && ComputerArchitecture.DURATION_WEIGHTS.arrive === 0.77);
+ok('CPU signal frames keep stable IDs while exposing readable labels and explanations',
+  ComputerArchitecture.SIGNAL_DEFINITIONS.MARin.label === 'MAR-in'
+  && ComputerArchitecture.SIGNAL_DEFINITIONS.PCout.label === 'PC-out'
+  && ComputerArchitecture.SIGNAL_IDS.every((id) => ComputerArchitecture.SIGNAL_DEFINITIONS[id]?.description));
+ok('three curated presets validate and decode to their declared mnemonics',
+  ComputerArchitecture.PRESETS.length === 3 && ComputerArchitecture.PRESETS.every((preset) => ComputerArchitecture.validatePreset(preset) && ComputerArchitecture.decodeInstruction(preset.word).mnemonic === preset.mnemonic));
+ComputerArchitecture.PRESETS.forEach((preset) => {
+  const first = ComputerArchitecture.run(preset.id, { granularity: 'operation' });
+  const second = ComputerArchitecture.run(preset.id, { granularity: 'operation' });
+  const micro = ComputerArchitecture.run(preset.id, { granularity: 'micro' });
+  const events = first.events;
+  const ids = events.map((event) => event.id);
+  const finalFrame = events.at(-1).frame;
+  const sequenceFrames = events.flatMap((event) => event.transition?.phases?.map((item) => item.frame) || [event.frame]);
+  const microFrames = micro.events.map((event) => event.frame);
+  const transfers = sequenceFrames.map((frame) => frame.transfer).filter(Boolean);
+  ok(`${preset.id}: emits six deterministic immutable operations`, events.length === 6 && JSON.stringify(first) === JSON.stringify(second) && events.every((event) => Object.isFrozen(event) && Object.isFrozen(event.frame)));
+  ok(`${preset.id}: operation identities are unique and stable`, new Set(ids).size === 6 && ids.every((id) => id.startsWith(`architecture-fetch-cycle:${preset.id}:operation:`)));
+  ok(`${preset.id}: fetch operations occur in the required order`, events.map((event) => event.type).join(',') === 'locate-pc,copy-pc-mar,read-memory-mdr,transfer-mdr-ir,increment-pc,decode-instruction');
+  ok(`${preset.id}: first frame highlights only PC without changing state`, events[0].frame.activeComponents.join(',') === 'PC' && events[0].frame.transfer === null && events[0].frame.signals.every((signal) => !signal.active) && events[0].frame.memory.selectedAddress === null && events[0].frame.registers.MAR.value === 0);
+  ok(`${preset.id}: operation sequences expose immutable phases and duration contracts`, events.slice(1).every((event) => event.transition.kind === 'cpu-operation' && event.transition.sequenceId && event.transition.durationUnits > 0 && event.transition.phases.every((item) => Object.isFrozen(item.frame))));
+  ok(`${preset.id}: stable address and word tokens survive compound transfers`, transfers.filter((item) => item.kind === 'address').every((item) => item.id === `address-token:${preset.id}`) && transfers.filter((item) => item.id === `instruction-word:${preset.id}`).every((item) => item.kind === 'instruction'));
+  ok(`${preset.id}: micro mode exposes the same graph as twenty-two individual phases`, micro.events.length === 22 && micro.events.every((event) => event.frame.playbackGranularity === 'micro') && micro.events.map((event) => event.frame.operation.id).filter((id, index, items) => index === 0 || id !== items[index - 1]).join(',') === events.map((event) => event.frame.operation.id).join(','));
+  ok(`${preset.id}: all twenty-two phases expose immutable PowerPoint-style animation metadata`, microFrames.length === 22 && microFrames.every((frame) => ComputerArchitecture.ANIMATION_STAGES.includes(frame.animation.stage) && frame.animation.sourceId && Object.isFrozen(frame.animation) && Object.isFrozen(frame.animation.timing) && Object.isFrozen(frame.animation.controlCues)));
+  ok(`${preset.id}: emitting phases hold and retain cues while non-emitting phases do not`, microFrames.every((frame) => {
+    const timing = frame.animation.timing;
+    if (frame.animation.stage === 'arm') return timing.spawnHoldUnits === 1.54 && timing.movementUnits === 1.25 && timing.retainAtEndpoint && frame.microStep.durationWeight === 2.79;
+    if (frame.animation.stage === 'travel') return timing.spawnHoldUnits === 1.54 && timing.movementUnits === 1.73 && timing.retainAtEndpoint && frame.microStep.durationWeight === 3.27;
+    return timing.spawnHoldUnits === 0 && timing.movementUnits === 0 && !timing.retainAtEndpoint;
+  }));
+  ok(`${preset.id}: animation metadata is identical in compound and micro playback`, JSON.stringify(sequenceFrames.map((frame) => frame.animation)) === JSON.stringify(microFrames.map((frame) => frame.animation)));
+  ok(`${preset.id}: control cues have stable unique identities and declared directions`, (() => {
+    const cues = microFrames.flatMap((frame) => frame.animation.controlCues);
+    return new Set(cues.map((cue) => cue.id)).size === cues.length
+      && cues.every((cue) => cue.id.startsWith('control-cue:') && cue.routeId.startsWith('control-') && cue.order > 0)
+      && cues.filter((cue) => cue.signalId === 'MFC').every((cue) => cue.direction === 'to-cu')
+      && cues.filter((cue) => cue.signalId === 'MFC').every((cue) => cue.originId === 'memory')
+      && cues.filter((cue) => cue.signalId !== 'MFC').every((cue) => cue.direction === 'from-cu' && cue.originId === 'CONTROL');
+  })());
+  ok(`${preset.id}: every transfer declares its semantic role`, transfers.every((item) => ['address', 'instruction', 'operand', 'result'].includes(item.role)));
+  ok(`${preset.id}: memory read is one operation with address, wait, MFC, transfer, and capture phases`, (() => {
+    const phases = events[2].transition.phases;
+    return phases.length === 7
+      && phases.map((item) => item.frame.microStep.id.split(':').at(-1)).join(',') === 'focus-mar,assert-read,address-memory,select-memory-word,memory-ready,memory-mdr,capture-mdr'
+      && phases[2].frame.transfer.to === 'memory'
+      && phases[3].frame.memory.state === 'reading'
+      && phases[4].frame.signals.some((signal) => signal.id === 'MFC' && signal.active)
+      && phases[5].frame.transfer.from === 'memory' && phases[5].frame.transfer.to === 'MDR'
+      && phases[6].frame.registers.MDR.value === preset.word;
+  })());
+  ok(`${preset.id}: final state retains address and word while advancing PC`, finalFrame.registers.MAR.value === preset.pc && finalFrame.registers.MDR.value === preset.word && finalFrame.registers.IR.value === preset.word && finalFrame.registers.PC.value === ((preset.pc + 1) & 0xFF));
+  ok(`${preset.id}: fetch never changes memory and leaves all signals inactive`, finalFrame.memory.unchanged && finalFrame.memory.snapshot[preset.pc] === preset.word && finalFrame.signals.every((signal) => !signal.active));
+  ok(`${preset.id}: operation and micro timelines commit identical machine state`, ['PC', 'MAR', 'MDR', 'IR', 'R0', 'R1', 'R2', 'R3'].every((id) => finalFrame.registers[id].value === micro.result.finalFrame.registers[id].value) && JSON.stringify(finalFrame.memory.snapshot) === JSON.stringify(micro.result.finalFrame.memory.snapshot));
+});
+ok('ADDI preset demonstrates 8-bit PC wraparound', ComputerArchitecture.run('addi-r3-07').events.at(-1).frame.registers.PC.value === 0x00);
+ok('guided execution preset encodes 5 + 13 as ADDI R1, #0x0D', (() => {
+  const preset = ComputerArchitecture.EXECUTION_PRESETS[0];
+  const decoded = ComputerArchitecture.decodeInstruction(preset.word);
+  return preset.id === 'addi-five-thirteen' && preset.registers[1] === 5
+    && decoded.opcodeName === 'ADDI' && decoded.register === 1 && decoded.operand === 13
+    && preset.equation.result === 18;
+})());
+const additionFirst = ComputerArchitecture.runExecution('addi-five-thirteen');
+const additionSecond = ComputerArchitecture.runExecution('addi-five-thirteen');
+const additionMicro = ComputerArchitecture.runExecution('addi-five-thirteen', { granularity: 'micro' });
+const additionEvents = additionFirst.events;
+const additionFinal = additionEvents.at(-1).frame;
+const additionMicroFrames = additionMicro.events.map((event) => event.frame);
+ok('5 + 13 emits ten deterministic immutable fetch-and-execute operations',
+  additionEvents.length === 10 && JSON.stringify(additionFirst) === JSON.stringify(additionSecond)
+  && additionEvents.every((event) => Object.isFrozen(event) && Object.isFrozen(event.frame)));
+ok('5 + 13 retains six fetch operations then executes operands, ALU, and write-back',
+  additionEvents.map((event) => event.type).join(',') === 'locate-pc,copy-pc-mar,read-memory-mdr,transfer-mdr-ir,increment-pc,decode-instruction,r1-alu-a,immediate-alu-b,add-alu,write-r1');
+ok('5 + 13 operation identities and hierarchical metadata remain stable',
+  additionEvents.every((event) => event.id.startsWith('architecture-add-immediate:addi-five-thirteen:operation:'))
+  && additionEvents.every((event, index) => event.frame.operation.index === index + 1 && event.frame.operation.total === 10)
+  && additionMicro.events.length === 37 && additionMicro.events.every((event) => event.frame.microStep.parentOperationId === event.frame.operation.id));
+ok('5 + 13 exposes animation metadata on all thirty-seven phases',
+  additionMicroFrames.length === 37
+  && additionMicroFrames.every((frame) => ComputerArchitecture.ANIMATION_STAGES.includes(frame.animation.stage) && Object.isFrozen(frame.animation) && Object.isFrozen(frame.animation.timing))
+  && additionMicroFrames.filter((frame) => frame.transfer).every((frame) => ['address', 'instruction', 'operand', 'result'].includes(frame.transfer.role)));
+ok('5 + 13 routes both operands and the result through stable semantic paths', (() => {
+  const routes = additionMicroFrames.filter((frame) => frame.transfer).map((frame) => `${frame.transfer.role}:${frame.animation.routeId}`);
+  return routes.includes('operand:r1-alu') && routes.includes('operand:decoder-alu') && routes.includes('result:alu-r1');
+})());
+ok('5 + 13 exposes active components and stable operand/result transfers',
+  additionEvents[6].transition.phases.some((item) => item.frame.transfer?.id === 'left-operand:addi-five-thirteen')
+  && additionEvents[7].transition.phases.some((item) => item.frame.transfer?.id === 'right-operand:addi-five-thirteen')
+  && additionEvents[9].transition.phases.some((item) => item.frame.transfer?.id === 'addition-result:addi-five-thirteen'));
+ok('5 + 13 writes unsigned result 18 to R1 without changing memory',
+  additionFinal.registers.R1.value === 18 && additionFinal.registers.PC.value === 0x21
+  && additionFinal.registers.MAR.value === 0x20 && additionFinal.registers.IR.value === 0x610D
+  && additionFinal.memory.unchanged && additionFinal.execution.complete
+  && additionFinal.signals.every((signal) => !signal.active));
+ok('computer architecture course and fetch activity expose their public contracts', (() => {
+  const course = ComputerArchitectureCourses.getCourse('computer-architecture');
+  const activity = ComputerArchitectureCatalog.get('architecture-fetch-cycle');
+  return course.code === 'CA' && course.brandLabel === 'Computer Architecture' && course.home === 'computer-architecture.html'
+    && activity.contentVersion === 1 && activity.engine === 'guided-teaching-cpu' && activity.renderer === 'cpu-datapath'
+    && activity.input.kind === 'cpu-preset' && activity.workspaceKind === 'cpu-lab'
+    && activity.evidenceViews.join(',') === 'micro-operations,cpu-registers,cpu-buses,cpu-instruction';
+})());
+ok('computer architecture catalog exposes the guided 5 + 13 activity', (() => {
+  const activity = ComputerArchitectureCatalog.get('architecture-add-immediate');
+  const finalFrame = activity.run().events.at(-1).frame;
+  return ComputerArchitectureCatalog.list().length === 2 && activity.title === 'Add 5 + 13'
+    && activity.input.defaultPreset === 'addi-five-thirteen'
+    && activity.source.length === 10 && finalFrame.registers.R1.value === 18;
+})());
+ComputerArchitectureRegistry.registerEvidenceView('metadata-test', function MetadataTest() {}, { label: 'Metadata test', icon: 'cpu' });
+ok('evidence registration retains component compatibility and label/icon metadata',
+  typeof ComputerArchitectureRegistry.getEvidenceView('metadata-test') === 'function'
+  && ComputerArchitectureRegistry.getEvidenceDefinition('metadata-test').label === 'Metadata test'
+  && ComputerArchitectureRegistry.getEvidenceDefinition('metadata-test').icon === 'cpu');
+const normalizedPractice = ComputerArchitecturePractice.normalize({ contentVersion: 1, solvedIds: ['fetch-order', 'fetch-order', 'unknown', 12] });
+ok('practice storage normalizes to contentVersion and valid unique solved IDs only',
+  JSON.stringify(normalizedPractice) === JSON.stringify({ contentVersion: 1, solvedIds: ['fetch-order'] })
+  && Object.keys(normalizedPractice).join(',') === 'contentVersion,solvedIds');
+ok('practice storage rejects outdated and malformed state',
+  ComputerArchitecturePractice.normalize({ contentVersion: 0, solvedIds: ['fetch-order'] }).solvedIds.length === 0
+  && ComputerArchitecturePractice.normalize(null).contentVersion === 1);
+
 const oopEngine = load(['course-catalog.js', 'playback.js', 'itcc45-activities.js', 'itcc45-practice-data.js'], { setTimeout, clearTimeout });
 const Courses = oopEngine.get('BSITLearningLab');
 const OOPActivities = oopEngine.get('ITCC45Activities');
 const OOPPractice = oopEngine.get('BSITOOPPractice');
-ok('course catalog is versioned and contains ITCC45 and ITCC47', Courses.SCHEMA_VERSION === 1 && Courses.listCourses().map((course) => course.id).join(',') === 'itcc45,itcc47');
-ok('course IDs and activity IDs are unique', new Set(Courses.listCourses().map((course) => course.id)).size === 2 && new Set(OOPActivities.list().map((activity) => activity.id)).size === 18);
+ok('course catalog is versioned and contains ITCC45 and ITCC47', Courses.SCHEMA_VERSION === 1 && ['itcc45', 'itcc47'].every((id) => Courses.listCourses().some((course) => course.id === id)));
+ok('course IDs and activity IDs are unique', new Set(Courses.listCourses().map((course) => course.id)).size === Courses.listCourses().length && new Set(OOPActivities.list().map((activity) => activity.id)).size === OOPActivities.list().length);
 const oopTopicIds = ['classes', 'objects', 'encapsulation', 'inheritance', 'abstraction', 'polymorphism'];
 ok('ITCC45 activity catalog has three ordered examples for each topic', oopTopicIds.every((topicId) => OOPActivities.forTopic(topicId).length === 3 && OOPActivities.forTopic(topicId).every((activity, index) => activity.exampleOrder === index + 1)));
 ok('ITCC45 activities declare discovery and misconception metadata', OOPActivities.list().every((activity) => ['classroom', 'textbook', 'real-world'].includes(activity.context) && activity.learningGoal && activity.misconceptionIds.length));
@@ -870,6 +1092,31 @@ ok('precache list covers every shipped asset', missing.length === 0,
 ok('precache list has no stale entries', extra.length === 0,
   extra.length ? `no longer exist: ${extra.join(', ')} — run: node tools/build-sw.js` : '');
 ok('precache includes the site root', listed.includes('./'));
+const rawPrecacheBytes = wanted.filter((asset) => asset !== './').reduce((total, asset) => {
+  const assetPath = path.join(ROOT, asset.replace(/^\.\//, ''));
+  return total + (fs.existsSync(assetPath) && fs.statSync(assetPath).isFile() ? fs.statSync(assetPath).size : 0);
+}, 0);
+ok('raw offline precache remains within the deterministic 2 MiB budget', rawPrecacheBytes <= 2 * 1024 * 1024,
+  rawPrecacheBytes > 2 * 1024 * 1024
+    ? `raw precache is ${rawPrecacheBytes} bytes; introduce an optional subject pack with its exact size and an explicit “Download for offline use” confirmation`
+    : '');
+const rootHtml = fs.readdirSync(ROOT).filter((file) => file.endsWith('.html'))
+  .map((file) => fs.readFileSync(path.join(ROOT, file), 'utf8')).join('\n');
+const referencedScripts = new Set([...rootHtml.matchAll(/<script[^>]+src=["']([^"']+)["']/g)]
+  .map((match) => match[1].split(/[?#]/)[0]));
+const orphanScripts = fs.readdirSync(ROOT).filter((file) => file.endsWith('.js'))
+  .filter((file) => !['sw.js', 'playwright.config.js', 'vite.visualizer.config.js'].includes(file))
+  .filter((file) => !referencedScripts.has(file));
+ok('every shipped root script has an entry-page owner', orphanScripts.length === 0,
+  orphanScripts.length ? `orphan scripts: ${orphanScripts.join(', ')}` : '');
+ok('retired visualizer, bundle, and companion implementations stay removed',
+  !fs.existsSync(path.join(ROOT, 'app.js'))
+  && !fs.existsSync(path.join(ROOT, 'tools', 'build-student-bundles.js'))
+  && !fs.existsSync(path.join(ROOT, 'lesson-app.js'))
+  && !fs.existsSync(path.join(ROOT, 'checkpoint-companions.js')));
+const sharedStyles = fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8');
+ok('retired visualizer, materials, lesson, and companion selectors stay removed',
+  !/\.(?:chart-zero|bar-col|bar-value|bar-index|materials-grid|material-card|material-downloads|lesson-main|lesson-companion|lesson-sequence|companion-mental|companion-trace|companion-self-check)\b/.test(sharedStyles));
 ok('service worker uses the BSIT cache prefix', swSource.includes("const CACHE_PREFIX = 'bsit-learning-lab-'") && swSource.includes("const RETIRED_CACHE_PREFIX = 'itcc47-practice-'"));
 ok('service worker precaches atomically', swSource.includes('cache.addAll(PRECACHE)'));
 ok('service worker cleans up old caches', swSource.includes('caches.delete'));
@@ -878,7 +1125,7 @@ ok('service worker ignores non-GET requests', /request\.method\s*!==\s*'GET'/.te
 ok('service worker ignores cross-origin requests', swSource.includes('url.origin !== self.location.origin'));
 
 // Every page must register the worker, or that page is not available offline.
-['index.html', 'visualizer.html', 'writer.html', 'tracer.html', 'problems.html', 'problem-list.html', 'practice.html', 'lesson.html'].forEach((page) => {
+['index.html', 'visualizer.html', 'industry-workbench.html', 'writer.html', 'tracer.html', 'problems.html', 'problem-list.html', 'practice.html'].forEach((page) => {
   const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
   ok(`${page} registers the offline worker`, html.includes('sw-register.js'));
 });
@@ -896,28 +1143,84 @@ function isIgnored(file) {
 
 ok('no answer file is publishable', sourceLeak.length === 0,
   sourceLeak.length ? `${sourceLeak.join(', ')} exists and is not gitignored` : '');
+const instructorTokenPath = path.join(ROOT, '.instructor-preview-token');
+const instructorTokenIgnored = isIgnored('.instructor-preview-token');
+const instructorToken = fs.existsSync(instructorTokenPath) ? fs.readFileSync(instructorTokenPath, 'utf8').trim() : '';
+ok('private instructor token is gitignored', instructorTokenIgnored);
+ok('private instructor token is absent from student HTML and offline cache', !instructorToken || (!rootHtml.includes(instructorToken) && !swSource.includes(instructorToken)));
+['writer.html', 'industry-workbench.html', 'problems.html', 'practice.html', 'visualizer.html', 'tracer.html', 'itcc47.html', 'problem-list.html'].forEach((page) => {
+  const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
+  const hashIndex = html.indexOf('sha256.js');
+  const accessIndex = html.indexOf('instructor-access.js');
+  const curriculumIndex = html.indexOf('curriculum.js');
+  ok(`${page} loads the instructor verifier before curriculum resolution`, hashIndex >= 0 && hashIndex < accessIndex && accessIndex < curriculumIndex);
+});
 
 // ---------- curriculum governance ----------
 
 section('curriculum governance');
 const previewStorage = (() => { const values = new Map(); return { getItem:(key)=>values.has(key)?values.get(key):null,setItem:(key,value)=>values.set(key,String(value)),removeItem:(key)=>values.delete(key) }; })();
-const curriculumEngine = load(['course-catalog.js','curriculum.data.js','release-profile.js','curriculum.js'], { localStorage:previewStorage, location:{ search:'' }, URLSearchParams });
+const unitInstructorToken = 'unit-test-instructor-capability-with-sufficient-entropy';
+const curriculumEngine = load(['course-catalog.js','curriculum.data.js','release-profile.js','sha256.js','curriculum.js'], {
+  ITCC47_INSTRUCTOR_ACCESS:{ schemaVersion:1,profileId:'itcc47-2026-2027-s1',profileVersion:5,tokenHash:Hash.hex(unitInstructorToken) },
+  localStorage:previewStorage,
+  location:{ search:'' },
+  URLSearchParams,
+});
 const Curriculum = curriculumEngine.get('ITCC47Curriculum');
 const ReleaseProfile = curriculumEngine.get('ITCC47_RELEASE_PROFILE');
-ok('semester profile currently ends with Module 1 complexity', ReleaseProfile.schemaVersion === 2 && ReleaseProfile.profileVersion === 3 && ReleaseProfile.currentCheckpointId === 'm1-complexity' && !('finalProjectId' in ReleaseProfile));
+const InstructorAccess = curriculumEngine.get('ITCC47_INSTRUCTOR_ACCESS');
+ok('semester profile currently opens Module 3 linked foundations', ReleaseProfile.schemaVersion === 2 && ReleaseProfile.profileVersion === 5 && ReleaseProfile.currentCheckpointId === 'm3-linked-foundations' && !('finalProjectId' in ReleaseProfile));
+const visualProgressStorage = (() => { const values = new Map(); return { getItem:(key)=>values.has(key)?values.get(key):null,setItem:(key,value)=>values.set(key,String(value)),removeItem:(key)=>values.delete(key) }; })();
+const visualProgressEngine = load(['visualizer-progress.js'], { localStorage: visualProgressStorage });
+const VisualProgress = visualProgressEngine.get('ITCC47VisualizerProgress');
+VisualProgress.markVisited('bubble-sort', { storage: visualProgressStorage, now: '2026-08-18T02:03:04.000Z' });
+ok('visualizer progress records a versioned local visit', VisualProgress.get('bubble-sort', visualProgressStorage)?.lastVisitedAt === '2026-08-18T02:03:04.000Z' && VisualProgress.formatDate('2026-08-18T02:03:04.000Z') === '18/08/2026');
+VisualProgress.markReviewed('bubble-sort', { storage: visualProgressStorage, now: '2026-08-19T05:06:07.000Z' });
+VisualProgress.markVisited('bubble-sort', { storage: visualProgressStorage, now: '2026-08-20T08:09:10.000Z' });
+const reviewedProgress = VisualProgress.get('bubble-sort', visualProgressStorage);
+ok('a later visit preserves the reviewed milestone', reviewedProgress.lastVisitedAt === '2026-08-20T08:09:10.000Z' && reviewedProgress.reviewedAt === '2026-08-19T05:06:07.000Z');
+ok('visualizer progress summarizes only requested activities', JSON.stringify(VisualProgress.summary(['bubble-sort','selection-sort'], visualProgressStorage)) === JSON.stringify({ total:2,visited:1,reviewed:1 }));
+const storedVisualProgress = JSON.parse(visualProgressStorage.getItem(VisualProgress.STORAGE_KEY));
+ok('visualizer progress stores no grade or authoritative result', storedVisualProgress.schemaVersion === 1 && Object.keys(storedVisualProgress.activities['bubble-sort']).sort().join(',') === 'lastVisitedAt,reviewedAt' && !/grade|score|submission/i.test(JSON.stringify(storedVisualProgress)));
 ok('catalog preserves all six authoritative CLO definitions', Curriculum.clos.length === 6 && Curriculum.clos.every((clo)=>clo.id && clo.statement));
 ok('checkpoint order is unique and increasing', new Set(Curriculum.checkpoints.map((item)=>item.order)).size === Curriculum.checkpoints.length && Curriculum.checkpoints.every((item,index,list)=>!index || item.order > list[index-1].order));
 ok('every checkpoint prerequisite points backward', Curriculum.checkpoints.every((item)=>item.prerequisiteIds.every((id)=>Curriculum.getCheckpoint(id)?.order < item.order)));
 ok('every resource mapping resolves', Curriculum.listResources().every((resource)=>resource.alwaysAvailable || Curriculum.getCheckpoint(resource.checkpointId)));
 ok('Modules 1-4 are reviewed while Modules 5-8 remain drafts', Curriculum.checkpoints.filter((item)=>item.order <= Curriculum.getCheckpoint('m4-queue-deque').order).every((item)=>item.reviewStatus === 'reviewed') && Curriculum.checkpoints.filter((item)=>item.order > Curriculum.getCheckpoint('m4-queue-deque').order).every((item)=>item.reviewStatus === 'draft'));
-ok('public curriculum exposes practice resources only', Curriculum.listResources().every((resource)=>['lesson','tool','activity','problem'].includes(resource.kind) && !('labRefs' in resource) && ['reviewed','draft'].includes(resource.reviewStatus)));
-ok('current, available, and locked states share one resolver', Curriculum.stateForResource('problem','sum-two').state === 'available' && Curriculum.stateForResource('problem','reward-points').state === 'current' && Curriculum.stateForResource('activity','selection-sort').state === 'locked');
+ok('public curriculum exposes tools, activities, and practice problems only', Curriculum.listResources().every((resource)=>['tool','activity','problem'].includes(resource.kind) && !('labRefs' in resource) && ['reviewed','draft'].includes(resource.reviewStatus)));
+ok('checkpoint sequences and resources contain no retired lesson references', Curriculum.listResources().every((resource)=>resource.kind !== 'lesson') && Curriculum.checkpoints.every((checkpoint)=>(checkpoint.sequence || []).every((reference)=>!reference.startsWith('lesson:'))));
+ok('current, available, and locked states share one resolver', Curriculum.stateForResource('problem','sum-two').state === 'available' && Curriculum.stateForResource('activity','industry-priority-range-recall').state === 'available' && Curriculum.stateForResource('activity','linked-list-traversal').state === 'current' && Curriculum.stateForResource('activity','linked-list-insert-head').state === 'locked');
 ok('missing mappings fail closed at runtime', Curriculum.stateForResource('activity','not-mapped').state === 'planned' && !Curriculum.isOpen('activity','not-mapped'));
+ok('student preview requests cannot authorize themselves', Curriculum.writePreview('m8-dp',previewStorage) === null && Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm3-linked-foundations');
+previewStorage.setItem(Curriculum.PREVIEW_STORAGE_KEY, JSON.stringify({ schemaVersion:2,profileId:ReleaseProfile.profileId,profileVersion:ReleaseProfile.profileVersion,currentCheckpointId:'m8-dp' }));
+ok('a stored release checkpoint without instructor access remains locked', Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm3-linked-foundations');
+previewStorage.setItem(Curriculum.INSTRUCTOR_ACCESS_STORAGE_KEY, JSON.stringify({ schemaVersion:InstructorAccess.schemaVersion,profileId:InstructorAccess.profileId,profileVersion:InstructorAccess.profileVersion,tokenHash:InstructorAccess.tokenHash }));
+ok('the public verifier hash cannot be copied into storage to forge instructor access', !Curriculum.hasInstructorAccess(previewStorage));
+Curriculum.grantInstructorAccess(unitInstructorToken, previewStorage);
 Curriculum.writePreview('m8-dp',previewStorage);
-ok('preview is explicit and persisted under the versioned key', Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm8-dp' && previewStorage.getItem(Curriculum.PREVIEW_STORAGE_KEY));
-ok('normal visits ignore a stored instructor preview', Curriculum.activeProfile({preview:false,storage:previewStorage,search:''}).currentCheckpointId === 'm1-complexity');
-Curriculum.clearPreview(previewStorage);
+ok('authorized preview is explicit and persisted under versioned keys', Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm8-dp' && previewStorage.getItem(Curriculum.PREVIEW_STORAGE_KEY) && previewStorage.getItem(Curriculum.INSTRUCTOR_ACCESS_STORAGE_KEY));
+ok('normal visits ignore an authorized stored preview without the preview query', Curriculum.activeProfile({preview:false,storage:previewStorage,search:''}).currentCheckpointId === 'm3-linked-foundations');
+Curriculum.revokeInstructorAccess(previewStorage);
+ok('exiting instructor mode removes both access and checkpoint state', !previewStorage.getItem(Curriculum.INSTRUCTOR_ACCESS_STORAGE_KEY) && !previewStorage.getItem(Curriculum.PREVIEW_STORAGE_KEY));
+const activationToken = 'separate-activation-token-with-sufficient-entropy';
+const activationStorage = (() => { const values = new Map(); return { getItem:(key)=>values.has(key)?values.get(key):null,setItem:(key,value)=>values.set(key,String(value)),removeItem:(key)=>values.delete(key) }; })();
+const activationHistory = { replaced:null,replaceState(_state,_title,url){this.replaced=url;} };
+const activationEngine = load(['course-catalog.js','curriculum.data.js','release-profile.js','sha256.js','curriculum.js'], {
+  ITCC47_INSTRUCTOR_ACCESS:{ schemaVersion:1,profileId:ReleaseProfile.profileId,profileVersion:ReleaseProfile.profileVersion,tokenHash:Hash.hex(activationToken) },
+  localStorage:activationStorage,
+  location:{ search:`?view=visualizations&instructorKey=${encodeURIComponent(activationToken)}`,pathname:'/problems.html',hash:'' },
+  history:activationHistory,
+  URLSearchParams,
+});
+const ActivatedCurriculum = activationEngine.get('ITCC47Curriculum');
+ok('a valid instructor capability is consumed, persisted, and removed from the URL', ActivatedCurriculum.hasInstructorAccess(activationStorage) && activationHistory.replaced === 'problems.html?view=visualizations&preview=1' && !activationHistory.replaced.includes(activationToken));
 ok('array-list mutation belongs to Module 2', Activities.get('array-list-insert').module === 2 && Activities.get('array-list-remove').module === 2);
+ok('industry workbench follows array mutation and precedes Module 3', Curriculum.getCheckpoint('m2-industry-workbench').prerequisiteIds.join(',') === 'm2-array-mutation' && Curriculum.getCheckpoint('m3-linked-foundations').prerequisiteIds.join(',') === 'm2-industry-workbench');
+ok('all industry scenarios release together at one reviewed checkpoint', industryScenarios.every((scenario) => Curriculum.getResource('activity', scenario.id)?.checkpointId === 'm2-industry-workbench') && Curriculum.getCheckpoint('m2-industry-workbench').reviewStatus === 'reviewed');
+ok('student profile keeps every Module 2 industry scenario available', industryScenarios.every((scenario) => Curriculum.stateForResource('activity', scenario.id).state === 'available'));
+ok('student profile opens only the linked foundations checkpoint in Module 3', ['linked-list-traversal','array-linked-comparison'].every((id) => Curriculum.stateForResource('activity', id).state === 'current') && ['linked-node-count','linked-find-value'].every((id) => Curriculum.stateForResource('problem', id).state === 'current') && Curriculum.stateForResource('activity','linked-list-insert-head').state === 'locked');
+ok('linked foundations sequence includes both reviewed practice problems', Curriculum.getCheckpoint('m3-linked-foundations').sequence.slice(-2).join(',') === 'problem:linked-node-count,problem:linked-find-value');
 ok('every shipped activity exposes curriculum metadata', Activities.list().filter((activity)=>Curriculum.getResource('activity',activity.id)).every((activity)=>activity.checkpointId && activity.cloIds.length));
 ok('every cataloged visualization has a concrete activity', Curriculum.listResources('activity').every((resource)=>Activities.list().some((activity)=>activity.id === resource.id)));
 const extendedIds = ['binary-range-search','stable-insertion-dispatch','array-linked-comparison','linked-list-sorted-insert','linked-list-find-update','linked-list-delete','recursive-range-search','stable-merge-sort','tree-traversals','bst-insert-search','bst-height-shape','graph-representation','bfs-shortest-path','dfs-reachability','greedy-dp-coin-change','knapsack-dp'];
@@ -993,10 +1296,8 @@ ok('future problem metadata matches the curriculum resolver', FutureProblems.pro
 const invalidFutureStarters = FutureProblems.problems.filter((problem)=>!parses(problem.starter)).map((problem)=>problem.id);
 ok('every future problem starter parses', invalidFutureStarters.length === 0, invalidFutureStarters.join(', '));
 
-const companionEngine = load(['checkpoint-companions.js']);
-const Companions = companionEngine.get('ITCC47CheckpointCompanions');
-ok('Modules 2-4 ship exactly eleven reviewed checkpoint companions', Companions.checkpointIds.length === 11 && Companions.validate().length === 0);
-Companions.checkpointIds.forEach((checkpointId)=>{ const companion = Companions.get(checkpointId); ok(`${checkpointId}: companion contract is complete`, companion.mentalModel && companion.vocabulary.length >= 3 && companion.workedTrace.length >= 3 && companion.invariants.length >= 3 && companion.misconceptions.length >= 2 && companion.selfChecks.length === 2); });
+const formerLessonPage = fs.readFileSync(path.join(ROOT,'lesson.html'),'utf8');
+ok('former lesson route is a metadata-free module-practice redirect', /problem-list\.html/.test(formerLessonPage) && !/checkpoint-companions|lesson-app|curriculum\.data|companion-/i.test(formerLessonPage));
 ok('released practice counts are Module 2: 10, Module 3: 6, Module 4: 6', [2,3,4].map((module)=>PROBLEMS.filter((problem)=>problem.module === `Module ${module}`).length).join(',') === '10,6,6');
 ok('released practice contracts are versioned and reviewed', PROBLEMS.filter((problem)=>['Module 2','Module 3','Module 4'].includes(problem.module)).every((problem)=>problem.contentVersion && problem.reviewStatus === 'reviewed' && problem.visibleTests.length >= 2 && problem.hidden.length >= 2));
 const practiceSource = fs.readFileSync(path.join(ROOT,'problems-app.js'),'utf8');

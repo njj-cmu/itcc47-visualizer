@@ -425,12 +425,27 @@ const ITCC47Activities = (() => {
     });
   }
 
+  const traversalPresets = Object.freeze([
+    {
+      id: 'default', label: 'Three nodes',
+      source: ['head <- NEW NODE(18)', 'head.next <- NEW NODE(7)', 'head.next.next <- NEW NODE(31)', 'current <- head', 'WHILE current <> NULL DO', '  WRITE current.value', '  current <- current.next', 'ENDWHILE'],
+    },
+    {
+      id: 'singleton', label: 'Single node',
+      source: ['head <- NEW NODE(7)', 'current <- head', 'WHILE current <> NULL DO', '  WRITE current.value', '  current <- current.next', 'ENDWHILE'],
+    },
+    {
+      id: 'empty', label: 'Empty list',
+      source: ['head <- NULL', 'current <- head', 'WHILE current <> NULL DO', '  WRITE current.value', '  current <- current.next', 'ENDWHILE'],
+    },
+  ]);
+
   const linkedTraversal = linkedActivity({
     id: 'linked-list-traversal', title: 'Traverse a singly linked list', subtitle: 'Follow next references until the current pointer reaches NULL.',
     teachingVariant: 'pointer-traversal',
     defaultValues: [18, 7, 31], complexity: { best: 'O(n)', avg: 'O(n)', worst: 'O(n)', space: 'O(1)' },
     blurb: 'Traversal visits each reachable node once and stops at the NULL link.',
-    source: ['head <- NEW NODE(18)', 'head.next <- NEW NODE(7)', 'head.next.next <- NEW NODE(31)', 'current <- head', 'WHILE current <> NULL DO', '  WRITE current.value', '  current <- current.next', 'ENDWHILE'],
+    presets: traversalPresets, source: traversalPresets[0].source,
   });
 
   const linkedInsertHead = linkedActivity({

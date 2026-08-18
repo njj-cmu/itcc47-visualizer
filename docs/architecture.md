@@ -170,7 +170,7 @@ renders its single legal end vertically, queues label front and back around a
 FIFO lane, and deques use the same two end markers without implying arbitrary
 middle access. Multiple lanes support examples such as undo/redo without
 introducing activity-specific renderer branches. The curriculum catalog, direct
-route resolver, activity menu, and source panel all consume the same registered
+route resolver, canonical visualization catalog, and source panel all consume the same registered
 activity metadata.
 
 ## Functions, calls, and recurrences

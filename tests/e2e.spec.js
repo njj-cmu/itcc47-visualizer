@@ -1,15 +1,30 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('fs');
 const path = require('path');
 
-const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=deque-sliding-window&preview=1', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'writer.html', 'tracer.html', 'problems.html', 'lesson.html?checkpoint=m2-selection-sort', 'student-materials.html', 'problem-list.html?module=1', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count'];
+const instructorAccessToken = fs.readFileSync(path.resolve(__dirname, '..', '.instructor-preview-token'), 'utf8').trim();
+const instructorAccessRecord = { schemaVersion: 1, profileId: 'itcc47-2026-2027-s1', profileVersion: 5, token: instructorAccessToken };
+const instructorPreviewRecord = { schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 5, currentCheckpointId: 'm8-dp' };
 
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('itcc47.release-preview:v1', JSON.stringify({ schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 3, currentCheckpointId: 'm8-dp' })));
+const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'computer-architecture.html', 'computer-architecture-modules.html', 'computer-architecture-practice.html', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=deque-sliding-window&preview=1', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', 'visualizer.html?course=computer-architecture&activity=architecture-add-immediate', 'industry-workbench.html', 'industry-workbench.html?scenario=industry-priority-range-recall&preview=1', 'writer.html', 'tracer.html', 'problems.html', 'problems.html?view=visualizations', 'problems.html?view=workbenches', 'lesson.html?checkpoint=m2-selection-sort', 'student-materials.html', 'problem-list.html?module=1', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count'];
+
+const studentStateTests = new Set([
+  'curriculum roadmap expands the current module and compacts locked modules',
+  'student preview query cannot expose instructor controls or locked content',
+  'instructor preview is explicit, persistent, and does not change the deployed profile',
+]);
+
+test.beforeEach(async ({ page }, testInfo) => {
+  if (studentStateTests.has(testInfo.title)) return;
+  await page.addInitScript(({ access, preview }) => {
+    localStorage.setItem('itcc47.instructor-access:v1', JSON.stringify(access));
+    localStorage.setItem('itcc47.release-preview:v1', JSON.stringify(preview));
+  }, { access: instructorAccessRecord, preview: instructorPreviewRecord });
 });
 
 async function openMobilePlaybackDetails(page) {
   const details = page.locator('.mobile-playback-details');
-  if (await details.isVisible() && await details.getAttribute('open') === null) await details.getByText('Timeline and settings', { exact: true }).click();
+  if (await details.isVisible() && await details.getAttribute('open') === null) await details.locator('summary').click();
 }
 
 async function visualizerTimeline(page) {
@@ -39,6 +54,42 @@ async function visualizerSpeed(page) {
   }
   if (await page.locator('.playback-settings').getAttribute('open') === null) await page.getByText('Settings', { exact: true }).click();
   return desktop;
+}
+
+async function installCpuAnimationProbe(page) {
+  await page.evaluate(() => {
+    window.__cpuAnimationObserver?.disconnect();
+    window.__cpuAnimationSamples = [];
+    const record = () => {
+      const root = document.querySelector('.cpu-datapath-full');
+      if (!root) return;
+      const sample = {
+        phase: document.querySelector('.cpu-canvas-heading')?.textContent || '',
+        stage: document.querySelector('.cpu-datapath-renderer')?.getAttribute('data-animation-stage') || '',
+        movingValues: root.querySelectorAll('[data-motion-role="moving-value"]').length,
+        movingControlCues: root.querySelectorAll('[data-motion-role="control-signal"]').length,
+        activeRoutes: [...root.querySelectorAll('[data-active-route-id]')].map((node) => node.getAttribute('data-active-route-id')),
+        activeControlRoutes: [...root.querySelectorAll('[data-active-control-id]')].map((node) => node.getAttribute('data-active-control-id')),
+        activeComponents: [...root.querySelectorAll('[data-component-id]:is(.is-source,.is-sent,.is-ready,.is-received)')].map((node) => node.getAttribute('data-component-id')),
+        componentStates: Object.fromEntries([...root.querySelectorAll('[data-component-id][data-component-state]')].map((node) => [node.getAttribute('data-component-id'), node.getAttribute('data-component-state')])),
+        cueDirections: [...root.querySelectorAll('[data-signal-direction]')].map((node) => node.getAttribute('data-signal-direction')),
+        readingRows: root.querySelectorAll('.cpu-main-memory .cpu-memory-row.is-reading').length,
+      };
+      const previous = window.__cpuAnimationSamples.at(-1);
+      if (JSON.stringify(previous) !== JSON.stringify(sample)) window.__cpuAnimationSamples.push(sample);
+    };
+    const observer = new MutationObserver(record);
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+    window.__cpuAnimationObserver = observer;
+    record();
+  });
+}
+
+async function collectCpuAnimationSamples(page) {
+  return page.evaluate(() => {
+    window.__cpuAnimationObserver?.disconnect();
+    return window.__cpuAnimationSamples || [];
+  });
 }
 
 async function installITCC45MotionProbe(page) {
@@ -95,31 +146,450 @@ test('mobile navigation opens and moves focus', async ({ page }, testInfo) => {
   await expect(page.getByRole('link', { name: 'Start', exact: true })).toBeFocused();
 });
 
-test('start page gives students a clear route into the current lecture', async ({ page }) => {
+test('subject chooser launches Computer Architecture as the third available course', async ({ page }) => {
+  await page.goto('/index.html');
+  await expect(page.locator('.subject-choice')).toHaveCount(3);
+  const architectureCard = page.locator('.subject-choice-ca');
+  await expect(architectureCard).toContainText('Computer Architecture');
+  await architectureCard.click();
+  await expect(page).toHaveURL(/computer-architecture\.html$/);
+  await expect(page.getByRole('heading', { name: 'Watch one instruction travel through the CPU.' })).toBeVisible();
+});
+
+test('subject chooser remains usable when the catalog grows to ten courses', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.evaluate(() => {
+    const catalog = document.querySelector('.subject-choices');
+    const seeds = [...catalog.children];
+    while (catalog.children.length < 10) {
+      const clone = seeds[catalog.children.length % seeds.length].cloneNode(true);
+      clone.href = `#future-subject-${catalog.children.length + 1}`;
+      clone.setAttribute('aria-label', `Open future subject ${catalog.children.length + 1}`);
+      catalog.append(clone);
+    }
+  });
+
+  const cards = page.locator('.subject-choice');
+  await expect(cards).toHaveCount(10);
+  const layout = await page.evaluate(() => {
+    const items = [...document.querySelectorAll('.subject-choice')];
+    return {
+      pageFits: document.documentElement.scrollWidth <= window.innerWidth,
+      rows: new Set(items.map((item) => Math.round(item.getBoundingClientRect().top))).size,
+      widths: items.map((item) => item.getBoundingClientRect().width),
+    };
+  });
+  expect(layout.pageFits).toBe(true);
+  expect(layout.rows).toBeGreaterThan(1);
+  expect(Math.min(...layout.widths)).toBeGreaterThanOrEqual(280);
+});
+
+test('computer architecture roadmap exposes one current module and two non-clickable planned modules', async ({ page }) => {
+  await page.goto('/computer-architecture-modules.html');
+  await expect(page.locator('.ca-module-card')).toHaveCount(3);
+  await expect(page.locator('.ca-module-card.is-current')).toContainText('Fetch one instruction');
+  await expect(page.locator('.ca-module-card.is-current')).toContainText('Add 5 + 13');
+  await expect(page.locator('.ca-module-card.is-current .ca-module-activity')).toHaveCount(2);
+  await expect(page.locator('.ca-module-card.is-planned')).toHaveCount(2);
+  await expect(page.locator('.ca-module-card.is-planned a')).toHaveCount(0);
+  await expect(page.locator('.topbar-nav a[href="computer-architecture-modules.html"]')).toHaveAttribute('aria-current', 'page');
+});
+
+test('computer architecture practice stores only version and solved IDs and can reset', async ({ page }) => {
+  await page.goto('/computer-architecture-practice.html');
+  const first = page.locator('.ca-practice-card').first();
+  await first.getByLabel('PC → MAR → address bus → memory → MDR → IR → increment PC').check();
+  await first.getByRole('button', { name: 'Check answer' }).click();
+  await expect(first.locator('.ca-practice-feedback')).toContainText('Correct.');
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('computer-architecture.practice:v1')));
+  expect(stored).toEqual({ contentVersion: 1, solvedIds: ['fetch-order'] });
+  await page.getByRole('button', { name: 'Reset progress' }).click();
+  await expect(page.locator('#ca-practice-progress')).toHaveText('0 / 3 complete');
+  expect(await page.evaluate(() => localStorage.getItem('computer-architecture.practice:v1'))).toBeNull();
+});
+
+test('CPU Lab preset rebuilds playback while number format remains view-only', async ({ page }, testInfo) => {
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
+  await expect(page.getByRole('heading', { name: 'Fetch one instruction' })).toBeVisible();
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 6');
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await page.getByRole('button', { name: 'BIN' }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await expect(page.locator('.cpu-register-box').first()).toContainText('0b');
+  await page.getByLabel('Instruction preset').selectOption('addi-r3-07');
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 6');
+  await expect(page.locator(testInfo.project.name === 'phone' ? '.cpu-memory-pane' : '.cpu-main-memory')).toContainText('0b11111111');
+  const timeline = await visualizerTimeline(page);
+  await timeline.fill('5');
+  await expect(page.locator('.integrated-step strong')).toHaveText('6 / 6');
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'More' }).click();
+  await page.getByRole('tab', { name: 'Instruction' }).click();
+  await expect(page.locator(testInfo.project.name === 'phone' ? '.mobile-evidence .cpu-instruction-evidence' : '.desktop-evidence .cpu-instruction-evidence')).toContainText('ADDI R3');
+});
+
+test('CPU Lab starts at the source and treats the memory handshake as one operation', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'on'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
+  await (await visualizerSpeed(page)).selectOption('3');
+
+  await expect(page.locator('.cpu-main-memory')).toHaveCount(1);
+  await expect(page.locator('.cpu-memory-surface')).toBeHidden();
+  await expect(page.locator('.cpu-datapath-full [data-component-id].is-source')).toHaveCount(1);
+  await expect(page.locator('[data-component-id="PC"]')).toHaveClass(/is-source/);
+  await expect(page.locator('.cpu-main-memory .cpu-memory-row.is-selected')).toHaveCount(0);
+  await expect(page.locator('[data-route-id="mar-memory"]')).toHaveAttribute('d', 'M590 72 V60 H246');
+  await expect(page.locator('[data-route-id="memory-mdr"]')).toHaveAttribute('d', 'M246 372 H525');
+
+  const timeline = await visualizerTimeline(page);
+  await timeline.fill('1');
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await installCpuAnimationProbe(page);
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('3 / 6');
+  await expect(page.getByRole('button', { name: 'Step' })).toBeEnabled({ timeout: 15000 });
+  await expect(page.locator('[data-component-id="MDR"]')).toContainText('0x31A4');
+  const samples = await collectCpuAnimationSamples(page);
+  const transferSample = samples.find((sample) => sample.phase.includes('Move the instruction word'));
+  expect(transferSample, `Recorded CPU animation samples: ${JSON.stringify(samples)}`).toBeDefined();
+  expect(transferSample).toMatchObject({
+    stage: 'travel',
+    movingValues: 1,
+    activeRoutes: ['memory-mdr'],
+    readingRows: 1,
+  });
+  expect(transferSample.activeComponents).toEqual(expect.arrayContaining(['memory', 'MDR']));
+  expect(transferSample.componentStates).toMatchObject({ memory: 'is-sent', MDR: 'is-ready' });
+  const mfcSample = samples.find((sample) => sample.phase.includes('Memory finishes the read'));
+  expect(mfcSample, `Recorded CPU animation samples: ${JSON.stringify(samples)}`).toBeDefined();
+  expect(mfcSample).toMatchObject({ stage: 'arm', movingControlCues: 2 });
+  expect(mfcSample.cueDirections).toEqual(expect.arrayContaining(['to-cu', 'from-cu']));
+});
+
+test('CPU Lab stages source, control cues, value travel, and target arrival without premature highlighting', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'on'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
+  await (await visualizerSpeed(page)).selectOption('3');
+  await page.getByRole('button', { name: 'Micro', exact: true }).click();
+  const timeline = await visualizerTimeline(page);
+  await timeline.fill('1');
+
+  await page.getByRole('button', { name: 'Step' }).click();
+  const renderer = page.locator('.cpu-datapath-renderer');
+  await expect(renderer).toHaveAttribute('data-animation-stage', 'arm');
+  await expect(renderer).toHaveAttribute('data-spawn-hold-ms', '1232');
+  const firstCue = page.locator('.cpu-control-cue [data-motion-role="control-signal"]').first();
+  const spawnBox = await firstCue.boundingBox();
+  await page.waitForTimeout(200);
+  const heldBox = await firstCue.boundingBox();
+  const center = (box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
+  expect(Math.abs(center(heldBox).x - center(spawnBox).x) + Math.abs(center(heldBox).y - center(spawnBox).y)).toBeLessThan(2);
+
+  await expect(page.locator('.cpu-control-cue')).toHaveCount(2);
+  await expect(page.locator('[data-component-id="PC"]')).toHaveClass(/is-source/);
+  await expect(page.locator('[data-component-id="MAR"]')).toHaveClass(/is-ready/);
+  await expect(page.locator('[data-source-pulse^="CONTROL:"]')).toHaveCount(2);
+  expect(await page.locator('[data-source-pulse^="CONTROL:"]').first().evaluate((node) => getComputedStyle(node).animationName)).toBe('cpu-source-pop');
+
+  await expect(page.getByRole('button', { name: 'Step' })).toBeEnabled({ timeout: 5000 });
+  const latchedBox = await firstCue.boundingBox();
+  expect(Math.abs(center(latchedBox).x - center(spawnBox).x) + Math.abs(center(latchedBox).y - center(spawnBox).y)).toBeGreaterThan(3);
+  await expect(page.locator('.cpu-control-cue')).toHaveCount(2);
+  await expect(page.locator('[data-active-control-id]')).toHaveCount(2);
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('.cpu-datapath-renderer')).toHaveAttribute('data-animation-stage', 'travel');
+  await expect(page.locator('.cpu-control-cue')).toHaveCount(0);
+  await expect(page.locator('[data-active-control-id]')).toHaveCount(0);
+  await expect(page.locator('.cpu-value-cue')).toHaveCount(1);
+  await expect(page.locator('[data-active-route-id="pc-mar"]')).toHaveCount(1);
+  await expect(page.locator('[data-source-pulse="PC"]')).toHaveCount(1);
+  await expect(page.locator('[data-component-id="PC"]')).toHaveClass(/is-sent/);
+  await expect(page.locator('[data-component-id="MAR"]')).toHaveClass(/is-ready/);
+
+  await expect(page.getByRole('button', { name: 'Step' })).toBeEnabled({ timeout: 5000 });
+  await expect(page.locator('.cpu-value-cue')).toHaveCount(1);
+  await expect(page.locator('[data-active-route-id="pc-mar"]')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('.cpu-datapath-renderer')).toHaveAttribute('data-animation-stage', 'arrive');
+  await expect(page.locator('[data-component-id="PC"]')).toHaveClass(/is-sent/);
+  await expect(page.locator('[data-component-id="MAR"]')).toHaveClass(/is-received/);
+  await expect(page.locator('.cpu-value-cue')).toHaveCount(0);
+  await expect(page.locator('[data-active-route-id="pc-mar"]')).toHaveCount(0);
+
+  await timeline.fill('9');
+  await expect(page.locator('[data-control-cue-id$=":MFC"]')).toHaveAttribute('data-signal-direction', 'to-cu');
+  await expect(page.locator('[data-control-cue-id$=":MFC"]')).toHaveAttribute('data-cue-origin', 'memory');
+  await expect(page.locator('[data-control-cue-id$=":MDRin"]')).toHaveAttribute('data-signal-direction', 'from-cu');
+  await expect(page.locator('[data-control-cue-id$=":MDRin"]')).toHaveAttribute('data-cue-origin', 'CONTROL');
+});
+
+test('CPU settled cues remain visible when motion is reduced or off', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  for (const motion of ['reduced', 'off']) {
+    await page.addInitScript((mode) => localStorage.setItem('itcc47:visualizer-motion:v1', mode), motion);
+    await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
+    await page.getByRole('button', { name: 'Micro', exact: true }).click();
+    const timeline = await visualizerTimeline(page);
+    await timeline.fill('2');
+    await expect(page.locator('.cpu-datapath-renderer')).toHaveAttribute('data-animation-stage', 'arm');
+    await expect(page.locator('.cpu-control-cue [data-motion-role="control-signal"]')).toHaveCount(2);
+    await expect(page.locator('[data-active-control-id]')).toHaveCount(2);
+    await timeline.fill('3');
+    await expect(page.locator('.cpu-datapath-renderer')).toHaveAttribute('data-animation-stage', 'travel');
+    await expect(page.locator('.cpu-value-cue [data-motion-role="moving-value"]')).toHaveCount(1);
+    await expect(page.locator('[data-active-route-id="pc-mar"]')).toHaveCount(1);
+  }
+});
+
+test('CPU desktop datapath remains a collision-free one-screen scene at supported widths', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  for (const viewport of [{ width: 1366, height: 768 }, { width: 1905, height: 921 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
+    await expect(page.locator('.cpu-datapath-full')).toBeVisible();
+    await expect(page.locator('.cpu-phase-panel')).toHaveCount(0);
+    await page.getByRole('button', { name: 'BIN' }).click();
+    const geometry = await page.evaluate(() => {
+      const rect = (selector) => {
+        const box = document.querySelector(selector)?.getBoundingClientRect();
+        return box ? { left: box.left, right: box.right, top: box.top, bottom: box.bottom } : null;
+      };
+      const overlaps = (a, b) => a && b && a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
+      const svg = rect('.cpu-datapath-full');
+      const componentText = [...document.querySelectorAll('.cpu-component [data-component-id] text, [data-component-id].cpu-component text')];
+      const clippedText = componentText.filter((node) => {
+        const box = node.getBoundingClientRect();
+        return svg && (box.left < svg.left - 1 || box.right > svg.right + 1 || box.top < svg.top - 1 || box.bottom > svg.bottom + 1);
+      }).length;
+      const binaryTextOverflow = [...document.querySelectorAll('.cpu-register-box, .cpu-register-cell, .cpu-memory-row')].filter((component) => {
+        const shell = component.querySelector('rect')?.getBoundingClientRect();
+        return shell && [...component.querySelectorAll('text')].some((node) => {
+          const box = node.getBoundingClientRect();
+          return box.left < shell.left - 1 || box.right > shell.right + 1 || box.top < shell.top - 1 || box.bottom > shell.bottom + 1;
+        });
+      }).length;
+      const marMemory = document.querySelector('[data-route-id="mar-memory"]');
+      const pc = rect('[data-component-id="PC"]');
+      const marMemoryCrossesPc = marMemory && pc ? Array.from({ length: 81 }, (_, index) => {
+        const point = marMemory.getPointAtLength((marMemory.getTotalLength() * index) / 80);
+        const screenPoint = new DOMPoint(point.x, point.y).matrixTransform(marMemory.getScreenCTM());
+        return screenPoint.x > pc.left + 1 && screenPoint.x < pc.right - 1 && screenPoint.y > pc.top + 1 && screenPoint.y < pc.bottom - 1;
+      }).some(Boolean) : true;
+      return {
+        horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth,
+        cuRegisterOverlap: overlaps(rect('.cpu-control-unit'), rect('.cpu-register-bank')),
+        cuAluOverlap: overlaps(rect('.cpu-control-unit'), rect('.cpu-alu-unit')),
+        cuMdrOverlap: overlaps(rect('.cpu-control-unit'), rect('[data-component-id="MDR"]')),
+        clippedText,
+        binaryTextOverflow,
+        marMemoryCrossesPc,
+        layers: [...document.querySelectorAll('.cpu-datapath-full [data-layer]')].map((node) => node.getAttribute('data-layer')),
+      };
+    });
+    expect(geometry).toEqual({
+      horizontalOverflow: 0,
+      cuRegisterOverlap: false,
+      cuAluOverlap: false,
+      cuMdrOverlap: false,
+      clippedText: 0,
+      binaryTextOverflow: 0,
+      marMemoryCrossesPc: false,
+      layers: ['structural-connections', 'active-connections', 'components-and-text', 'traveling-cues-and-arrivals'],
+    });
+  }
+});
+
+test('CPU Lab switches between operation and micro playback without returning to step one', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
+  const timeline = await visualizerTimeline(page);
+  await timeline.fill('2');
+  await expect(page.locator('.integrated-step strong')).toHaveText('3 / 6');
+
+  await page.getByRole('button', { name: 'Micro', exact: true }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('6 / 22');
+  await expect(page.locator('.cpu-canvas-heading')).toContainText('Operation 3 / 6');
+  await expect(page.locator('.cpu-canvas-heading')).toContainText('1 / 7 · Focus MAR');
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('7 / 22');
+
+  await page.getByRole('button', { name: 'Operation', exact: true }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('3 / 6');
+  await expect(page.locator('[data-component-id="MDR"]')).toContainText('0x31A4');
+});
+
+test('CPU control unit explains readable signals, the current action, and what happens next', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
+  await page.getByRole('button', { name: 'Micro', exact: true }).click();
+  const timeline = await visualizerTimeline(page);
+  await timeline.fill('2');
+
+  const controlUnit = page.locator('.cpu-control-unit');
+  await expect(controlUnit).toContainText('PC-out');
+  await expect(controlUnit).toContainText('MAR-in');
+  await expect(controlUnit).toContainText('WHAT IS HAPPENING');
+  await expect(controlUnit.locator('.cpu-svg-guidance').first()).toHaveAttribute('aria-label', 'PC sends its address. MAR accepts the address.');
+  await expect(controlUnit).toContainText('UP NEXT');
+  await expect(controlUnit.locator('.cpu-svg-next')).toHaveAttribute('aria-label', 'Move the address.');
+  await expect(controlUnit).not.toContainText('ANIMATION STAGE');
+
+  await timeline.fill('21');
+  await expect(controlUnit.locator('.cpu-svg-guidance').first()).toHaveAttribute('aria-label', 'LOAD R1, [0xA4] is ready for execution.');
+  await expect(controlUnit.locator('.cpu-svg-next')).toHaveAttribute('aria-label', 'Execute LOAD R1, [0xA4]; execution is outside this activity.');
+
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-add-immediate');
+  await page.getByRole('button', { name: 'Micro', exact: true }).click();
+  await (await visualizerTimeline(page)).fill('36');
+  await expect(page.locator('.cpu-control-unit .cpu-svg-next')).toHaveAttribute('aria-label', 'Fetch the next instruction at PC 0x21.');
+});
+
+test('CPU mobile datapath keeps the next-action note without exposing animation-stage jargon', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
+  await openMobilePlaybackDetails(page);
+  await page.locator('.mobile-playback-details').getByRole('button', { name: 'Micro', exact: true }).click();
+  const timeline = await visualizerTimeline(page);
+  await timeline.fill('21');
+  await page.locator('.mobile-playback-details > summary').click();
+
+  await expect(page.locator('.cpu-mobile-phase')).toContainText('Operation 6 / 6 · Decode the instruction');
+  await expect(page.locator('.cpu-mobile-phase')).not.toContainText('arrive');
+  await expect(page.locator('.cpu-mobile-next')).toContainText('Execute LOAD R1, [0xA4]; execution is outside this activity.');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('CPU Lab animates active-only paths and executes the guided 5 + 13 operation', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'on'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-add-immediate');
+  await (await visualizerSpeed(page)).selectOption('3');
+  await expect(page.getByRole('heading', { name: 'Add 5 + 13' })).toBeVisible();
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 10');
+  await expect(page.locator('.cpu-datapath-full marker')).toHaveCount(0);
+  await expect(page.locator('.cpu-register-bank')).toContainText('R1 0x0005');
+
+  const timeline = await visualizerTimeline(page);
+  await timeline.fill('5');
+  await expect(page.locator('.integrated-step strong')).toHaveText('6 / 10');
+  await installCpuAnimationProbe(page);
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('7 / 10');
+  await expect(page.getByRole('button', { name: 'Step' })).toBeEnabled({ timeout: 10000 });
+  const samples = await collectCpuAnimationSamples(page);
+  const operandSample = samples.find((sample) => sample.phase.includes('Move operand 5'));
+  expect(operandSample, `Recorded CPU animation samples: ${JSON.stringify(samples)}`).toBeDefined();
+  expect(operandSample).toMatchObject({
+    stage: 'travel',
+    movingValues: 1,
+    activeRoutes: ['r1-alu'],
+  });
+  expect(operandSample.activeComponents).toEqual(expect.arrayContaining(['R1', 'ALU']));
+
+  await timeline.fill('8');
+  await expect(page.locator('.integrated-step strong')).toHaveText('9 / 10');
+  await expect(page.locator('.cpu-alu-unit')).toHaveClass(/is-received/);
+  await expect(page.locator('.cpu-alu-unit')).toContainText('5 + 13 = 18');
+
+  await timeline.fill('9');
+  await page.getByRole('tab', { name: 'Registers' }).click();
+  const r1Evidence = page.locator('.desktop-evidence .cpu-register-evidence > div').filter({ hasText: 'R1' });
+  await expect(r1Evidence).toContainText('0x0012');
+});
+
+test('CPU Lab evidence is registered, collapsible, and keyboard reachable', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
+  await expect(page.getByRole('tab', { name: 'Operations' })).toBeVisible();
+  await page.getByRole('tab', { name: 'Registers' }).click();
+  await expect(page.locator('.desktop-evidence .cpu-register-evidence')).toBeVisible();
+  await page.getByRole('tab', { name: 'Buses' }).click();
+  await expect(page.locator('.desktop-evidence .cpu-signal-grid')).toBeVisible();
+  await page.getByRole('button', { name: 'Collapse learning evidence' }).click();
+  await expect(page.getByRole('button', { name: 'Expand learning evidence' })).toBeVisible();
+  await page.getByRole('button', { name: 'Expand learning evidence' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('button', { name: 'Collapse learning evidence' })).toBeVisible();
+});
+
+test('CPU Lab mobile tabs keep playback state and the sticky dock reachable', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await page.getByRole('tab', { name: 'Memory' }).click();
+  await expect(page.locator('.cpu-memory-pane')).toBeVisible();
+  await page.getByRole('tab', { name: 'Steps' }).click();
+  await expect(page.locator('.mobile-evidence .cpu-micro-operations')).toBeVisible();
+  await page.getByRole('tab', { name: 'Datapath' }).click();
+  await expect(page.locator('.cpu-mobile-transfer')).toBeVisible();
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await expect(page.getByRole('button', { name: 'Step' })).toBeInViewport();
+});
+
+test('CPU Lab respects reduced motion and direct file operation', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const fileUrl = `file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}?course=computer-architecture&activity=architecture-fetch-cycle`;
+  await page.goto(fileUrl);
+  await expect(page.getByRole('heading', { name: 'Fetch one instruction' })).toBeVisible();
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-reduced/);
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+});
+
+test('start page gives students a clear route into the current practice bank', async ({ page }) => {
   await page.goto('/itcc47.html');
   await expect(page.getByRole('heading', { name: /Start with a problem/ })).toBeVisible();
-  await expect(page.locator('#current-checkpoint')).toContainText('Complexity basics');
-  await page.getByRole('link', { name: /Continue current lecture/ }).click();
-  await expect(page).toHaveURL(/lesson\.html\?checkpoint=m1-complexity$/);
-  await expect(page.getByRole('heading', { name: /Complexity basics/ })).toBeVisible();
+  await expect(page.locator('#current-checkpoint')).toContainText('Linked nodes and traversal');
+  await page.getByRole('link', { name: /Open current practice bank/ }).click();
+  await expect(page).toHaveURL(/problem-list\.html\?module=3$/);
+  await expect(page.getByRole('heading', { name: /Linked Lists: select a problem/ })).toBeVisible();
 });
 
 test('curriculum roadmap expands the current module and compacts locked modules', async ({ page }) => {
   await page.goto('/problems.html');
   await expect(page.locator('.module-card')).toHaveCount(8);
-  await expect(page.locator('.module-card-current')).toContainText('Algorithmic Thinking');
-  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(11);
+  await expect(page.locator('.module-card-current')).toContainText('Linked Lists');
+  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(2);
   await expect(page.locator('.checkpoint-list, .module-lessons, .module-outline')).toHaveCount(0);
   await expect(page.locator('.module-card-locked').first()).toBeVisible();
   await expect(page.locator('.module-card-locked .module-problem-card')).toHaveCount(0);
-  await expect(page.getByText('Instructor preview', { exact: true })).toBeVisible();
+  await expect(page.getByText('Instructor preview', { exact: true })).toHaveCount(0);
+  await expect(page.locator('#release-controls')).toHaveCount(0);
+});
+
+test('student preview query cannot expose instructor controls or locked content', async ({ page }) => {
+  await page.addInitScript((preview) => localStorage.setItem('itcc47.release-preview:v1', JSON.stringify(preview)), instructorPreviewRecord);
+  await page.goto('/problems.html?preview=1');
+  await expect(page.getByText('Instructor preview', { exact: true })).toHaveCount(0);
+  await expect(page.locator('#release-controls, .draft-preview-indicator')).toHaveCount(0);
+  await expect(page.locator('.module-card-current')).toContainText('Linked Lists');
+  await page.goto('/visualizer.html?activity=recursive-range-search&preview=1');
+  await expect(page.locator('.curriculum-lock')).toContainText('Recursive duplicate-range search is coming later');
+  await expect(page.locator('.curriculum-lock')).not.toContainText('Practice release');
+  await expect(page.locator('.curriculum-lock .release-badge')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Continue with Module 3/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Explore available visualizations' })).toBeVisible();
+  await expect(page.locator('.visualizer-workspace, .source-panel')).toHaveCount(0);
 });
 
 test('locked visualization cards use a compact icon and border state', async ({ page }) => {
   await page.goto('/problems.html?view=visualizations');
+  await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.industry-catalog-feature')).toBeHidden();
   await expect(page.locator('.visualization-card')).toHaveCount(35);
-  await expect(page.locator('.visualization-card.visualization-locked')).toHaveCount(35);
-  await expect(page.locator('.visualization-lock')).toHaveCount(35);
+  await expect(page.locator('.visualization-card.visualization-available')).toHaveCount(9);
+  await expect(page.locator('.visualization-card.visualization-current')).toHaveCount(2);
+  await expect(page.locator('.visualization-card.visualization-locked')).toHaveCount(24);
+  await expect(page.locator('.visualization-lock')).toHaveCount(24);
   await expect(page.locator('.visualization-card .release-badge')).toHaveCount(0);
   await expect(page.locator('.visualization-card').first().locator('.visualization-card-meta')).toContainText('Module 2');
   const familyOrder = await page.locator('.visualization-group h2').allTextContents();
@@ -127,13 +597,194 @@ test('locked visualization cards use a compact icon and border state', async ({ 
   expect(familyOrder.indexOf('Deques')).toBeLessThan(familyOrder.indexOf('Recursion'));
 });
 
+test('focused visualizations remember visits and fade only after the final step', async ({ page }) => {
+  await page.goto('/problems.html?view=visualizations');
+  await page.evaluate(() => localStorage.removeItem('itcc47.visualizer-progress:v1'));
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '0 of 11 available visualizations reviewed' })).toBeVisible();
+  let bubbleCard = page.locator('.visualization-card', { hasText: 'Bubble Sort' });
+  await expect(bubbleCard).not.toHaveClass(/visualization-visited/);
+  await bubbleCard.click();
+  await expect(page.getByRole('heading', { name: 'Bubble Sort' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => Boolean(JSON.parse(localStorage.getItem('itcc47.visualizer-progress:v1'))?.activities?.['bubble-sort']?.lastVisitedAt))).toBe(true);
+  await page.getByRole('link', { name: 'All visualizations' }).click();
+  bubbleCard = page.locator('.visualization-card', { hasText: 'Bubble Sort' });
+  await expect(bubbleCard).toHaveClass(/visualization-visited/);
+  await expect(bubbleCard).not.toHaveClass(/visualization-reviewed/);
+  await expect(bubbleCard).toContainText('Visited');
+  await expect(bubbleCard).toContainText(/Last visited at: \d{2}\/\d{2}\/\d{4}/);
+  await bubbleCard.click();
+  await expect(page.getByRole('heading', { name: 'Bubble Sort' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+  const slider = await visualizerTimeline(page);
+  await slider.fill(await slider.getAttribute('max'));
+  await expect.poll(() => page.evaluate(() => Boolean(JSON.parse(localStorage.getItem('itcc47.visualizer-progress:v1'))?.activities?.['bubble-sort']?.reviewedAt))).toBe(true);
+  await page.getByRole('link', { name: 'All visualizations' }).click();
+  bubbleCard = page.locator('.visualization-card', { hasText: 'Bubble Sort' });
+  await expect(bubbleCard).toHaveClass(/visualization-reviewed/);
+  await expect(bubbleCard).toContainText('Reviewed');
+  await expect(page.getByRole('heading', { name: '1 of 11 available visualizations reviewed' })).toBeVisible();
+  await expect(bubbleCard).toHaveCSS('background-color', 'rgb(32, 33, 38)');
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('itcc47.visualizer-progress:v1')));
+  expect(stored.schemaVersion).toBe(1);
+  expect(Object.keys(stored.activities['bubble-sort']).sort()).toEqual(['lastVisitedAt', 'reviewedAt']);
+});
+
+test('workbench samples are separate from focused visualizations', async ({ page }) => {
+  await page.goto('/problems.html?view=workbenches');
+  await expect(page.getByRole('tab', { name: 'Workbench Samples' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'See how algorithms support real data decisions' })).toBeVisible();
+  await expect(page.locator('.industry-catalog-feature')).toHaveCount(1);
+  await expect(page.locator('.industry-catalog-feature')).toContainText('Industry Data Workbench Sample');
+  await expect(page.locator('.industry-catalog-feature')).toContainText('Choose a scenario');
+  await expect(page.locator('.visualization-card').first()).toBeHidden();
+  await expect(page.locator('.topbar-nav a', { hasText: 'Visualize' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('.topbar-nav a', { hasText: 'Modules' })).not.toHaveAttribute('aria-current', 'page');
+  const layout = await page.locator('.industry-catalog-feature').evaluate((feature) => {
+    const stream = feature.querySelector('.industry-catalog-stream')?.getBoundingClientRect();
+    const action = feature.querySelector('.industry-catalog-action')?.getBoundingClientRect();
+    const overlap = stream && action
+      ? stream.left < action.right && stream.right > action.left && stream.top < action.bottom && stream.bottom > action.top
+      : true;
+    return { overlap, pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1 };
+  });
+  expect(layout).toEqual({ overlap: false, pageOverflow: false });
+});
+
+test('released Module 2 workbench hub previews records without initializing playback', async ({ page }) => {
+  await page.goto('/industry-workbench.html');
+  await expect(page.getByRole('heading', { name: 'Industry Data Workbench' })).toBeVisible();
+  await expect(page.locator('.industry-scenario-row')).toHaveCount(4);
+  await expect(page.locator('.industry-scenario-row')).toContainText(['SLA Breach Scan', 'Priority Range Recall', 'Stable Priority Dispatch', 'Review Queue Mutation']);
+  await expect(page.locator('.industry-scenario-row').first()).toContainText('Linear search');
+  await expect(page.locator('.industry-record')).toHaveCount(0);
+  await expect(page.locator('.industry-scenario-preview')).toHaveCount(4);
+  await expect(page.getByRole('region', { name: 'Playback controls' })).toHaveCount(0);
+  await expect(page.locator('.industry-release-note')).toHaveCount(0);
+});
+
+test('direct Module 2 workbench scenario routes are available', async ({ page }) => {
+  await page.goto('/industry-workbench.html?scenario=industry-priority-range-recall');
+  await expect(page.getByRole('heading', { name: 'Priority Range Recall' })).toBeVisible();
+  await expect(page.locator('.curriculum-lock')).toHaveCount(0);
+  await expect(page.locator('.industry-record-rail')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+});
+
+test('instructor preview opens deterministic workbench playback and record inspection', async ({ page }) => {
+  await page.goto('/industry-workbench.html?scenario=industry-priority-range-recall&preview=1');
+  await expect(page.getByRole('heading', { name: 'Priority Range Recall' })).toBeVisible();
+  await expect(page.locator('.industry-record-rail')).toBeVisible();
+  await expect(page.locator('.source-panel, .evidence-drawer, .desktop-evidence')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+  const firstRecord = page.locator('[data-record-button]').first();
+  await firstRecord.focus();
+  await expect(page.locator('.industry-record-inspector')).toBeVisible();
+  await firstRecord.press('Enter');
+  await expect(firstRecord).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.industry-record-inspector')).toHaveCount(0);
+  const slider = await visualizerTimeline(page);
+  await slider.fill('1');
+  const transientMid = page.locator('[data-record-index="6199"]');
+  await transientMid.click();
+  await expect(page.locator('.industry-record-inspector')).toBeVisible();
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('.industry-record-inspector')).toHaveCount(0);
+  await slider.fill(await slider.getAttribute('max'));
+  await expect(page.locator('.industry-facts')).toContainText('3,100');
+  await expect(page.locator('.industry-record-pointers', { hasText: 'first P2' })).toHaveCount(1);
+  await slider.fill('0');
+  await expect(page.locator('.industry-teaching-heading')).toContainText('Validate stable priority order');
+});
+
+test('all four workbench scenarios use the shared visualization-only shell', async ({ page }) => {
+  const scenarios = [
+    ['industry-sla-breach-scan', 'SLA Breach Scan'],
+    ['industry-priority-range-recall', 'Priority Range Recall'],
+    ['industry-stable-priority-dispatch', 'Stable Priority Dispatch'],
+    ['industry-review-queue-mutation', 'Review Queue Mutation'],
+  ];
+  for (const [id, title] of scenarios) {
+    await page.goto(`/industry-workbench.html?scenario=${id}&preview=1`);
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    await expect(page.locator('.industry-record-rail')).toBeVisible();
+    await expect(page.locator('.industry-state-evidence')).toContainText('Metrics');
+    await expect(page.locator('.industry-state-evidence')).toContainText('Invariants');
+    await expect(page.locator('.source-panel, .evidence-drawer, .desktop-evidence')).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+  }
+});
+
+test('compressed mutation stages name every covered operation span', async ({ page }) => {
+  await page.goto('/industry-workbench.html?scenario=industry-stable-priority-dispatch&preview=1');
+  let slider = await visualizerTimeline(page);
+  await slider.fill('3');
+  await expect(page.locator('.industry-operation-span')).toContainText('8,678 repeated operations compressed');
+  await expect(page.locator('.industry-operation-span')).toContainText('indexes 3,721…12,398');
+  await page.goto('/industry-workbench.html?scenario=industry-review-queue-mutation&preview=1');
+  slider = await visualizerTimeline(page);
+  await slider.fill('2');
+  await expect(page.locator('.industry-operation-span')).toContainText('1,406 repeated operations compressed');
+  await expect(page.locator('.industry-record.is-hole')).toContainText('OPEN');
+});
+
+test('workbench structural moves reuse transition gating and motion preferences', async ({ page }) => {
+  await page.goto('/industry-workbench.html?scenario=industry-stable-priority-dispatch&preview=1');
+  await (await visualizerMotion(page)).selectOption('on');
+  let slider = await visualizerTimeline(page);
+  await slider.fill('1');
+  const step = page.getByRole('button', { name: 'Step', exact: true });
+  await step.click();
+  await expect(step).toBeDisabled();
+  await expect(step).toBeEnabled({ timeout: 1600 });
+  await (await visualizerMotion(page)).selectOption('off');
+  slider = await visualizerTimeline(page);
+  await slider.fill('1');
+  await step.click();
+  await expect(step).toBeEnabled();
+});
+
+test('the legacy visualizer discovery route redirects to the canonical catalog', async ({ page }) => {
+  await page.goto('/visualizer.html');
+  await expect(page).toHaveURL(/problems\.html\?view=visualizations$/);
+  await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.visualization-card')).toHaveCount(35);
+  await expect(page.locator('.industry-catalog-feature')).toBeHidden();
+  await expect(page.locator('#visualizer-root')).toHaveCount(0);
+});
+
+test('phone playback stays sticky without covering the final workbench evidence', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone');
+  await page.goto('/industry-workbench.html?scenario=industry-priority-range-recall&preview=1');
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const geometry = await page.evaluate(() => {
+    const footer = document.querySelector('.industry-complexity')?.getBoundingClientRect();
+    const playback = document.querySelector('.integrated-playback')?.getBoundingClientRect();
+    return footer && playback ? { footerBottom: footer.bottom, playbackTop: playback.top } : null;
+  });
+  expect(geometry).not.toBeNull();
+  expect(geometry.footerBottom).toBeLessThanOrEqual(geometry.playbackTop + 1);
+});
+
+test('workbench activity aliases redirect before the standard workspace initializes', async ({ page }) => {
+  await page.goto('/visualizer.html?activity=industry-sla-breach-scan&preview=1');
+  await expect(page).toHaveURL(/industry-workbench\.html\?scenario=industry-sla-breach-scan&preview=1$/);
+  await expect(page.getByRole('heading', { name: 'SLA Breach Scan' })).toBeVisible();
+  await expect(page.locator('.visualizer-workspace, .source-panel')).toHaveCount(0);
+});
+
 test('locked visualizer route renders requirements without source or playback', async ({ page }) => {
   await page.goto('/visualizer.html?activity=recursive-range-search');
-  await expect(page.locator('.curriculum-lock')).toContainText('Recursive duplicate-range search is not released yet');
+  await expect(page.locator('.curriculum-lock')).toContainText('Recursive duplicate-range search is coming later');
+  await expect(page.locator('.curriculum-lock')).not.toContainText('Practice release');
+  await expect(page.locator('.curriculum-lock .release-badge')).toHaveCount(0);
   const actions = page.locator('.curriculum-lock-actions .btn');
   await expect(actions).toHaveCount(2);
+  await expect(actions.first()).toContainText('Continue with Module 3');
+  await expect(actions.nth(1)).toHaveText('Explore available visualizations');
   expect(await actions.evaluateAll((links) => links.every((link) => getComputedStyle(link).textDecorationLine === 'none'))).toBe(true);
-  await expect(actions.first()).toHaveCSS('min-height', '44px');
+  await expect(actions.first()).toHaveCSS('min-height', '46px');
   await expect(page.locator('.source-panel')).toHaveCount(0);
   await expect(page.getByRole('slider', { name: /Timeline/ })).toHaveCount(0);
   await expect(page.locator('.visualizer-workspace')).toHaveCount(0);
@@ -141,12 +792,17 @@ test('locked visualizer route renders requirements without source or playback', 
 
 test('locked planned practice route exposes no problem statement or editor', async ({ page }) => {
   await page.goto('/practice.html?module=5&problem=recursive-sum');
-  await expect(page.locator('.curriculum-lock')).toContainText('Recursive range sum is not released yet');
+  await expect(page.locator('.curriculum-lock')).toContainText('Recursive range sum is coming later');
   await expect(page.locator('#p-statement')).toHaveCount(0);
   await expect(page.locator('#code-box')).toHaveCount(0);
 });
 
 test('instructor preview is explicit, persistent, and does not change the deployed profile', async ({ page }) => {
+  await page.goto('/problems.html');
+  await page.evaluate(({ access, preview }) => {
+    localStorage.setItem('itcc47.instructor-access:v1', JSON.stringify(access));
+    localStorage.setItem('itcc47.release-preview:v1', JSON.stringify(preview));
+  }, { access: instructorAccessRecord, preview: instructorPreviewRecord });
   await page.goto('/problems.html?preview=1');
   await page.getByText('Instructor preview', { exact: true }).click();
   await page.getByLabel('Preview checkpoint').selectOption('m8-dp');
@@ -156,6 +812,13 @@ test('instructor preview is explicit, persistent, and does not change the deploy
   await expect(page.getByRole('heading', { name: 'Recursive duplicate-range search' })).toBeVisible();
   await expect(page.locator('.draft-preview-indicator')).toContainText('Draft preview');
   await page.goto('/visualizer.html?activity=recursive-range-search');
+  await expect(page.locator('.curriculum-lock')).toBeVisible();
+  await page.goto('/problems.html?preview=1');
+  await page.getByText('Instructor preview', { exact: true }).click();
+  await page.getByRole('button', { name: 'Exit instructor mode' }).click();
+  await expect(page).not.toHaveURL(/preview=1/);
+  await expect(page.getByText('Instructor preview', { exact: true })).toHaveCount(0);
+  await page.goto('/visualizer.html?activity=recursive-range-search&preview=1');
   await expect(page.locator('.curriculum-lock')).toBeVisible();
 });
 
@@ -234,6 +897,7 @@ test('visualizer workspaces choose a structure-aware desktop composition', async
 test('deque foundation names both ends and changes state line by line', async ({ page }) => {
   await page.goto('/visualizer.html?activity=deque-end-operations&preview=1');
   await expect(page.getByRole('heading', { name: 'Use both ends of a deque' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Practice this module' })).toHaveAttribute('href', /problem-list\.html\?module=4&preview=1$/);
   await expect(page.locator('.linear-end-label.end-front')).toContainText('front');
   await expect(page.locator('.linear-end-label.end-back')).toContainText('back');
   await page.getByRole('button', { name: 'Step' }).click();
@@ -251,15 +915,35 @@ test('instructor preview opens the six-problem Module 3 practice bank', async ({
   await expect(page.locator('#p-statement')).not.toBeEmpty();
 });
 
-test('reviewed companions expose the full teaching bridge and practice-only links', async ({ page }) => {
+test('public Module 3 foundations open two problems and keep mutation gated', async ({ page }) => {
+  await page.goto('/problem-list.html?module=3');
+  await expect(page.locator('.problem-choice')).toHaveCount(6);
+  await expect(page.locator('.problem-choice-current')).toHaveCount(2);
+  await expect(page.locator('.problem-choice-locked')).toHaveCount(4);
+  await expect(page.locator('.problem-choice-current').nth(0)).toContainText('Count Reachable Linked Nodes');
+  await expect(page.locator('.problem-choice-current').nth(1)).toContainText('Lookup and Update a Node');
+  for (const [problemId, title] of [['linked-node-count', /Count Reachable Linked Nodes/i], ['linked-find-value', /Lookup and Update a Node/i]]) {
+    await page.goto(`/practice.html?module=3&problem=${problemId}`);
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    if ((await page.viewportSize()).width <= 620) await page.getByRole('tab', { name: 'Code' }).click();
+    await page.getByRole('button', { name: 'Run Checks' }).click();
+    await expect(page.locator('#results-body .case')).not.toHaveCount(0);
+    await expect(page.locator('#results-body .hidden-pill')).not.toHaveCount(0);
+  }
+
+  await page.goto('/visualizer.html?activity=linked-list-traversal');
+  await expect(page.getByRole('heading', { name: 'Traverse a singly linked list' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Edit pseudocode' })).toHaveAttribute('href', 'tracer.html?activity=linked-list-traversal');
+  await page.goto('/visualizer.html?activity=linked-list-insert-head');
+  await expect(page.locator('.curriculum-lock')).toContainText('Insert at the head is coming later');
+  await expect(page.locator('.visualizer-workspace')).toHaveCount(0);
+});
+
+test('legacy checkpoint-guide routes redirect to module practice without companion content', async ({ page }) => {
   await page.goto('/lesson.html?checkpoint=m2-binary-search&preview=1');
-  await expect(page.locator('.companion-mental')).toContainText('Mental model');
-  await expect(page.locator('.companion-trace')).toContainText('Worked trace');
-  await expect(page.locator('.companion-invariants')).toContainText('Invariants and complexity');
-  await expect(page.locator('.companion-misconceptions')).toContainText('Common misconceptions');
-  await expect(page.locator('.companion-self-check details')).toHaveCount(2);
-  await expect(page.locator('.lesson-sequence a')).not.toHaveCount(0);
-  expect(await page.locator('.lesson-sequence a').evaluateAll((links) => links.every((link) => /(?:visualizer|practice)\.html/.test(link.getAttribute('href') || '')))).toBe(true);
+  await expect(page).toHaveURL(/problem-list\.html\?module=2&preview=1$/);
+  await expect(page.getByRole('heading', { name: /Arrays, Lists, Searching, and Sorting: select a problem/ })).toBeVisible();
+  await expect(page.locator('.lesson-companion, .companion-mental, .companion-trace, .lesson-sequence')).toHaveCount(0);
 });
 
 test('practice contract changes preserve the old draft and clear only that completion', async ({ page }, testInfo) => {
@@ -582,12 +1266,14 @@ test('mismatched ITCC45 activity falls back and normalizes the URL', async ({ pa
   await expect(page).toHaveURL(/course=itcc45&activity=itcc45-classes-blueprint/);
 });
 
-test('Visualize opens the activity menu instead of defaulting to Bubble Sort', async ({ page }) => {
+test('Visualize opens the canonical Modules visualization catalog', async ({ page }) => {
   await page.goto('/itcc47.html');
   await page.getByRole('link', { name: /Visualize an algorithm/ }).click();
-  await expect(page).toHaveURL(/visualizer\.html$/);
-  await expect(page.getByRole('heading', { name: 'Choose a visualization.' })).toBeVisible();
-  await expect(page.locator('.visualizer-menu-item')).toHaveCount(35);
+  await expect(page).toHaveURL(/problems\.html\?view=visualizations$/);
+  await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.visualization-card')).toHaveCount(35);
+  await expect(page.locator('.industry-catalog-feature')).toBeHidden();
+  await expect(page.locator('#visualizer-root')).toHaveCount(0);
   await expect(page.locator('.visualizer-workspace')).toHaveCount(0);
   await page.getByRole('link', { name: /Selection Sort/ }).click();
   await expect(page).toHaveURL(/visualizer\.html\?activity=selection-sort$/);
@@ -661,11 +1347,15 @@ test('ITCC47 integrates playback and remembers the evidence rail', async ({ page
   await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
   if (testInfo.project.name === 'phone') {
     await expect(page.locator('.integrated-playback')).toHaveCSS('position', 'sticky');
+    await expect(page.locator('.desktop-evidence, .mobile-evidence, .trace-item')).toHaveCount(0);
     await page.getByRole('tab', { name: 'Code' }).click();
     await page.getByRole('button', { name: 'Step', exact: true }).click();
     await expect(page.locator('#result-caption')).toContainText('Set i to 0');
     return;
   }
+  await expect(page.locator('.desktop-evidence')).toHaveCount(1);
+  await expect(page.locator('.mobile-evidence')).toHaveCount(0);
+  expect(await page.locator('.trace-item').count()).toBeLessThanOrEqual(80);
   await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-expanded/);
   await page.getByRole('button', { name: 'Collapse learning evidence' }).click();
   await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-collapsed/);
@@ -881,12 +1571,26 @@ test('motion preferences persist, reduce, turn off, and reset to the device', as
 
 test('OS reduced motion becomes the default when no override is saved', async ({ browser }) => {
   const context = await browser.newContext({ reducedMotion: 'reduce' });
-  await context.addInitScript(() => localStorage.setItem('itcc47.release-preview:v1', JSON.stringify({ schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 3, currentCheckpointId: 'm8-dp' })));
+  await context.addInitScript(({ access, preview }) => {
+    localStorage.setItem('itcc47.instructor-access:v1', JSON.stringify(access));
+    localStorage.setItem('itcc47.release-preview:v1', JSON.stringify(preview));
+  }, { access: instructorAccessRecord, preview: instructorPreviewRecord });
   const page = await context.newPage();
   await page.goto('/visualizer.html?activity=bubble-sort&preview=1');
   await expect(await visualizerMotion(page)).toHaveValue('device');
   await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-reduced/);
   await context.close();
+});
+
+test('linked foundation visualizations respect reduced motion', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.addInitScript(() => localStorage.removeItem('itcc47:visualizer-motion:v1'));
+  for (const activity of ['linked-list-traversal', 'array-linked-comparison']) {
+    await page.goto(`/visualizer.html?activity=${activity}`);
+    await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-reduced/);
+    await page.getByRole('button', { name: 'Step', exact: true }).click();
+    await expect(page.locator('.integrated-step strong')).toHaveText(/2 \/ /);
+  }
 });
 
 test('linked-list head insertion synchronizes references, links, source, and metrics', async ({ page }, testInfo) => {
@@ -912,6 +1616,77 @@ test('linked-list structure, head, and current pointer have distinct visual role
   await expect(page.locator('.pointer-head')).toHaveText('head');
   await expect(page.locator('.pointer-current')).toHaveText('current');
   await expect(page.locator('.linked-node-wrap.is-current .linked-node')).toHaveAttribute('aria-label', /current node/);
+});
+
+test('linked-list traversal presets cover multi-node, singleton, and empty termination', async ({ page }, testInfo) => {
+  await page.goto('/visualizer.html?activity=linked-list-traversal');
+  await (await visualizerMotion(page)).selectOption('off');
+  const preset = page.getByLabel('Case preset');
+  await expect(preset).toHaveValue('default');
+  await expect(preset.locator('option')).toHaveCount(3);
+  const defaultTimeline = await visualizerTimeline(page);
+  await defaultTimeline.fill(await defaultTimeline.getAttribute('max'));
+  await expect(page.locator('.linked-node')).toHaveCount(3);
+  await expect(page.locator('.linked-null')).toContainText('current');
+
+  await preset.selectOption('singleton');
+  await expect(page.locator('.integrated-step strong')).toHaveText(/1 \/ /);
+  await expect(page.locator('.linked-node')).toHaveCount(1);
+  await expect(page.locator('.source-line.is-current')).toContainText('head <- NEW NODE(7)');
+
+  await preset.selectOption('empty');
+  await expect(page.locator('.linked-node')).toHaveCount(0);
+  await expect(page.locator('.source-line.is-current')).toContainText('head <- NULL');
+  await expect(page.locator('.linked-null')).toContainText('head');
+  const timeline = await visualizerTimeline(page);
+  await timeline.fill(await timeline.getAttribute('max'));
+  await expect(page.locator('.integrated-step span')).toHaveText('Condition is FALSE');
+  await expect(page.locator('.source-line.is-current')).toContainText('WHILE current <> NULL DO');
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'More' }).click();
+  await page.getByRole('tab', { name: 'Operations' }).click();
+  await expect(page.locator('.evidence-drawer:visible .metric-summary')).toContainText('Node visits');
+  await expect(page.locator('.evidence-drawer:visible .metric-summary')).toContainText('0');
+});
+
+test('linked foundations keep the active pointer and comparison readable on a phone', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone');
+  await page.goto('/visualizer.html?activity=linked-list-traversal');
+  await (await visualizerMotion(page)).selectOption('off');
+  const activeIndex = await page.evaluate(() => {
+    const events = ITCC47Activities.get('linked-list-traversal').run({ preset: 'default' }).events;
+    let match = 0;
+    events.forEach((event, index) => { if (event.frame.pointers.current === 'node:3') match = index; });
+    return match;
+  });
+  await (await visualizerTimeline(page)).fill(String(activeIndex));
+  await expect(page.locator('[data-follow-target="true"]')).toHaveAttribute('data-node-id', 'node:3');
+  await expect.poll(() => page.locator('.linked-canvas').evaluate((canvas) => canvas.scrollLeft)).toBeGreaterThan(0);
+  const followGeometry = await page.evaluate(() => {
+    const canvas = document.querySelector('.linked-canvas').getBoundingClientRect();
+    const target = document.querySelector('[data-follow-target="true"]').getBoundingClientRect();
+    return { visible: target.left >= canvas.left && target.right <= canvas.right, overflow: document.documentElement.scrollWidth - innerWidth };
+  });
+  expect(followGeometry).toEqual({ visible: true, overflow: 0 });
+  const stepText = await page.locator('.integrated-step strong').innerText();
+  await page.getByRole('tab', { name: 'Code' }).click();
+  await page.getByRole('tab', { name: 'Visualize' }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText(stepText);
+
+  await page.goto('/visualizer.html?activity=array-linked-comparison');
+  await expect(page.locator('.representation-array')).toBeVisible();
+  await expect(page.locator('.linked-chain')).toBeVisible();
+  const comparisonGeometry = await page.evaluate(() => {
+    const canvas = document.querySelector('.visual-canvas').getBoundingClientRect();
+    const array = document.querySelector('.representation-array').getBoundingClientRect();
+    const chain = document.querySelector('.linked-chain').getBoundingClientRect();
+    return { height: canvas.height, arrayVisible: array.top >= canvas.top && array.bottom <= canvas.bottom, chainVisible: chain.top >= canvas.top && chain.bottom <= canvas.bottom, overflow: document.documentElement.scrollWidth - innerWidth };
+  });
+  expect(comparisonGeometry.height).toBe(340);
+  expect(comparisonGeometry.arrayVisible).toBe(true);
+  expect(comparisonGeometry.chainVisible).toBe(true);
+  expect(comparisonGeometry.overflow).toBe(0);
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 5');
 });
 
 test('curated linked-list pseudocode opens in the lab and retains trace, output, and diagnostics', async ({ page }, testInfo) => {
@@ -948,14 +1723,38 @@ WRITE alias = head`);
 test('mobile visualizer tabs replace the central surface without resetting playback', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'phone');
   await page.goto('/visualizer.html?activity=bubble-sort&preview=1');
+  await expect(page.locator('.integrated-step span')).toBeVisible();
+  await expect(page.locator('.integrated-step span')).toContainText('Set n to 10');
+  await expect(page.locator('.array-scroll-hint')).toBeVisible();
+  await expect(page.locator('.visualization-legend > summary')).toBeInViewport();
+  await expect(page.locator('.desktop-evidence, .mobile-evidence, .trace-item')).toHaveCount(0);
+  const initialVisualHeight = await page.locator('.visual-canvas').evaluate((element) => Math.round(element.getBoundingClientRect().height));
+  expect(initialVisualHeight).toBeLessThanOrEqual(310);
   await page.getByRole('button', { name: 'Step' }).click();
   await expect(await visualizerTimeline(page)).toHaveValue('1');
+  const timeline = await visualizerTimeline(page);
+  await timeline.fill('34');
+  await expect(page.locator('.integrated-step strong')).toHaveText('35 / 155');
+  await expect(page.locator('[data-follow-target="true"]')).toHaveAttribute('data-slot', 'slot:9');
+  await expect.poll(() => page.locator('.visual-canvas').evaluate((element) => Math.round(element.scrollLeft))).toBeGreaterThan(0);
+  await expect.poll(() => page.evaluate(() => {
+    const viewport = document.querySelector('.visual-canvas').getBoundingClientRect();
+    const target = document.querySelector('[data-follow-target="true"]').getBoundingClientRect();
+    return target.left >= viewport.left && target.right <= viewport.right;
+  })).toBe(true);
+  await page.locator('.mobile-playback-details > summary').click();
   await page.getByRole('tab', { name: 'Code' }).click();
   await expect(page.locator('.desktop-source')).toBeVisible();
   await expect(page.locator('.visual-canvas')).toBeHidden();
   await page.getByRole('tab', { name: 'Trace' }).click();
   await expect(page.locator('.mobile-evidence')).toBeVisible();
-  await expect(await visualizerTimeline(page)).toHaveValue('1');
+  await expect(page.locator('.desktop-evidence')).toHaveCount(0);
+  await expect(page.locator('.evidence-drawer')).toHaveCount(1);
+  await expect(page.locator('.trace-item')).toHaveCount(80);
+  await expect(page.locator('.trace-item.is-current')).toContainText('63 > 76 is FALSE');
+  await page.getByRole('tab', { name: 'Visualize' }).click();
+  await expect(page.locator('.mobile-evidence, .evidence-drawer, .trace-item')).toHaveCount(0);
+  await expect(page.locator('.integrated-step strong')).toHaveText('35 / 155');
 });
 
 test('tracer runs and its result tabs work from the keyboard', async ({ page }) => {
@@ -1067,16 +1866,16 @@ test('module catalog exposes current practice and retains the full problem list'
   await page.goto('/problems.html');
   await expect(page.getByRole('heading', { name: 'Choose what to practise' })).toBeVisible();
   await expect(page.locator('.module-card')).toHaveCount(8);
-  await expect(page.locator('.module-card-current')).toContainText('Algorithmic Thinking');
+  await expect(page.locator('.module-card-current')).toContainText('Linked Lists');
   await expect(page.locator('.module-card-locked')).not.toHaveCount(0);
-  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(11);
-  await page.getByRole('link', { name: /Browse all Module 1 practice/ }).click();
-  await expect(page).toHaveURL(/problem-list\.html\?module=1$/);
-  await expect(page.getByRole('heading', { name: 'Module 1: select a problem' })).toBeVisible();
+  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(2);
+  await page.getByRole('link', { name: /Browse all Module 3 practice/ }).click();
+  await expect(page).toHaveURL(/problem-list\.html\?module=3$/);
+  await expect(page.getByRole('heading', { name: 'Linked Lists: select a problem' })).toBeVisible();
   await page.locator('.problem-choice-action').first().click();
-  await expect(page).toHaveURL(/practice\.html\?module=1&problem=/);
-  await expect(page.locator('#p-module')).toHaveText('Module 1');
-  await expect(page.locator('#progress-line')).toContainText('of 11 solved');
+  await expect(page).toHaveURL(/practice\.html\?module=3&problem=/);
+  await expect(page.locator('#p-module')).toHaveText('Module 3');
+  await expect(page.locator('#progress-line')).toContainText('of 6 solved');
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
   await expect(page.getByRole('link', { name: 'Back to Problem List' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'All Problems' })).toHaveCount(0);
@@ -1155,6 +1954,15 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
   await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(await visualizerTimeline(page)).toHaveValue('1');
 
+  await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}?activity=linked-list-traversal`);
+  await page.getByLabel('Case preset').selectOption('empty');
+  await expect(page.getByRole('heading', { name: 'Traverse a singly linked list' })).toBeVisible();
+  await expect(page.locator('.source-line.is-current')).toContainText('head <- NULL');
+
+  await page.goto(`file:///${path.resolve(__dirname, '..', 'industry-workbench.html').replace(/\\/g, '/')}?scenario=industry-priority-range-recall&preview=1`);
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(await visualizerTimeline(page)).toHaveValue('1');
+
   await page.goto(`file:///${path.resolve(__dirname, '..', 'tracer.html').replace(/\\/g, '/')}`);
   await page.getByRole('button', { name: 'Load Example' }).click();
   await page.getByRole('button', { name: /Counting: sum of n values/ }).click();
@@ -1170,12 +1978,22 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
 });
 
 test('cached navigation remains available offline', async ({ page, context }, testInfo) => {
-  await page.goto('/visualizer.html');
+  await page.goto('/index.html');
   await page.evaluate(async () => {
     if ('serviceWorker' in navigator) await navigator.serviceWorker.ready;
   });
   await page.reload();
   await context.setOffline(true);
+  await page.goto('/industry-workbench.html?scenario=industry-priority-range-recall&preview=1');
+  await expect(page.getByRole('heading', { name: 'Priority Range Recall' })).toBeVisible();
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
+  await expect(page.getByRole('heading', { name: 'Fetch one instruction' })).toBeVisible();
+  await page.goto('/computer-architecture-practice.html');
+  await expect(page.getByRole('heading', { name: 'Check the fetch path.' })).toBeVisible();
+  await page.goto('/visualizer.html?activity=linked-list-traversal');
+  await expect(page.getByRole('heading', { name: 'Traverse a singly linked list' })).toBeVisible();
+  await page.goto('/problem-list.html?module=3');
+  await expect(page.locator('.problem-choice-current')).toHaveCount(2);
   await page.goto('/practice.html?module=1');
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
   await expect(page.locator('#code-box')).toBeVisible();

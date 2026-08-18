@@ -80,10 +80,39 @@
         : `<div class="module-card-footer"><span>${moduleState === 'locked' ? `Unlocks after the current Module ${activeModule?.number || 1} ${activeProfile.preview ? 'preview' : 'release'}.` : 'Previously released practice stays available.'}</span><a class="btn module-action" href="${ui.href(`problem-list.html?module=${module.number}`)}">${moduleState === 'locked' ? 'View requirements' : `Open ${problems.length} problems`}</a></div>`}`;
     moduleGrid.appendChild(article);
   });
-  ui.mountPreviewControls(document.getElementById('release-controls'));
+  ui.mountPreviewControls(document.querySelector('.catalog-intro'));
 
   const visualizationGrid = document.getElementById('visualization-grid');
-  const activities = typeof ITCC47Activities === 'undefined' ? [] : ITCC47Activities.list();
+  const workbenchGrid = document.getElementById('workbench-grid');
+  const allActivities = typeof ITCC47Activities === 'undefined' ? [] : ITCC47Activities.list();
+  const activities = allActivities.filter((activity) => activity.catalogPlacement !== 'featured-workbench');
+  const focusedProgress = typeof ITCC47VisualizerProgress === 'undefined' ? null : ITCC47VisualizerProgress;
+  const releasedActivityIds = activities
+    .filter((activity) => ['available', 'current'].includes(ITCC47Curriculum.stateForResource('activity', activity.id, { preview: false }).state))
+    .map((activity) => activity.id);
+  if (visualizationGrid && focusedProgress) {
+    const progress = focusedProgress.summary(releasedActivityIds);
+    const progressPanel = document.createElement('section');
+    progressPanel.className = 'visualization-progress-summary';
+    progressPanel.setAttribute('aria-labelledby', 'visualization-progress-title');
+    progressPanel.innerHTML = `<span class="visualization-progress-icon" aria-hidden="true">${typeof BSITIcons === 'function' ? BSITIcons('check') : '✓'}</span>
+      <div><p class="eyebrow">Your progress</p><h2 id="visualization-progress-title">${progress.reviewed} of ${progress.total} available visualizations reviewed</h2><p>Reach the final step to mark a visualization as reviewed. Progress stays in this browser.</p></div>
+      <div class="visualization-progress-meter"><span>${progress.reviewed} / ${progress.total}</span><progress value="${progress.reviewed}" max="${Math.max(progress.total, 1)}">${progress.reviewed} of ${progress.total}</progress></div>`;
+    visualizationGrid.appendChild(progressPanel);
+  }
+  if (workbenchGrid && typeof ITCC47IndustryWorkbench !== 'undefined') {
+    const scenarios = ITCC47IndustryWorkbench.listScenarios();
+    const release = ITCC47Curriculum.stateForResource('activity', scenarios[0].id, options);
+    const open = ['available', 'current'].includes(release.state);
+    const feature = document.createElement('a');
+    feature.className = `industry-catalog-feature industry-catalog-${release.state}`;
+    feature.href = ui.href('industry-workbench.html');
+    feature.innerHTML = `<span class="industry-catalog-icon" aria-hidden="true">${typeof BSITIcons === 'function' ? BSITIcons('database') : '▦'}</span>
+      <span class="industry-catalog-copy"><small>Featured experience · Module 2</small><strong>Industry Data Workbench Sample</strong><span>Follow four algorithm decisions across one deterministic 12,400-ticket support dataset.</span></span>
+      <span class="industry-catalog-stream" aria-hidden="true"><i><small>0</small><b>TCK-000001</b><em>P1</em></i><i><small>1</small><b>TCK-000002</b><em>P1</em></i><span>+ 12,396 compressed records</span><i><small>12,398</small><b>TCK-012399</b><em>P4</em></i><i><small>12,399</small><b>TCK-012400</b><em>P4</em></i></span>
+      <span class="industry-catalog-action">${open ? 'Choose a scenario' : `${typeof BSITIcons === 'function' ? BSITIcons('lock') : '🔒'} Preview scenarios`} <b aria-hidden="true">→</b></span>`;
+    workbenchGrid.appendChild(feature);
+  }
   const visualizationFamilies = [...new Set(activities.map((activity) => activity.family))]
     .map((family, firstSeen) => ({
       family,
@@ -96,18 +125,26 @@
     group.innerHTML = `<header><p>Course visualizations</p><h2>${ui.esc(family)}</h2></header><div class="visualization-cards"></div>`;
     activities.filter((activity) => activity.family === family).forEach((activity) => {
       const result = ITCC47Curriculum.stateForResource('activity', activity.id, options);
-      const link = document.createElement('a'); link.className = `visualization-card visualization-${result.state}`;
+      const progress = focusedProgress?.get(activity.id);
+      const reviewed = Boolean(progress?.reviewedAt);
+      const visited = Boolean(progress?.lastVisitedAt);
+      const link = document.createElement('a'); link.className = `visualization-card visualization-${result.state}${visited ? ' visualization-visited' : ''}${reviewed ? ' visualization-reviewed' : ''}`;
       link.href = ui.href(`visualizer.html?activity=${encodeURIComponent(activity.id)}`);
       const locked = !['available', 'current'].includes(result.state);
       const lockIcon = locked ? `<span class="visualization-lock" role="img" aria-label="${ui.esc(result.state)}">${typeof BSITIcons === 'function' ? BSITIcons('lock') : '🔒'}</span>` : '';
-      link.innerHTML = `<span class="visualization-card-meta"><span class="visualization-module">Module ${activity.module} · ${ui.esc(activity.topic)}</span>${lockIcon}</span><strong>${ui.esc(activity.title)}</strong><span class="visualization-subtitle">${ui.esc(activity.subtitle)}</span><em>${locked ? 'View requirements' : 'Open visualization'} →</em>`;
+      const progressMeta = visited ? `<span class="visualization-progress-meta"><span class="visualization-progress-state">${reviewed ? `${typeof BSITIcons === 'function' ? BSITIcons('check') : '✓'} Reviewed` : 'Visited'}</span><span>Last visited at: ${focusedProgress.formatDate(progress.lastVisitedAt)}</span></span>` : '';
+      link.innerHTML = `<span class="visualization-card-meta"><span class="visualization-module">Module ${activity.module} · ${ui.esc(activity.topic)}</span>${lockIcon}</span><strong>${ui.esc(activity.title)}</strong><span class="visualization-subtitle">${ui.esc(activity.subtitle)}</span>${progressMeta}<em>${locked ? 'View requirements' : reviewed ? 'Review again' : visited ? 'Continue visualization' : 'Open visualization'} <span aria-hidden="true">→</span></em>`;
       group.querySelector('.visualization-cards').appendChild(link);
     });
     visualizationGrid.appendChild(group);
   });
 
   const tabs = [...document.querySelectorAll('[data-catalog-view]')];
-  const views = { problems: document.getElementById('problem-catalog'), visualizations: document.getElementById('visualization-catalog') };
+  const views = {
+    problems: document.getElementById('problem-catalog'),
+    visualizations: document.getElementById('visualization-catalog'),
+    workbenches: document.getElementById('workbench-catalog'),
+  };
   function selectView(name, updateUrl = true, focus = false) {
     const selected = views[name] ? name : 'problems';
     tabs.forEach((tab) => { const active = tab.dataset.catalogView === selected; tab.setAttribute('aria-selected', String(active)); tab.tabIndex = active ? 0 : -1; if (active && focus) tab.focus(); });

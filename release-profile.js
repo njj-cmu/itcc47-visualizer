@@ -2,6 +2,6 @@
 const ITCC47_RELEASE_PROFILE = Object.freeze({
   schemaVersion: 2,
   profileId: 'itcc47-2026-2027-s1',
-  profileVersion: 3,
-  currentCheckpointId: 'm1-complexity',
+  profileVersion: 5,
+  currentCheckpointId: 'm3-linked-foundations',
 });

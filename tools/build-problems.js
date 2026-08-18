@@ -143,6 +143,21 @@ function readJson(file, hint) {
 }
 
 function build() {
+  // In CI (or any environment without the instructor-only hidden file), skip
+  // regeneration when problems.data.js already exists. The committed copy is
+  // what the tests validate; rebuilding it requires secrets that are not in the
+  // repo by design.
+  const hiddenPath = path.join(ROOT, 'problems.hidden.json');
+  const dataPath = path.join(ROOT, 'problems.data.js');
+  if (!fs.existsSync(hiddenPath)) {
+    if (fs.existsSync(dataPath)) {
+      console.log('problems.hidden.json not found — using committed problems.data.js (CI mode).');
+      return;
+    }
+    console.error('Missing problems.hidden.json — this file is deliberately gitignored. Restore it from your own backup — it is not in the repo.');
+    process.exit(1);
+  }
+
   const problems = readJson('problems.public.json', 'this file is committed; restore it from git.');
   const curriculum = readJson('curriculum.public.json', 'the release catalog is required to map every problem.');
   const curriculumProblems = new Map(curriculum.resources.filter((resource) => resource.kind === 'problem').map((resource) => [resource.id, resource]));

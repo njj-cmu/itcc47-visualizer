@@ -905,6 +905,7 @@ ok('computer architecture catalog exposes Decode with focused renderer and immut
   const decode = ComputerArchitectureCatalog.get('architecture-decode-instruction');
   const fetch = ComputerArchitectureCatalog.get('architecture-fetch-cycle');
   return decode.renderer === 'cpu-instruction-decode' && decode.workspaceComposition === 'cpu-decode'
+    && decode.defaultPlaybackGranularity === 'micro' && fetch.defaultPlaybackGranularity === undefined
     && decode.source.length === 6 && decode.evidenceViews.join(',') === 'micro-operations,cpu-decode-fields,cpu-machine-state,cpu-decode-meaning'
     && decode.completionActions[0].href.includes('architecture-add-immediate')
     && fetch.completionActions[0].href.includes('architecture-decode-instruction')

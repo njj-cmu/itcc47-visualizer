@@ -612,10 +612,14 @@ test('Decode activity starts from completed fetch state and progressively explai
   await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
   await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-decode-instruction');
   await expect(page.getByRole('heading', { name: 'Decode one instruction' })).toBeVisible();
-  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 6');
+  await expect(page.getByRole('button', { name: 'Micro', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 16');
   await expect(page.locator('.cpu-decode-full')).toBeVisible();
   await expect(page.locator('.cpu-decode-bit')).toHaveCount(16);
   expect(await page.locator('.cpu-decode-bit').allTextContents()).toEqual('0011000110100100'.split(''));
+  await expect(page.locator('.cpu-decode-field-header')).toHaveCount(3);
+  await expect(page.locator('.cpu-decode-field-card[data-card-content="empty"]')).toHaveCount(3);
+  await expect(page.locator('.cpu-decode-field-card .cpu-decode-card-bits')).toHaveCount(0);
   await expect(page.locator('.cpu-decode-components [data-component-state="is-source"]')).toHaveCount(2);
   await expect(page.locator('.cpu-decode-ir')).toHaveClass(/is-source/);
   await expect(page.locator('.cpu-decode-callout')).toContainText('PC advanced · memory idle');
@@ -625,12 +629,12 @@ test('Decode activity starts from completed fetch state and progressively explai
 
   const binaryBits = await page.locator('.cpu-decode-bit').allTextContents();
   await page.getByRole('button', { name: 'DEC' }).click();
-  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 16');
   expect(await page.locator('.cpu-decode-bit').allTextContents()).toEqual(binaryBits);
   await expect(page.locator('.cpu-decode-ir')).toContainText('12708');
 
   const timeline = await visualizerTimeline(page);
-  await timeline.fill('5');
+  await timeline.fill('15');
   await expect(page.locator('.cpu-decode-summary')).toContainText('LOAD R1, [0xA4]');
   await expect(page.locator('.cpu-decode-summary')).toContainText('Read Main Memory');
   await expect(page.locator('.cpu-completion-actions')).toBeVisible();
@@ -644,7 +648,7 @@ test('Decode activity starts from completed fetch state and progressively explai
   await expect(page.locator('.desktop-evidence .cpu-decode-meaning-evidence')).toContainText('does not execute');
 
   await page.getByLabel('Instruction preset').selectOption('store-r2-b0');
-  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 16');
   await expect(page.locator('.cpu-decode-ir')).toContainText('17072');
   await expect(page.locator('.cpu-completion-actions')).toHaveCount(0);
 });
@@ -653,7 +657,7 @@ test('Decode activity exposes sixteen latched micro-steps without control signal
   test.skip(testInfo.project.name !== 'laptop');
   await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
   await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-decode-instruction');
-  await page.getByRole('button', { name: 'Micro', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Micro', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.integrated-step strong')).toHaveText('1 / 16');
   const timeline = await visualizerTimeline(page);
   await timeline.fill('1');
@@ -665,6 +669,13 @@ test('Decode activity exposes sixteen latched micro-steps without control signal
   await expect(page.locator('.cpu-decode-renderer')).toHaveAttribute('data-active-field', 'opcode');
   await expect(page.locator('[data-active-route-id="decode-opcode"]')).toHaveCount(1);
   await expect(page.locator('.cpu-value-cue')).toHaveCount(1);
+  await expect(page.locator('.cpu-decode-field-card.field-opcode')).toHaveAttribute('data-card-content', 'empty');
+  await expect(page.locator('.cpu-decode-field-card.field-opcode .cpu-decode-card-bits')).toHaveCount(0);
+  await timeline.fill('6');
+  await expect(page.locator('.cpu-decode-field-card.field-opcode')).toHaveAttribute('data-card-content', 'committed');
+  await expect(page.locator('.cpu-decode-field-card.field-opcode .cpu-decode-card-bits')).toHaveText('0011');
+  await expect(page.locator('.cpu-decode-field-card.field-register')).toHaveAttribute('data-card-content', 'empty');
+  await expect(page.locator('.cpu-decode-field-card.field-operand')).toHaveAttribute('data-card-content', 'empty');
   await timeline.fill('15');
   await expect(page.locator('.integrated-step strong')).toHaveText('16 / 16');
   await expect(page.locator('.cpu-decode-summary')).toContainText('LOAD R1, [0xA4]');
@@ -685,15 +696,21 @@ test('Decode desktop board stays collision-free at both supported desktop widths
       }).length;
       const cards = [...document.querySelectorAll('.cpu-decode-field-card > rect')].map((node) => node.getBoundingClientRect());
       const cardCollisions = cards.some((box, index) => cards.some((other, otherIndex) => otherIndex > index && box.left < other.right - 1 && box.right > other.left + 1 && box.top < other.bottom - 1 && box.bottom > other.top + 1));
+      const headers = [...document.querySelectorAll('.cpu-decode-field-header')].map((node) => node.getBoundingClientRect());
+      const headerCollisions = headers.some((box, index) => headers.some((other, otherIndex) => otherIndex > index && box.left < other.right - 1 && box.right > other.left + 1 && box.top < other.bottom - 1 && box.bottom > other.top + 1));
+      const bitCells = [...document.querySelectorAll('.cpu-decode-bit > rect')].map((node) => node.getBoundingClientRect());
+      const headerBitCollisions = headers.some((box) => bitCells.some((cell) => box.left < cell.right - 1 && box.right > cell.left + 1 && box.top < cell.bottom - 1 && box.bottom > cell.top + 1));
       return {
         bits: document.querySelectorAll('.cpu-decode-bit').length,
         markers: document.querySelectorAll('.cpu-decode-full marker').length,
         horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth,
         clippedText,
         cardCollisions,
+        headerCollisions,
+        headerBitCollisions,
       };
     });
-    expect(geometry).toEqual({ bits: 16, markers: 0, horizontalOverflow: 0, clippedText: 0, cardCollisions: false });
+    expect(geometry).toEqual({ bits: 16, markers: 0, horizontalOverflow: 0, clippedText: 0, cardCollisions: false, headerCollisions: false, headerBitCollisions: false });
   }
 });
 
@@ -703,14 +720,16 @@ test('Decode mobile tabs preserve playback and never overflow the page', async (
   await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-decode-instruction');
   await expect(page.locator('.cpu-decode-mobile')).toBeVisible();
   await expect(page.locator('.cpu-decode-mobile-bits b')).toHaveCount(16);
+  await expect(page.locator('.cpu-decode-mobile-cards [data-card-content="empty"]')).toHaveCount(3);
+  await expect(page.locator('.cpu-decode-mobile-cards code')).toHaveCount(0);
   await page.getByRole('button', { name: 'Step' }).click();
-  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 16');
   await page.getByRole('tab', { name: 'Fields' }).click();
   await expect(page.locator('.cpu-decode-fields-pane')).toBeVisible();
   await page.getByRole('tab', { name: 'Steps' }).click();
   await expect(page.locator('.mobile-evidence .cpu-micro-operations')).toBeVisible();
   await page.getByRole('tab', { name: 'Decode' }).click();
-  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 16');
   await expect(page.getByRole('button', { name: 'Step' })).toBeInViewport();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

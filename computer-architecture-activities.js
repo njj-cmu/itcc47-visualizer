@@ -51,6 +51,7 @@ const ComputerArchitectureActivities = (() => {
     renderer: 'cpu-instruction-decode',
     workspaceKind: 'cpu-lab',
     workspaceComposition: 'cpu-decode',
+    defaultPlaybackGranularity: 'micro',
     mobileViews: Object.freeze([
       Object.freeze({ id: 'decode', label: 'Decode', icon: 'grid' }),
       Object.freeze({ id: 'fields', label: 'Fields', icon: 'registers' }),

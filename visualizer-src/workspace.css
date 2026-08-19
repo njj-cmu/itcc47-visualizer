@@ -562,7 +562,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .cpu-decode-shell { fill: #131920; stroke: #344452; stroke-width: 1.5; }
 .cpu-decode-structural path { fill: none; stroke: #718092; stroke-width: 1.5; opacity: .14; }
 .cpu-decode-active-routes path { fill: none; stroke: var(--ca-cyan); stroke-width: 3.5; stroke-linecap: round; opacity: 1; filter: drop-shadow(0 0 6px rgba(34,211,238,.58)); }
-.cpu-decode-kicker, .cpu-decode-box-label, .cpu-decode-box-value, .cpu-decode-callout text, .cpu-decode-range, .cpu-decode-bit text, .cpu-decode-card-label, .cpu-decode-card-bits, .cpu-decode-card-meaning, .cpu-decode-mnemonic, .cpu-decode-next-action, .cpu-decode-context-label, .cpu-decode-context-value { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
+.cpu-decode-kicker, .cpu-decode-box-label, .cpu-decode-box-value, .cpu-decode-callout text, .cpu-decode-field-name, .cpu-decode-range, .cpu-decode-bit text, .cpu-decode-card-label, .cpu-decode-card-bits, .cpu-decode-card-meaning, .cpu-decode-mnemonic, .cpu-decode-next-action, .cpu-decode-context-label, .cpu-decode-context-value { font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
 .cpu-decode-kicker { fill: #8b9bad; font-size: 15px; font-weight: 750; letter-spacing: .06em; }
 .cpu-decode-ir rect, .cpu-decode-field-card rect, .cpu-decode-summary rect, .cpu-decode-context-cell rect { fill: #171e26; stroke: #425363; stroke-width: 1.5; transition: fill 160ms ease, stroke 160ms ease, filter 160ms ease, opacity 160ms ease; }
 .cpu-decode-box-label { fill: #dffbff; font-size: 17px; font-weight: 800; }
@@ -571,8 +571,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .cpu-decode-callout text:first-of-type { fill: #8feaf4; font: 750 14px ui-monospace, monospace; letter-spacing: .04em; }
 .cpu-decode-callout text:last-of-type { fill: #95a4b3; font: 14px ui-monospace, monospace; }
 .cpu-decode-bit-board > rect { fill: #171d24; stroke: #334452; stroke-width: 1.5; transition: opacity 160ms ease; }
+.cpu-decode-field-header { stroke-width: 1; }
+.cpu-decode-field-group.field-opcode .cpu-decode-field-header { fill: #123039; stroke: #287f8c; }
+.cpu-decode-field-group.field-register .cpu-decode-field-header { fill: #302819; stroke: #8b6e38; }
+.cpu-decode-field-group.field-operand .cpu-decode-field-header { fill: #272239; stroke: #6f6593; }
 .cpu-decode-field-outline { fill: transparent; stroke: #4e6172; stroke-width: 1; }
-.cpu-decode-range { fill: #9cabba; font-size: 14px; font-weight: 700; letter-spacing: .025em; }
+.cpu-decode-field-name { fill: #e6edf3; font-size: 12px; font-weight: 800; letter-spacing: .04em; }
+.cpu-decode-range { fill: #aab7c4; font-size: 12px; font-weight: 700; letter-spacing: .025em; }
 .cpu-decode-bit rect { fill: #11171d; stroke: #425161; stroke-width: 1; }
 .cpu-decode-bit text { fill: #dce5ee; font-size: 18px; font-weight: 800; }
 .cpu-decode-bit.field-opcode.is-active rect, .cpu-decode-field-group.field-opcode.is-source .cpu-decode-field-outline { fill: #12333a; stroke: var(--ca-cyan); stroke-width: 2; filter: drop-shadow(0 0 5px rgba(34,211,238,.35)); }
@@ -582,6 +587,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .cpu-decode-field-card.field-opcode rect { stroke: #287f8c; }
 .cpu-decode-field-card.field-register rect { stroke: #8b6e38; }
 .cpu-decode-field-card.field-operand rect { stroke: #6f6593; }
+.cpu-decode-field-card.is-empty rect { stroke-dasharray: 4 4; }
 .cpu-decode-card-label { fill: #98a6b5; font-size: 14px; font-weight: 750; letter-spacing: .05em; }
 .cpu-decode-card-bits { fill: #dce7f0; font-size: 17px; font-weight: 800; }
 .cpu-decode-card-meaning { fill: #758493; font-size: 15px; }
@@ -620,6 +626,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .cpu-decode-fields-pane dd code, .cpu-decode-fields-pane dd strong { display: block; overflow-wrap: anywhere; }
 .cpu-decode-fields-pane dd code { color: var(--ca-lavender); font-size: .75rem; }
 .cpu-decode-fields-pane dd strong { margin-top: 3px; color: #dbe5ed; font-size: .68rem; }
+.cpu-decode-field-pending, .cpu-decode-evidence-fields section em { color: #758493; font-size: .62rem; font-style: normal; }
 .cpu-decode-fields-pane section { margin-top: auto; padding: 14px; border: 1px solid #365765; border-radius: 8px; background: #14242b; }
 .cpu-decode-fields-pane section strong { display: block; margin-top: 5px; color: #e8fbfe; font: 800 1rem ui-monospace, monospace; }
 .cpu-decode-fields-pane section p { margin: 8px 0 0; color: #aebbc7; font-size: .7rem; line-height: 1.45; }
@@ -630,6 +637,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .cpu-decode-evidence-fields section span small { display: block; margin-top: 3px; color: #6f7d8c; font-size: .52rem; }
 .cpu-decode-evidence-fields section code { color: var(--ca-lavender); font-size: .66rem; }
 .cpu-decode-evidence-fields section strong { grid-column: 1 / 3; color: #e1e8ef; font-size: .68rem; }
+.cpu-decode-evidence-fields section em { grid-column: 1 / 3; }
 .cpu-decode-evidence-fields > p { color: #8492a0; font-size: .63rem; line-height: 1.5; }
 .cpu-decode-meaning-evidence > span, .cpu-decode-meaning-evidence section > span { color: #8492a0; font-size: .6rem; text-transform: uppercase; }
 .cpu-decode-meaning-evidence > strong { display: block; margin: 5px 0 14px; color: var(--ca-lavender); font: 800 1.05rem ui-monospace, monospace; }

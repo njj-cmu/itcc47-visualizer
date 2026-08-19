@@ -291,10 +291,10 @@ export const CpuDatapathRenderer = memo(function CpuDatapathRenderer({ frame, nu
 });
 
 const DECODE_ROUTES = Object.freeze([
-  Object.freeze({ id: 'decode-word', d: 'M170 101 V126 H500 V145', x: [170, 170, 500, 500], y: [101, 126, 126, 145], times: [0, .1, .9, 1] }),
-  Object.freeze({ id: 'decode-opcode', d: 'M190 202 V238', x: [190, 190], y: [202, 238], times: [0, 1] }),
-  Object.freeze({ id: 'decode-register', d: 'M390 202 V220 H500 V238', x: [390, 390, 500, 500], y: [202, 220, 220, 238], times: [0, .2, .8, 1] }),
-  Object.freeze({ id: 'decode-operand', d: 'M700 202 V220 H810 V238', x: [700, 700, 810, 810], y: [202, 220, 220, 238], times: [0, .2, .8, 1] }),
+  Object.freeze({ id: 'decode-word', d: 'M170 101 V116 H500 V124', x: [170, 170, 500, 500], y: [101, 116, 116, 124], times: [0, .1, .9, 1] }),
+  Object.freeze({ id: 'decode-opcode', d: 'M190 199 V238', x: [190, 190], y: [199, 238], times: [0, 1] }),
+  Object.freeze({ id: 'decode-register', d: 'M390 199 V220 H500 V238', x: [390, 390, 500, 500], y: [199, 220, 220, 238], times: [0, .2, .8, 1] }),
+  Object.freeze({ id: 'decode-operand', d: 'M700 199 V220 H810 V238', x: [700, 700, 810, 810], y: [199, 220, 220, 238], times: [0, .2, .8, 1] }),
   Object.freeze({ id: 'decode-assemble', d: 'M500 330 V352', x: [500, 500], y: [330, 352], times: [0, 1] }),
 ]);
 
@@ -316,7 +316,7 @@ function decodeFieldMeaning(frame, fieldId, numberFormat) {
   return `${decodeFieldValue(frame, fieldId, numberFormat)} · ${instruction.operandKind}`;
 }
 
-function isDecodeFieldInterpreted(instruction, animationMetadata, fieldId) {
+function isDecodeFieldCommitted(instruction, animationMetadata, fieldId) {
   const order = { locate: 0, split: 1, opcode: 2, register: 3, operand: 4, complete: 5 };
   const fieldOrder = { opcode: 2, register: 3, operand: 4 };
   const stage = order[instruction.decodeStage] ?? 0;
@@ -383,27 +383,34 @@ export const CpuInstructionDecodeRenderer = memo(function CpuInstructionDecodeRe
         </g>
 
         <g className={`cpu-decode-bit-board ${boardState}`} data-component-id="DecodeBoard" data-component-state={boardState || 'idle'}>
-          <rect x="62" y="132" width="876" height="76" rx="10"/>
+          <rect x="62" y="124" width="876" height="88" rx="10"/>
           {DECODE_FIELDS.map((field) => <g className={`cpu-decode-field-group field-${field.id} ${fieldState(field.id)} ${revealed.has(field.id) ? 'is-revealed' : ''}`} data-component-id={`field:${field.id}`} data-component-state={fieldState(field.id) || 'idle'} key={field.id}>
-            <rect className="cpu-decode-field-outline" x={field.x} y="147" width={field.width} height="43" rx="5"/>
-            <text className="cpu-decode-range" x={field.x + field.width / 2} y="141" textAnchor="middle">{field.label} · {field.range}</text>
+            <rect className="cpu-decode-field-header" x={field.x + 2} y="131" width={field.width - 4} height="23" rx="5"/>
+            <text className="cpu-decode-field-name" x={field.x + 12} y="147">{field.label}</text>
+            <text className="cpu-decode-range" x={field.x + field.width - 12} y="147" textAnchor="end">{field.range.replace('bits ', '')}</text>
+            <rect className="cpu-decode-field-outline" x={field.x} y="157" width={field.width} height="42" rx="5"/>
           </g>)}
           {[...bits].map((bit, index) => {
             const fieldId = index < 4 ? 'opcode' : index < 8 ? 'register' : 'operand';
             const x = 94 + index * 49.5;
             return <g className={`cpu-decode-bit field-${fieldId} ${instruction.activeField === fieldId ? 'is-active' : ''}`} data-bit-position={15 - index} key={`${index}:${bit}`}>
-              <rect x={x} y="151" width="43" height="35" rx="3"/>
-              <text x={x + 21.5} y="175" textAnchor="middle">{bit}</text>
+              <rect x={x} y="161" width="43" height="34" rx="3"/>
+              <text x={x + 21.5} y="184" textAnchor="middle">{bit}</text>
             </g>;
           })}
         </g>
 
-        {DECODE_FIELDS.map((field) => <g className={`cpu-decode-field-card field-${field.id} ${cardState(field.id)} ${isDecodeFieldInterpreted(instruction, animationMetadata, field.id) ? 'is-interpreted' : ''}`} data-component-id={`card:${field.id}`} data-component-state={cardState(field.id) || 'idle'} key={`card:${field.id}`}>
-          <rect x={field.cardX} y="238" width={field.cardWidth} height="92" rx="8"/>
-          <text className="cpu-decode-card-label" x={field.cardX + 16} y="261">{field.label}</text>
-          <text className="cpu-decode-card-bits" x={field.cardX + 16} y="286">{instruction.fields[field.id].bits}</text>
-          <text className="cpu-decode-card-meaning" x={field.cardX + 16} y="313">{isDecodeFieldInterpreted(instruction, animationMetadata, field.id) ? decodeFieldMeaning(frame, field.id, numberFormat) : 'Not interpreted yet'}</text>
-        </g>)}
+        {DECODE_FIELDS.map((field) => {
+          const committed = isDecodeFieldCommitted(instruction, animationMetadata, field.id);
+          return <g className={`cpu-decode-field-card field-${field.id} ${cardState(field.id)} ${committed ? 'is-interpreted' : 'is-empty'}`} data-component-id={`card:${field.id}`} data-component-state={cardState(field.id) || 'idle'} data-card-content={committed ? 'committed' : 'empty'} aria-label={committed ? `${field.label}: ${decodeFieldMeaning(frame, field.id, numberFormat)}` : `${field.label}: empty until the field arrives`} key={`card:${field.id}`}>
+            <rect x={field.cardX} y="238" width={field.cardWidth} height="92" rx="8"/>
+            <text className="cpu-decode-card-label" x={field.cardX + 16} y="261">{field.label}</text>
+            {committed ? <>
+              <text className="cpu-decode-card-bits" x={field.cardX + 16} y="286">{instruction.fields[field.id].bits}</text>
+              <text className="cpu-decode-card-meaning" x={field.cardX + 16} y="313">{decodeFieldMeaning(frame, field.id, numberFormat)}</text>
+            </> : null}
+          </g>;
+        })}
 
         <g className={`cpu-decode-summary ${assembledState}`} data-component-id="DecodedInstruction" data-component-state={assembledState || 'idle'}>
           <rect x="74" y="352" width="852" height="76" rx="9"/>
@@ -432,7 +439,10 @@ export const CpuInstructionDecodeRenderer = memo(function CpuInstructionDecodeRe
       <section className={`cpu-decode-mobile-ir ${irState}`}><span>IR · 16-bit word</span><strong className={isTransferSource(animationMetadata, 'IR') ? 'is-emitting' : ''}>{format(instruction.word, 16, numberFormat)}</strong><small>Fetch complete · PC advanced</small></section>
       <section className="cpu-decode-mobile-bits" aria-label={`Instruction bits ${bits}`}><span>15</span><div>{[...bits].map((bit, index) => <b className={`field-${index < 4 ? 'opcode' : index < 8 ? 'register' : 'operand'} ${instruction.activeField === (index < 4 ? 'opcode' : index < 8 ? 'register' : 'operand') ? 'is-active' : ''}`} key={`${index}:${bit}`}>{bit}</b>)}</div><span>0</span></section>
       <div className="cpu-decode-mobile-groups"><span>4 opcode</span><span>4 register</span><span>8 operand</span></div>
-      <div className="cpu-decode-mobile-cards">{DECODE_FIELDS.map((field) => <section className={`field-${field.id} ${cardState(field.id)}`} key={field.id}><span>{field.label}</span><code>{instruction.fields[field.id].bits}</code><strong>{isDecodeFieldInterpreted(instruction, animationMetadata, field.id) ? decodeFieldMeaning(frame, field.id, numberFormat) : 'Not interpreted yet'}</strong></section>)}</div>
+      <div className="cpu-decode-mobile-cards">{DECODE_FIELDS.map((field) => {
+        const committed = isDecodeFieldCommitted(instruction, animationMetadata, field.id);
+        return <section className={`field-${field.id} ${cardState(field.id)} ${committed ? 'is-interpreted' : 'is-empty'}`} data-card-content={committed ? 'committed' : 'empty'} aria-label={committed ? `${field.label}: ${decodeFieldMeaning(frame, field.id, numberFormat)}` : `${field.label}: empty until the field arrives`} key={field.id}><span>{field.label}</span>{committed ? <><code>{instruction.fields[field.id].bits}</code><strong>{decodeFieldMeaning(frame, field.id, numberFormat)}</strong></> : null}</section>;
+      })}</div>
       <section className={`cpu-decode-mobile-summary ${assembledState}`}><span>Assembled instruction</span><strong>{instruction.decoded ? instruction.mnemonic : 'Not assembled yet'}</strong><p><b>What happens next:</b> {instruction.decoded ? instruction.nextAction : 'Revealed after the fields are assembled.'}</p></section>
       <section className="cpu-mobile-current-step"><b>{frame.microStep.index}</b><span><strong>{frame.microStep.label}</strong><p>{stageText}</p>{terminal ? <p className="cpu-mobile-next"><b>Up next:</b> run or practice the decoded instruction.</p> : null}</span></section>
     </div>
@@ -447,7 +457,10 @@ export const DecodeFieldsPane = memo(function DecodeFieldsPane({ frame, numberFo
     <div className="cpu-decode-fields-pane-bits" aria-label="Four opcode bits, four register bits, and eight operand bits">
       <code className="field-opcode">{instruction.fields.opcode.bits}</code><code className="field-register">{instruction.fields.register.bits}</code><code className="field-operand">{instruction.fields.operand.bits}</code>
     </div>
-    <dl>{DECODE_FIELDS.map((field) => <div className={instruction.activeField === field.id ? 'is-active' : ''} key={field.id}><dt>{field.label}<small>{field.range}</small></dt><dd><code>{decodeFieldValue(frame, field.id, numberFormat)}</code><strong>{isDecodeFieldInterpreted(instruction, frame.animation, field.id) ? decodeFieldMeaning(frame, field.id, numberFormat) : 'Not interpreted yet'}</strong></dd></div>)}</dl>
+    <dl>{DECODE_FIELDS.map((field) => {
+      const committed = isDecodeFieldCommitted(instruction, frame.animation, field.id);
+      return <div className={instruction.activeField === field.id ? 'is-active' : ''} data-field-content={committed ? 'committed' : 'empty'} key={field.id}><dt>{field.label}<small>{field.range}</small></dt><dd>{committed ? <><code>{decodeFieldValue(frame, field.id, numberFormat)}</code><strong>{decodeFieldMeaning(frame, field.id, numberFormat)}</strong></> : <span className="cpu-decode-field-pending">Waiting for arrival</span>}</dd></div>;
+    })}</dl>
     <section><span>What it means</span><strong>{instruction.decoded ? instruction.mnemonic : 'Still decoding'}</strong><p>{instruction.decoded ? instruction.nextAction : 'Complete all three field interpretations to reveal the next CPU action.'}</p></section>
   </aside>;
 });
@@ -499,7 +512,10 @@ function CpuDecodeFieldsView({ frame, viewOptions }) {
   const numberFormat = viewOptions?.numberFormat || 'hex';
   return <div className="cpu-decode-evidence-fields">
     <div className="cpu-instruction-bits"><i className="opcode">{frame.instruction.fields.opcode.bits}</i><i className="register">{frame.instruction.fields.register.bits}</i><i className="operand">{frame.instruction.fields.operand.bits}</i></div>
-    {DECODE_FIELDS.map((field) => <section className={frame.instruction.activeField === field.id ? 'is-active' : ''} key={field.id}><span>{field.label}<small>{field.range}</small></span><code>{decodeFieldValue(frame, field.id, numberFormat)}</code><strong>{isDecodeFieldInterpreted(frame.instruction, frame.animation, field.id) ? decodeFieldMeaning(frame, field.id, numberFormat) : 'Not interpreted yet'}</strong></section>)}
+    {DECODE_FIELDS.map((field) => {
+      const committed = isDecodeFieldCommitted(frame.instruction, frame.animation, field.id);
+      return <section className={frame.instruction.activeField === field.id ? 'is-active' : ''} data-field-content={committed ? 'committed' : 'empty'} key={field.id}><span>{field.label}<small>{field.range}</small></span>{committed ? <><code>{decodeFieldValue(frame, field.id, numberFormat)}</code><strong>{decodeFieldMeaning(frame, field.id, numberFormat)}</strong></> : <em>Waiting for arrival</em>}</section>;
+    })}
     <p>Bit cells remain binary; the selected number format changes only interpreted values.</p>
   </div>;
 }

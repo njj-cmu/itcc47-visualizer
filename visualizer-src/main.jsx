@@ -905,7 +905,7 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   }, []);
   const [inputs, setInputs] = useState(() => initialInputs(activity));
   const [viewOptions, setViewOptions] = useState({ numberFormat: 'hex' });
-  const [cpuGranularity, setCpuGranularity] = useState('operation');
+  const [cpuGranularity, setCpuGranularity] = useState(() => activity.defaultPlaybackGranularity === 'micro' ? 'micro' : 'operation');
   const [networkGranularity, setNetworkGranularity] = useState('micro');
   const pendingGranularityMap = useRef(null);
   const networkDetailedPositions = useRef(new Map());

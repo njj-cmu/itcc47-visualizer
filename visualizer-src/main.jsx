@@ -5,7 +5,7 @@ import './workspace.css';
 import { ConceptDomainRenderer } from './domain-renderers.jsx';
 import { LinearADTRenderer } from './linear-adt-renderer.jsx';
 import { IndustryWorkbenchApp } from './industry-workbench.jsx';
-import { CpuDatapathRenderer, MainMemoryPane } from './cpu-datapath.jsx';
+import { CpuDatapathRenderer, CpuInstructionDecodeRenderer, DecodeFieldsPane, MainMemoryPane } from './cpu-datapath.jsx';
 
 const MAX_VISUAL_VALUES = 18;
 const DEFAULT_SPEED = 6;
@@ -712,6 +712,14 @@ function workspaceCompositionFor(activity) {
   return 'stacked';
 }
 
+function CompletionActions({ activity, visible }) {
+  if (!visible || !activity.completionActions?.length) return null;
+  return <nav className="cpu-completion-actions" aria-label="Activity complete">
+    <div><span>Activity complete</span><strong>Choose what to explore next.</strong></div>
+    <div>{activity.completionActions.map((action) => <a className={`is-${action.kind || 'secondary'}`} href={action.href} key={action.id}>{action.label}<Icon name="next" size={14}/></a>)}</div>
+  </nav>;
+}
+
 function PlaybackDock({ state, controller, activity, event, motionPreference }) {
   const visibleMetrics = (activity.metrics || []).slice(0, 2);
   return <footer className="playback-dock">
@@ -910,7 +918,8 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const objectVisualDuration = playback.navigationSource === 'seek' ? 0 : duration;
   const cpuFrame = useCpuSequenceFrame({ enabled: isComputerArchitecture, event, frame: event?.frame, duration: visualDuration, onSequenceComplete: onEntityComplete });
   const workspaceComposition = workspaceCompositionFor(activity);
-  const [Renderer, setRenderer] = useState(() => activity.renderer === 'object-model' ? ObjectModelRenderer : activity.renderer === 'cpu-datapath' ? CpuDatapathRenderer : ArrayRenderer);
+  const isCpuDecode = workspaceComposition === 'cpu-decode';
+  const [Renderer, setRenderer] = useState(() => activity.renderer === 'object-model' ? ObjectModelRenderer : activity.renderer === 'cpu-datapath' ? CpuDatapathRenderer : activity.renderer === 'cpu-instruction-decode' ? CpuInstructionDecodeRenderer : ArrayRenderer);
 
   useEffect(() => {
     const mapping = pendingGranularityMap.current;
@@ -974,10 +983,10 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
       {!isITCC45 && !isComputerArchitecture ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} onShuffle={shuffle} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : null}
       <div className="mobile-surface-tabs" role="tablist" aria-label="Workspace view">{mobileTabs.map(([id, icon, label]) => <button type="button" role="tab" aria-selected={mobileTab === id} className={mobileTab === id ? 'active' : ''} onClick={() => setMobileTab(id)} key={id}><Icon name={icon}/>{label}</button>)}</div>
       {isITCC45 ? <ITCC45LabStage activity={activity} event={event} previousEvent={previousEvent} index={playback.index} source={source} mobileTab={mobileTab} layout={workspaceLayout} onRatioChange={(sourceRatio) => updateWorkspaceLayout({ sourceRatio })} duration={objectVisualDuration} motionMode={motionPreference.mode}/> : isComputerArchitecture ? <div className="cpu-workbench">
-        <div className={`cpu-memory-surface mobile-surface ${mobileTab === 'memory' ? 'mobile-active' : ''}`}><MainMemoryPane frame={cpuFrame} numberFormat={viewOptions.numberFormat}/></div>
+        {isCpuDecode ? <div className={`cpu-auxiliary-surface mobile-surface ${mobileTab === 'fields' ? 'mobile-active' : ''}`}><DecodeFieldsPane frame={cpuFrame} numberFormat={viewOptions.numberFormat}/></div> : <div className={`cpu-memory-surface mobile-surface ${mobileTab === 'memory' ? 'mobile-active' : ''}`}><MainMemoryPane frame={cpuFrame} numberFormat={viewOptions.numberFormat}/></div>}
         <div className="cpu-visual-shell">
-          <header className="cpu-canvas-heading"><strong>CPU datapath</strong><span><b>Operation {cpuFrame?.operation?.index || 1} / {cpuFrame?.operation?.total || 1}</b><em>{cpuFrame?.microStep?.index || 1} / {cpuFrame?.microStep?.total || 1} · {cpuFrame?.microStep?.label || 'Find the source'}</em></span></header>
-          <section className={`cpu-visual-canvas mobile-surface ${mobileTab === 'datapath' ? 'mobile-active' : ''}`} tabIndex="0" aria-label={`${activity.title} teaching CPU datapath`}><Renderer frame={cpuFrame} event={event} activity={activity} numberFormat={viewOptions.numberFormat} motionMode={motionPreference.mode} duration={visualDuration * (cpuFrame?.microStep?.durationWeight || 1)}/></section>
+          <header className="cpu-canvas-heading"><strong>{isCpuDecode ? 'Instruction decoder' : 'CPU datapath'}</strong><span><b>Operation {cpuFrame?.operation?.index || 1} / {cpuFrame?.operation?.total || 1}</b><em>{cpuFrame?.microStep?.index || 1} / {cpuFrame?.microStep?.total || 1} · {cpuFrame?.microStep?.label || 'Find the source'}</em></span></header>
+          <section className={`cpu-visual-canvas mobile-surface ${mobileTab === (isCpuDecode ? 'decode' : 'datapath') ? 'mobile-active' : ''}`} tabIndex="0" aria-label={isCpuDecode ? `${activity.title} focused decoder board` : `${activity.title} teaching CPU datapath`}><Renderer frame={cpuFrame} event={event} activity={activity} numberFormat={viewOptions.numberFormat} motionMode={motionPreference.mode} duration={visualDuration * (cpuFrame?.microStep?.durationWeight || 1)}/></section>
         </div>
       </div> : <div className="itcc47-workbench">
         <div className={`desktop-source mobile-surface ${mobileTab === 'code' ? 'mobile-active' : ''}`}><SourcePanel activity={activity} event={event} source={source}/></div>
@@ -989,6 +998,7 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
       {usesCompactWorkspace && mobileEvidenceActive ? <div className="mobile-evidence mobile-surface mobile-active">
         <EvidenceDrawer tab={mobileTab === 'trace' || mobileTab === 'steps' ? primaryEvidence : evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/>
       </div> : null}
+      {isComputerArchitecture ? <CompletionActions activity={activity} visible={playback.atEnd && !playback.transitioning}/> : null}
     </main>
     {!usesCompactWorkspace ? <div className="desktop-evidence"><CollapsibleEvidencePanel contentId={isITCC45 ? 'itcc45-learning-evidence' : isComputerArchitecture ? 'computer-architecture-learning-evidence' : 'itcc47-learning-evidence'} expanded={workspaceLayout.evidence === 'expanded'} onExpandedChange={(expanded) => updateWorkspaceLayout({ evidence: expanded ? 'expanded' : 'collapsed' })} showCurrentLabel={isITCC45 || isComputerArchitecture} tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/></div> : null}
     {isComputerArchitecture ? <IntegratedPlayback state={playback} controller={controller} event={event} motionPreference={motionPreference} granularity={cpuGranularity} onGranularityChange={changeCpuGranularity}/> : null}

@@ -66,6 +66,8 @@ function nextTeachingNote(frame, numberFormat) {
     const pc = format(frame.registers.PC.value, frame.registers.PC.width, numberFormat);
     return `Fetch the next instruction at PC ${pc}.`;
   }
+  if (terminal && frame.kind === 'cpu-instruction-decode') return frame.instruction.nextAction;
+  if (terminal && !frame.instruction.decoded) return `Decode the word ${format(frame.instruction.word, 16, numberFormat)} now stored in IR.`;
   if (terminal) return `Execute ${frame.instruction.mnemonic}; execution is outside this activity.`;
 
   const currentOperation = frame.microOperations.find((operation) => operation.id === `operation:${frame.operation.id}`);
@@ -90,7 +92,7 @@ function ValueCue({ route, transfer, motionMode, spawnHoldDuration, movementDura
   if (!route || !transfer) return null;
   const animate = motionMode === 'on' && movementDuration > 0;
   const last = route.x.length - 1;
-  const label = `${format(transfer.value, transfer.width, numberFormat)} · ${transfer.role || transfer.kind}`;
+  const label = `${format(transfer.value, transfer.width, numberFormat)} · ${transfer.fieldId || transfer.role || transfer.kind}`;
   const width = Math.min(148, Math.max(88, 24 + label.length * 6.2));
   const content = <g className="cpu-value-pill"><rect x={-width / 2} y="-12" width={width} height="24" rx="12"/><text x="0" y="4" textAnchor="middle" textLength={label.length > 18 ? width - 18 : undefined} lengthAdjust={label.length > 18 ? 'spacingAndGlyphs' : undefined}>{label}</text></g>;
   return <g className="cpu-value-cue" data-transfer-id={transfer.id} data-transfer-role={transfer.role || transfer.kind} data-retain-at-endpoint="true">
@@ -288,6 +290,168 @@ export const CpuDatapathRenderer = memo(function CpuDatapathRenderer({ frame, nu
   </div>;
 });
 
+const DECODE_ROUTES = Object.freeze([
+  Object.freeze({ id: 'decode-word', d: 'M170 101 V126 H500 V145', x: [170, 170, 500, 500], y: [101, 126, 126, 145], times: [0, .1, .9, 1] }),
+  Object.freeze({ id: 'decode-opcode', d: 'M190 202 V238', x: [190, 190], y: [202, 238], times: [0, 1] }),
+  Object.freeze({ id: 'decode-register', d: 'M390 202 V220 H500 V238', x: [390, 390, 500, 500], y: [202, 220, 220, 238], times: [0, .2, .8, 1] }),
+  Object.freeze({ id: 'decode-operand', d: 'M700 202 V220 H810 V238', x: [700, 700, 810, 810], y: [202, 220, 220, 238], times: [0, .2, .8, 1] }),
+  Object.freeze({ id: 'decode-assemble', d: 'M500 330 V352', x: [500, 500], y: [330, 352], times: [0, 1] }),
+]);
+
+const DECODE_FIELDS = Object.freeze([
+  Object.freeze({ id: 'opcode', label: 'OPCODE', range: 'bits 15–12', start: 0, count: 4, x: 90, width: 200, cardX: 74, cardWidth: 232 }),
+  Object.freeze({ id: 'register', label: 'REGISTER', range: 'bits 11–8', start: 4, count: 4, x: 290, width: 200, cardX: 384, cardWidth: 232 }),
+  Object.freeze({ id: 'operand', label: 'OPERAND', range: 'bits 7–0', start: 8, count: 8, x: 490, width: 400, cardX: 694, cardWidth: 232 }),
+]);
+
+function decodeFieldValue(frame, fieldId, numberFormat) {
+  const field = frame.instruction.fields[fieldId];
+  return format(field.value, field.width, numberFormat);
+}
+
+function decodeFieldMeaning(frame, fieldId, numberFormat) {
+  const instruction = frame.instruction;
+  if (fieldId === 'opcode') return instruction.opcodeName;
+  if (fieldId === 'register') return `R${instruction.fields.register.value} · ${instruction.registerRole}`;
+  return `${decodeFieldValue(frame, fieldId, numberFormat)} · ${instruction.operandKind}`;
+}
+
+function isDecodeFieldInterpreted(instruction, animationMetadata, fieldId) {
+  const order = { locate: 0, split: 1, opcode: 2, register: 3, operand: 4, complete: 5 };
+  const fieldOrder = { opcode: 2, register: 3, operand: 4 };
+  const stage = order[instruction.decodeStage] ?? 0;
+  return stage > fieldOrder[fieldId] || (stage === fieldOrder[fieldId] && animationMetadata.stage === 'arrive');
+}
+
+function DecodeContextCell({ id, x, register, animationMetadata, numberFormat, detail }) {
+  const state = componentState(animationMetadata, id);
+  return <g className={`cpu-decode-context-cell ${state}`} data-component-id={id} data-component-state={state || 'idle'}>
+    <rect x={x} y="452" width="142" height="34" rx="6"/>
+    <text className="cpu-decode-context-label" x={x + 10} y="466">{id}</text>
+    <text className="cpu-decode-context-value" x={x + 132} y="476" textAnchor="end">{detail || format(register.value, register.width, numberFormat)}</text>
+  </g>;
+}
+
+export const CpuInstructionDecodeRenderer = memo(function CpuInstructionDecodeRenderer({ frame, numberFormat = 'hex', motionMode = 'on', duration = .52 }) {
+  if (!frame) return <p className="cpu-empty-state">Preparing the decoder…</p>;
+  const instruction = frame.instruction;
+  const bits = instruction.fields.opcode.bits + instruction.fields.register.bits + instruction.fields.operand.bits;
+  const revealed = new Set(instruction.revealedFields || []);
+  const animationMetadata = frame.animation || { stage: 'focus', sourceId: 'IR', targetId: null, routeId: null };
+  const route = DECODE_ROUTES.find((item) => item.id === animationMetadata.routeId);
+  const showRoute = !!route && animationMetadata.stage === 'travel';
+  const timing = animationMetadata.timing || { spawnHoldUnits: 0, movementUnits: 0 };
+  const phaseWeight = Number(frame.microStep?.durationWeight) || timing.spawnHoldUnits + timing.movementUnits || 1;
+  const durationUnit = duration > 0 ? duration / phaseWeight : 0;
+  const spawnHoldDuration = durationUnit * timing.spawnHoldUnits;
+  const movementDuration = durationUnit * timing.movementUnits;
+  const irState = componentState(animationMetadata, 'IR');
+  const boardState = componentState(animationMetadata, 'DecodeBoard');
+  const assembledState = componentState(animationMetadata, 'DecodedInstruction');
+  const fieldState = (fieldId) => componentState(animationMetadata, `field:${fieldId}`);
+  const cardState = (fieldId) => componentState(animationMetadata, `card:${fieldId}`);
+  const terminal = frame.operation.index === frame.operation.total && frame.microStep.index === frame.microStep.total;
+  const stageText = animationMetadata.stage === 'travel' && frame.transfer
+    ? `${frame.microStep.label}. ${frame.displayStep.detail}`
+    : frame.displayStep.detail;
+
+  return <div className="cpu-decode-renderer" data-animation-stage={animationMetadata.stage} data-decode-stage={instruction.decodeStage} data-active-field={instruction.activeField || 'none'} data-motion-mode={motionMode} data-spawn-hold-ms={Math.round(spawnHoldDuration * 1000)}>
+    <p className="sr-only" role="status">Operation {frame.operation.index} of {frame.operation.total}: {frame.operation.label}. Micro-step {frame.microStep.index} of {frame.microStep.total}: {stageText}</p>
+    <svg className="cpu-decode-full" viewBox="0 0 1000 500" role="img" aria-labelledby="cpu-decode-title cpu-decode-description">
+      <title id="cpu-decode-title">Focused 16-bit instruction decoder</title>
+      <desc id="cpu-decode-description">{stageText} The fetched word in IR is divided into four opcode bits, four register bits, and eight operand bits. Decoding does not change registers or Main Memory.</desc>
+
+      <g className="cpu-decode-structural" data-layer="structural-connections">
+        <rect className="cpu-decode-shell" x="14" y="12" width="972" height="476" rx="14"/>
+        {DECODE_ROUTES.map((item) => <path d={item.d} data-route-id={item.id} key={item.id}/>) }
+      </g>
+      <g className="cpu-decode-active-routes" data-layer="active-connections">
+        {showRoute ? <m.path d={route.d} data-active-route-id={route.id} initial={motionMode === 'on' ? { pathLength: 0, opacity: .35 } : false} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: motionMode === 'on' ? Math.min(duration * .34, .3) : 0, ease: 'easeOut' }}/> : null}
+      </g>
+
+      <g className="cpu-decode-components" data-layer="components-and-text">
+        <text className="cpu-decode-kicker" x="38" y="39">INSTRUCTION REGISTER · 16-BIT WORD</text>
+        <g className={`cpu-decode-ir ${irState}`} data-component-id="IR" data-component-state={irState || 'idle'}>
+          <rect x="38" y="52" width="264" height="50" rx="8"/>
+          <text className="cpu-decode-box-label" x="54" y="74">IR</text>
+          <text className={`cpu-decode-box-value ${isTransferSource(animationMetadata, 'IR') ? 'is-emitting' : ''}`} data-source-pulse={isTransferSource(animationMetadata, 'IR') ? 'IR' : undefined} x="286" y="84" textAnchor="end">{format(instruction.word, 16, numberFormat)}</text>
+        </g>
+        <g className="cpu-decode-callout">
+          <rect x="720" y="48" width="236" height="58" rx="7"/>
+          <text x="738" y="70">FETCH IS COMPLETE</text>
+          <text x="738" y="91">PC advanced · memory idle</text>
+        </g>
+
+        <g className={`cpu-decode-bit-board ${boardState}`} data-component-id="DecodeBoard" data-component-state={boardState || 'idle'}>
+          <rect x="62" y="132" width="876" height="76" rx="10"/>
+          {DECODE_FIELDS.map((field) => <g className={`cpu-decode-field-group field-${field.id} ${fieldState(field.id)} ${revealed.has(field.id) ? 'is-revealed' : ''}`} data-component-id={`field:${field.id}`} data-component-state={fieldState(field.id) || 'idle'} key={field.id}>
+            <rect className="cpu-decode-field-outline" x={field.x} y="147" width={field.width} height="43" rx="5"/>
+            <text className="cpu-decode-range" x={field.x + field.width / 2} y="141" textAnchor="middle">{field.label} · {field.range}</text>
+          </g>)}
+          {[...bits].map((bit, index) => {
+            const fieldId = index < 4 ? 'opcode' : index < 8 ? 'register' : 'operand';
+            const x = 94 + index * 49.5;
+            return <g className={`cpu-decode-bit field-${fieldId} ${instruction.activeField === fieldId ? 'is-active' : ''}`} data-bit-position={15 - index} key={`${index}:${bit}`}>
+              <rect x={x} y="151" width="43" height="35" rx="3"/>
+              <text x={x + 21.5} y="175" textAnchor="middle">{bit}</text>
+            </g>;
+          })}
+        </g>
+
+        {DECODE_FIELDS.map((field) => <g className={`cpu-decode-field-card field-${field.id} ${cardState(field.id)} ${isDecodeFieldInterpreted(instruction, animationMetadata, field.id) ? 'is-interpreted' : ''}`} data-component-id={`card:${field.id}`} data-component-state={cardState(field.id) || 'idle'} key={`card:${field.id}`}>
+          <rect x={field.cardX} y="238" width={field.cardWidth} height="92" rx="8"/>
+          <text className="cpu-decode-card-label" x={field.cardX + 16} y="261">{field.label}</text>
+          <text className="cpu-decode-card-bits" x={field.cardX + 16} y="286">{instruction.fields[field.id].bits}</text>
+          <text className="cpu-decode-card-meaning" x={field.cardX + 16} y="313">{isDecodeFieldInterpreted(instruction, animationMetadata, field.id) ? decodeFieldMeaning(frame, field.id, numberFormat) : 'Not interpreted yet'}</text>
+        </g>)}
+
+        <g className={`cpu-decode-summary ${assembledState}`} data-component-id="DecodedInstruction" data-component-state={assembledState || 'idle'}>
+          <rect x="74" y="352" width="852" height="76" rx="9"/>
+          <text className="cpu-decode-card-label" x="94" y="377">ASSEMBLED INSTRUCTION</text>
+          <text className="cpu-decode-mnemonic" x="94" y="409">{instruction.decoded ? instruction.mnemonic : 'Waiting for all field meanings'}</text>
+          <path d="M446 368 V414"/>
+          <text className="cpu-decode-card-label" x="470" y="377">WHAT HAPPENS NEXT</text>
+          <SvgTeachingNote className="cpu-decode-next-action" text={instruction.decoded ? instruction.nextAction : 'Revealed after the fields are assembled.'} x={470} y={399}/>
+        </g>
+
+        <text className="cpu-decode-kicker" x="38" y="448">COMPLETED FETCH STATE · UNCHANGED DURING DECODE</text>
+        <DecodeContextCell id="PC" x={38} register={frame.registers.PC} animationMetadata={animationMetadata} numberFormat={numberFormat}/>
+        <DecodeContextCell id="MAR" x={190} register={frame.registers.MAR} animationMetadata={animationMetadata} numberFormat={numberFormat}/>
+        <DecodeContextCell id="MDR" x={342} register={frame.registers.MDR} animationMetadata={animationMetadata} numberFormat={numberFormat}/>
+        <DecodeContextCell id="IR" x={494} register={frame.registers.IR} animationMetadata={animationMetadata} numberFormat={numberFormat}/>
+        <DecodeContextCell id="Decoder" x={646} register={frame.registers.IR} animationMetadata={animationMetadata} numberFormat={numberFormat} detail={instruction.decodeStage}/>
+        <DecodeContextCell id="Memory" x={798} register={frame.registers.MAR} animationMetadata={animationMetadata} numberFormat={numberFormat} detail="idle"/>
+      </g>
+
+      <g className="cpu-decode-cues" data-layer="traveling-cues">
+        {showRoute && frame.transfer ? <ValueCue route={route} transfer={frame.transfer} motionMode={motionMode} spawnHoldDuration={spawnHoldDuration} movementDuration={movementDuration} numberFormat={numberFormat}/> : null}
+      </g>
+    </svg>
+
+    <div className="cpu-decode-mobile">
+      <section className={`cpu-decode-mobile-ir ${irState}`}><span>IR · 16-bit word</span><strong className={isTransferSource(animationMetadata, 'IR') ? 'is-emitting' : ''}>{format(instruction.word, 16, numberFormat)}</strong><small>Fetch complete · PC advanced</small></section>
+      <section className="cpu-decode-mobile-bits" aria-label={`Instruction bits ${bits}`}><span>15</span><div>{[...bits].map((bit, index) => <b className={`field-${index < 4 ? 'opcode' : index < 8 ? 'register' : 'operand'} ${instruction.activeField === (index < 4 ? 'opcode' : index < 8 ? 'register' : 'operand') ? 'is-active' : ''}`} key={`${index}:${bit}`}>{bit}</b>)}</div><span>0</span></section>
+      <div className="cpu-decode-mobile-groups"><span>4 opcode</span><span>4 register</span><span>8 operand</span></div>
+      <div className="cpu-decode-mobile-cards">{DECODE_FIELDS.map((field) => <section className={`field-${field.id} ${cardState(field.id)}`} key={field.id}><span>{field.label}</span><code>{instruction.fields[field.id].bits}</code><strong>{isDecodeFieldInterpreted(instruction, animationMetadata, field.id) ? decodeFieldMeaning(frame, field.id, numberFormat) : 'Not interpreted yet'}</strong></section>)}</div>
+      <section className={`cpu-decode-mobile-summary ${assembledState}`}><span>Assembled instruction</span><strong>{instruction.decoded ? instruction.mnemonic : 'Not assembled yet'}</strong><p><b>What happens next:</b> {instruction.decoded ? instruction.nextAction : 'Revealed after the fields are assembled.'}</p></section>
+      <section className="cpu-mobile-current-step"><b>{frame.microStep.index}</b><span><strong>{frame.microStep.label}</strong><p>{stageText}</p>{terminal ? <p className="cpu-mobile-next"><b>Up next:</b> run or practice the decoded instruction.</p> : null}</span></section>
+    </div>
+  </div>;
+});
+
+export const DecodeFieldsPane = memo(function DecodeFieldsPane({ frame, numberFormat = 'hex' }) {
+  if (!frame) return null;
+  const instruction = frame.instruction;
+  return <aside className="cpu-decode-fields-pane" aria-label="Decoded instruction fields">
+    <header><span>Instruction fields</span><strong>{format(instruction.word, 16, numberFormat)}</strong></header>
+    <div className="cpu-decode-fields-pane-bits" aria-label="Four opcode bits, four register bits, and eight operand bits">
+      <code className="field-opcode">{instruction.fields.opcode.bits}</code><code className="field-register">{instruction.fields.register.bits}</code><code className="field-operand">{instruction.fields.operand.bits}</code>
+    </div>
+    <dl>{DECODE_FIELDS.map((field) => <div className={instruction.activeField === field.id ? 'is-active' : ''} key={field.id}><dt>{field.label}<small>{field.range}</small></dt><dd><code>{decodeFieldValue(frame, field.id, numberFormat)}</code><strong>{isDecodeFieldInterpreted(instruction, frame.animation, field.id) ? decodeFieldMeaning(frame, field.id, numberFormat) : 'Not interpreted yet'}</strong></dd></div>)}</dl>
+    <section><span>What it means</span><strong>{instruction.decoded ? instruction.mnemonic : 'Still decoding'}</strong><p>{instruction.decoded ? instruction.nextAction : 'Complete all three field interpretations to reveal the next CPU action.'}</p></section>
+  </aside>;
+});
+
 export const MainMemoryPane = memo(function MainMemoryPane({ frame, numberFormat = 'hex' }) {
   if (!frame) return null;
   return <aside className="cpu-memory-pane" aria-label="Main Memory">
@@ -326,8 +490,27 @@ function CpuBusesView({ frame, viewOptions }) {
 function CpuInstructionView({ frame, viewOptions }) {
   const numberFormat = viewOptions?.numberFormat || 'hex';
   if (!frame.instruction.available) return <div className="cpu-instruction-waiting"><strong>IR is not populated yet.</strong><p>Advance until MDR transfers the fetched word into the instruction register.</p></div>;
+  if (!frame.instruction.decoded) return <div className="cpu-instruction-evidence"><span>Instruction register</span><strong>{format(frame.instruction.word, 16, numberFormat)}</strong><p>The fetched word is available, but its fields have not been interpreted. Continue to Decode one instruction.</p></div>;
   const { fields } = frame.instruction;
-  return <div className="cpu-instruction-evidence"><span>Instruction register</span><strong>{format(frame.instruction.word, 16, numberFormat)}</strong><div className="cpu-instruction-bits"><i className="opcode">{fields.opcode.bits}</i><i className="register">{fields.register.bits}</i><i className="operand">{fields.operand.bits}</i></div><dl><div><dt>Opcode</dt><dd>{frame.instruction.opcodeName}</dd></div><div><dt>Register</dt><dd>R{fields.register.value}</dd></div><div><dt>Operand / address</dt><dd>{format(fields.operand.value, 8, numberFormat)}</dd></div></dl><p>{frame.instruction.decoded ? frame.instruction.mnemonic : 'The fields are visible; decoding is the final fetch operation.'}</p>{frame.execution ? <section className={`cpu-execution-equation is-${frame.execution.status}`}><span>Guided operation</span><strong>{frame.execution.left} + {frame.execution.right} = {frame.execution.resultAvailable ? frame.execution.result : '?'}</strong><p>{frame.execution.complete ? `R1 now contains ${frame.execution.result}.` : `R1 starts at ${frame.execution.left}; follow both inputs through the ALU.`}</p></section> : null}</div>;
+  return <div className="cpu-instruction-evidence"><span>Instruction register</span><strong>{format(frame.instruction.word, 16, numberFormat)}</strong><div className="cpu-instruction-bits"><i className="opcode">{fields.opcode.bits}</i><i className="register">{fields.register.bits}</i><i className="operand">{fields.operand.bits}</i></div><dl><div><dt>Opcode</dt><dd>{frame.instruction.opcodeName}</dd></div><div><dt>Register</dt><dd>R{fields.register.value}</dd></div><div><dt>Operand / address</dt><dd>{format(fields.operand.value, 8, numberFormat)}</dd></div></dl><p>{frame.instruction.decoded ? frame.instruction.mnemonic : 'The word is safely stored in IR. Decode it in the next activity.'}</p>{frame.execution ? <section className={`cpu-execution-equation is-${frame.execution.status}`}><span>Guided operation</span><strong>{frame.execution.left} + {frame.execution.right} = {frame.execution.resultAvailable ? frame.execution.result : '?'}</strong><p>{frame.execution.complete ? `R1 now contains ${frame.execution.result}.` : `R1 starts at ${frame.execution.left}; follow both inputs through the ALU.`}</p></section> : null}</div>;
+}
+
+function CpuDecodeFieldsView({ frame, viewOptions }) {
+  const numberFormat = viewOptions?.numberFormat || 'hex';
+  return <div className="cpu-decode-evidence-fields">
+    <div className="cpu-instruction-bits"><i className="opcode">{frame.instruction.fields.opcode.bits}</i><i className="register">{frame.instruction.fields.register.bits}</i><i className="operand">{frame.instruction.fields.operand.bits}</i></div>
+    {DECODE_FIELDS.map((field) => <section className={frame.instruction.activeField === field.id ? 'is-active' : ''} key={field.id}><span>{field.label}<small>{field.range}</small></span><code>{decodeFieldValue(frame, field.id, numberFormat)}</code><strong>{isDecodeFieldInterpreted(frame.instruction, frame.animation, field.id) ? decodeFieldMeaning(frame, field.id, numberFormat) : 'Not interpreted yet'}</strong></section>)}
+    <p>Bit cells remain binary; the selected number format changes only interpreted values.</p>
+  </div>;
+}
+
+function CpuDecodeMeaningView({ frame }) {
+  return <div className="cpu-decode-meaning-evidence">
+    <span>Decoded instruction</span><strong>{frame.instruction.decoded ? frame.instruction.mnemonic : 'Still decoding'}</strong>
+    <dl><div><dt>Register role</dt><dd>{frame.instruction.registerRole}</dd></div><div><dt>Operand kind</dt><dd>{frame.instruction.operandKind}</dd></div></dl>
+    <section><span>What happens next</span><p>{frame.instruction.decoded ? frame.instruction.nextAction : 'Complete the decode to reveal the next CPU action.'}</p></section>
+    <small>Decode interprets the fetched word. It does not execute the instruction or change Main Memory.</small>
+  </div>;
 }
 
 function CpuPresetControls({ activity, inputs, setInputs, viewOptions, setViewOptions }) {
@@ -338,8 +521,12 @@ function CpuPresetControls({ activity, inputs, setInputs, viewOptions, setViewOp
 }
 
 BSITVisualizerRegistry.registerRenderer('cpu-datapath', CpuDatapathRenderer);
+BSITVisualizerRegistry.registerRenderer('cpu-instruction-decode', CpuInstructionDecodeRenderer);
 BSITVisualizerRegistry.registerEvidenceView('micro-operations', MicroOperationsView, { label: 'Operations', icon: 'list' });
 BSITVisualizerRegistry.registerEvidenceView('cpu-registers', CpuRegistersView, { label: 'Registers', icon: 'registers' });
+BSITVisualizerRegistry.registerEvidenceView('cpu-machine-state', CpuRegistersView, { label: 'Machine state', icon: 'registers' });
 BSITVisualizerRegistry.registerEvidenceView('cpu-buses', CpuBusesView, { label: 'Buses', icon: 'bus' });
 BSITVisualizerRegistry.registerEvidenceView('cpu-instruction', CpuInstructionView, { label: 'Instruction', icon: 'code' });
+BSITVisualizerRegistry.registerEvidenceView('cpu-decode-fields', CpuDecodeFieldsView, { label: 'Fields', icon: 'grid' });
+BSITVisualizerRegistry.registerEvidenceView('cpu-decode-meaning', CpuDecodeMeaningView, { label: 'Meaning', icon: 'code' });
 BSITVisualizerRegistry.registerInputControls('cpu-preset', CpuPresetControls);

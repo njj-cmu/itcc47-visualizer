@@ -49,10 +49,20 @@ const ComputerArchitectureMachine = (() => {
     'Add 5 + 13 inside the ALU',
     'Write result 18 into R1',
   ]);
+  const DECODE_OPERATION_LABELS = Object.freeze([
+    'Locate the fetched word',
+    'Split the instruction fields',
+    'Interpret the opcode',
+    'Interpret the register',
+    'Interpret the operand',
+    'Assemble the instruction',
+  ]);
   const ANIMATION_STAGES = Object.freeze(['focus', 'arm', 'travel', 'arrive']);
   const ROUTE_IDS = Object.freeze({
     pcMar: 'pc-mar', marMemory: 'mar-memory', memoryMdr: 'memory-mdr', mdrIr: 'mdr-ir',
     irDecoder: 'ir-decoder', r1Alu: 'r1-alu', decoderAlu: 'decoder-alu', aluR1: 'alu-r1',
+    decodeWord: 'decode-word', decodeOpcode: 'decode-opcode', decodeRegister: 'decode-register',
+    decodeOperand: 'decode-operand', decodeAssemble: 'decode-assemble',
   });
   const CUE_SPAWN_HOLD_UNITS = 1.54;
   const ANIMATION_TIMING = Object.freeze({
@@ -278,7 +288,7 @@ const ComputerArchitectureMachine = (() => {
       },
     ];
 
-    if (!includeExecution) return operations;
+    if (!includeExecution) return operations.slice(0, 5);
     const { left, right, result } = preset.equation;
     operations.push(
       {
@@ -396,6 +406,156 @@ const ComputerArchitectureMachine = (() => {
     return Object.freeze(operations);
   }
 
+  function decodeProfileFor(decoded) {
+    if (decoded.opcodeName === 'STORE') {
+      return Object.freeze({
+        registerRole: 'source', operandKind: 'address',
+        nextAction: `Write R${decoded.register} into Main Memory[${formatValue(decoded.operand, 8)}].`,
+      });
+    }
+    if (decoded.opcodeName === 'ADDI') {
+      return Object.freeze({
+        registerRole: 'read-write', operandKind: 'immediate',
+        nextAction: `Add immediate ${formatValue(decoded.operand, 8)} to R${decoded.register} and write the result back to R${decoded.register}.`,
+      });
+    }
+    return Object.freeze({
+      registerRole: 'destination', operandKind: 'address',
+      nextAction: `Read Main Memory[${formatValue(decoded.operand, 8)}] and write the word into R${decoded.register}.`,
+    });
+  }
+
+  function buildDecodeOperationGraph(preset) {
+    validatePreset(preset);
+    const decoded = decodeInstruction(preset.word);
+    if (decoded.mnemonic !== preset.mnemonic) throw new Error(`Preset ${preset.id} mnemonic does not match its instruction word.`);
+    const profile = decodeProfileFor(decoded);
+    const wordTokenId = `decode-word:${preset.id}`;
+    const fieldToken = (field) => `decode-field:${preset.id}:${field}`;
+    const specs = [
+      {
+        id: 'locate-ir-word', label: DECODE_OPERATION_LABELS[0],
+        summary: `Begin with fetched word ${formatValue(preset.word, 16)} in IR.`,
+        phases: [phase('decode-focus-ir', 'Find the fetched word', `IR already holds fetched word ${formatValue(preset.word, 16)}.`, {
+          decodeStage: 'locate', activeComponents: ['IR'], animation: animation('focus', 'IR'), durationWeight: DURATION_WEIGHTS.focus,
+        })],
+      },
+      {
+        id: 'split-instruction-fields', label: DECODE_OPERATION_LABELS[1],
+        summary: 'Divide the 16-bit instruction into 4-bit opcode, 4-bit register, and 8-bit operand fields.',
+        phases: [
+          phase('decode-move-word', 'Move the word to the decode board', 'The complete 16-bit word moves from IR into the decode board.', {
+            decodeStage: 'split', transfer: { id: wordTokenId, kind: 'instruction', role: 'instruction', width: 16, value: preset.word, from: 'IR', to: 'DecodeBoard' }, animation: animation('travel', 'IR', 'DecodeBoard', ROUTE_IDS.decodeWord), durationWeight: DURATION_WEIGHTS.travel,
+          }),
+          phase('decode-split-groups', 'Separate the bit groups', 'The word separates into fields of 4 bits, 4 bits, and 8 bits.', {
+            decodeStage: 'split', activeComponents: ['DecodeBoard'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('arrive', 'IR', 'DecodeBoard', ROUTE_IDS.decodeWord), durationWeight: DURATION_WEIGHTS.arrive,
+          }),
+          phase('decode-label-ranges', 'Label the field ranges', 'Bits 15–12 are the opcode, 11–8 select a register, and 7–0 hold the operand.', {
+            decodeStage: 'split', activeComponents: ['DecodeBoard'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('focus', 'DecodeBoard'), durationWeight: DURATION_WEIGHTS.focus,
+          }),
+        ],
+      },
+      {
+        id: 'interpret-opcode', label: DECODE_OPERATION_LABELS[2],
+        summary: `Interpret opcode ${decoded.fields.opcode.bits} as ${decoded.opcodeName}.`,
+        phases: [
+          phase('decode-focus-opcode', 'Focus bits 15–12', `Opcode bits ${decoded.fields.opcode.bits} are selected.`, {
+            decodeStage: 'opcode', activeField: 'opcode', activeComponents: ['field:opcode'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('focus', 'field:opcode', 'card:opcode', ROUTE_IDS.decodeOpcode), durationWeight: DURATION_WEIGHTS.focus,
+          }),
+          phase('decode-move-opcode', 'Convert the opcode value', `${decoded.fields.opcode.bits} is ${decoded.opcode} in decimal.`, {
+            decodeStage: 'opcode', activeField: 'opcode', activeComponents: ['field:opcode', 'card:opcode'], revealedFields: ['opcode', 'register', 'operand'], transfer: { id: fieldToken('opcode'), kind: 'field', role: 'operand', fieldId: 'opcode', width: 4, value: decoded.opcode, from: 'field:opcode', to: 'card:opcode' }, animation: animation('travel', 'field:opcode', 'card:opcode', ROUTE_IDS.decodeOpcode), durationWeight: DURATION_WEIGHTS.travel,
+          }),
+          phase('decode-reveal-opcode', 'Reveal the operation', `Opcode ${decoded.opcode} means ${decoded.opcodeName}.`, {
+            decodeStage: 'opcode', activeField: 'opcode', activeComponents: ['card:opcode'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('arrive', 'field:opcode', 'card:opcode', ROUTE_IDS.decodeOpcode), durationWeight: DURATION_WEIGHTS.arrive,
+          }),
+        ],
+      },
+      {
+        id: 'interpret-register', label: DECODE_OPERATION_LABELS[3],
+        summary: `Interpret register bits ${decoded.fields.register.bits} as R${decoded.register}, the ${profile.registerRole} register.`,
+        phases: [
+          phase('decode-focus-register', 'Focus bits 11–8', `Register bits ${decoded.fields.register.bits} are selected.`, {
+            decodeStage: 'register', activeField: 'register', activeComponents: ['field:register'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('focus', 'field:register', 'card:register', ROUTE_IDS.decodeRegister), durationWeight: DURATION_WEIGHTS.focus,
+          }),
+          phase('decode-move-register', 'Convert the register index', `${decoded.fields.register.bits} is register index ${decoded.register}.`, {
+            decodeStage: 'register', activeField: 'register', activeComponents: ['field:register', 'card:register'], revealedFields: ['opcode', 'register', 'operand'], transfer: { id: fieldToken('register'), kind: 'field', role: 'operand', fieldId: 'register', width: 4, value: decoded.register, from: 'field:register', to: 'card:register' }, animation: animation('travel', 'field:register', 'card:register', ROUTE_IDS.decodeRegister), durationWeight: DURATION_WEIGHTS.travel,
+          }),
+          phase('decode-reveal-register', 'Explain the register role', `R${decoded.register} is the ${profile.registerRole} register for ${decoded.opcodeName}.`, {
+            decodeStage: 'register', activeField: 'register', activeComponents: ['card:register'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('arrive', 'field:register', 'card:register', ROUTE_IDS.decodeRegister), durationWeight: DURATION_WEIGHTS.arrive,
+          }),
+        ],
+      },
+      {
+        id: 'interpret-operand', label: DECODE_OPERATION_LABELS[4],
+        summary: `Interpret operand bits ${decoded.fields.operand.bits} as an ${profile.operandKind}.`,
+        phases: [
+          phase('decode-focus-operand', 'Focus bits 7–0', `Operand bits ${decoded.fields.operand.bits} are selected.`, {
+            decodeStage: 'operand', activeField: 'operand', activeComponents: ['field:operand'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('focus', 'field:operand', 'card:operand', ROUTE_IDS.decodeOperand), durationWeight: DURATION_WEIGHTS.focus,
+          }),
+          phase('decode-move-operand', 'Convert the operand value', `${decoded.fields.operand.bits} is ${formatValue(decoded.operand, 8)}.`, {
+            decodeStage: 'operand', activeField: 'operand', activeComponents: ['field:operand', 'card:operand'], revealedFields: ['opcode', 'register', 'operand'], transfer: { id: fieldToken('operand'), kind: 'field', role: 'operand', fieldId: 'operand', width: 8, value: decoded.operand, from: 'field:operand', to: 'card:operand' }, animation: animation('travel', 'field:operand', 'card:operand', ROUTE_IDS.decodeOperand), durationWeight: DURATION_WEIGHTS.travel,
+          }),
+          phase('decode-reveal-operand', `Identify the ${profile.operandKind}`, `${formatValue(decoded.operand, 8)} is used as an ${profile.operandKind}.`, {
+            decodeStage: 'operand', activeField: 'operand', activeComponents: ['card:operand'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('arrive', 'field:operand', 'card:operand', ROUTE_IDS.decodeOperand), durationWeight: DURATION_WEIGHTS.arrive,
+          }),
+        ],
+      },
+      {
+        id: 'assemble-instruction', label: DECODE_OPERATION_LABELS[5],
+        summary: `Assemble the fields as ${decoded.mnemonic}.`,
+        phases: [
+          phase('decode-combine-fields', 'Combine the interpreted fields', 'Opcode, register, and operand meanings move into one instruction.', {
+            decodeStage: 'complete', activeComponents: ['DecodeBoard', 'DecodedInstruction'], revealedFields: ['opcode', 'register', 'operand'], transfer: { id: `decode-assembly:${preset.id}`, kind: 'instruction', role: 'instruction', width: 16, value: preset.word, from: 'DecodeBoard', to: 'DecodedInstruction' }, animation: animation('travel', 'DecodeBoard', 'DecodedInstruction', ROUTE_IDS.decodeAssemble), durationWeight: DURATION_WEIGHTS.travel,
+          }),
+          phase('decode-reveal-mnemonic', 'Reveal the complete instruction', `The complete instruction is ${decoded.mnemonic}.`, {
+            decodeStage: 'complete', activeComponents: ['DecodedInstruction'], revealedFields: ['opcode', 'register', 'operand'], decodedAvailable: true, animation: animation('arrive', 'DecodeBoard', 'DecodedInstruction', ROUTE_IDS.decodeAssemble), durationWeight: DURATION_WEIGHTS.arrive,
+          }),
+          phase('decode-explain-next-action', 'State what the CPU does next', profile.nextAction, {
+            decodeStage: 'complete', activeComponents: ['DecodedInstruction'], revealedFields: ['opcode', 'register', 'operand'], decodedAvailable: true, animation: animation('focus', 'DecodedInstruction'), terminal: true, durationWeight: DURATION_WEIGHTS.focus,
+          }),
+        ],
+      },
+    ];
+
+    const memory = memoryFor(preset);
+    const memorySnapshot = Object.freeze(Object.fromEntries(memory.map((cell) => [cell.address, cell.value])));
+    const registers = { PC: (preset.pc + 1) & 0xFF, MAR: preset.pc, MDR: preset.word, IR: preset.word, R0: preset.registers[0], R1: preset.registers[1], R2: preset.registers[2], R3: preset.registers[3] };
+    const frozenRegisters = registerFrame(registers, registers);
+    return Object.freeze(specs.map((operation, operationIndex) => Object.freeze({
+      id: operation.id, index: operationIndex + 1, label: operation.label, summary: operation.summary,
+      phases: Object.freeze(operation.phases.map((spec) => {
+        const revealedFields = Object.freeze([...(spec.revealedFields || [])]);
+        const transfer = spec.transfer ? Object.freeze({ ...spec.transfer }) : null;
+        const activeComponents = Object.freeze([
+          ...(transfer ? [transfer.from, transfer.to] : []), ...(spec.activeComponents || []),
+        ].filter((id, index, items) => items.indexOf(id) === index));
+        const frame = Object.freeze({
+          kind: 'cpu-instruction-decode',
+          phase: Object.freeze({ id: 'decode', label: 'Decode instruction', status: spec.terminal ? 'complete' : 'active' }),
+          registers: frozenRegisters,
+          memory: Object.freeze({ cells: memory, selectedAddress: preset.pc, state: 'idle', unchanged: true, snapshot: memorySnapshot }),
+          buses: Object.freeze({
+            address: Object.freeze({ id: 'address-bus', width: 8, value: null, active: false }),
+            data: Object.freeze({ id: 'data-bus', width: 16, value: null, active: false }),
+            control: Object.freeze({ activeSignalIds: Object.freeze([]) }),
+          }),
+          signals: signalFrame([]),
+          instruction: Object.freeze({
+            id: `instruction-word:${preset.id}`, word: preset.word, available: true, decoded: !!spec.decodedAvailable,
+            opcodeName: decoded.opcodeName, mnemonic: decoded.mnemonic, fields: decoded.fields,
+            decodeStage: spec.decodeStage || 'locate', activeField: spec.activeField || null, revealedFields,
+            registerRole: profile.registerRole, operandKind: profile.operandKind, nextAction: profile.nextAction,
+          }),
+          transfer,
+          animation: Object.freeze({ ...(spec.animation || animation('focus', activeComponents[0] || null)), controlCues: Object.freeze([]) }),
+          activeComponents,
+          preset: Object.freeze({ id: preset.id, label: preset.label, mnemonic: preset.mnemonic }),
+        });
+        return Object.freeze({ id: `${operation.id}:${spec.id}`, label: spec.label, message: spec.message, durationWeight: spec.durationWeight, terminal: !!spec.terminal, frame });
+      })),
+    })));
+  }
+
   function evidenceFor(operations, currentOperationIndex, currentMicroIndex, granularity, terminal) {
     let globalStart = 0;
     return Object.freeze(operations.map((operation, operationIndex) => {
@@ -481,6 +641,11 @@ const ComputerArchitectureMachine = (() => {
     return timelineFromGraph('architecture-add-immediate', 'cpu-execute', preset, buildOperationGraph(preset, true), options.granularity);
   }
 
+  function decodeTimelineFor(presetOrId = PRESETS[0].id, options = {}) {
+    const preset = resolveFetchPreset(presetOrId);
+    return timelineFromGraph('architecture-decode-instruction', 'cpu-decode', preset, buildDecodeOperationGraph(preset), options.granularity);
+  }
+
   function run(presetOrId, options = {}) {
     const preset = presetOrId ? resolveFetchPreset(presetOrId) : PRESETS[0];
     const events = timelineFor(preset, options);
@@ -493,18 +658,24 @@ const ComputerArchitectureMachine = (() => {
     return BSITPlayback.runResult({ events, capabilities: { visualize: true, trace: true, variables: true, operations: true, output: true }, result: Object.freeze({ presetId: preset.id, granularity: normalizeGranularity(options.granularity), finalFrame: events.at(-1).frame }) });
   }
 
+  function runDecode(presetOrId, options = {}) {
+    const preset = presetOrId ? resolveFetchPreset(presetOrId) : PRESETS[0];
+    const events = decodeTimelineFor(preset, options);
+    return BSITPlayback.runResult({ events, capabilities: { visualize: true, trace: true, variables: true, operations: true, output: true }, result: Object.freeze({ presetId: preset.id, granularity: normalizeGranularity(options.granularity), finalFrame: events.at(-1).frame }) });
+  }
+
   PRESETS.forEach(validatePreset);
   EXECUTION_PRESETS.forEach(validatePreset);
 
   return Object.freeze({
     WIDTHS, SIGNAL_IDS, SIGNAL_DEFINITIONS, OPCODES, PRESETS, EXECUTION_PRESETS,
     ANIMATION_STAGES, ROUTE_IDS, DURATION_WEIGHTS,
-    MICRO_OPERATION_LABELS, EXECUTION_MICRO_OPERATION_LABELS,
+    MICRO_OPERATION_LABELS, EXECUTION_MICRO_OPERATION_LABELS, DECODE_OPERATION_LABELS,
     validatePreset, decodeInstruction, formatValue, normalizeGranularity,
     getPreset(id) { return PRESET_BY_ID.get(id) || null; },
     listPresets() { return PRESETS; },
     getExecutionPreset(id) { return EXECUTION_PRESET_BY_ID.get(id) || null; },
     listExecutionPresets() { return EXECUTION_PRESETS; },
-    timelineFor, executionTimelineFor, run, runExecution,
+    timelineFor, executionTimelineFor, decodeTimelineFor, run, runExecution, runDecode,
   });
 })();

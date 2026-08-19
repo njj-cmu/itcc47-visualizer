@@ -29,10 +29,51 @@ const ComputerArchitectureActivities = (() => {
       presets: ComputerArchitectureMachine.PRESETS,
     }),
     metrics: Object.freeze([]),
-    source: Object.freeze(ComputerArchitectureMachine.MICRO_OPERATION_LABELS),
+    completionActions: Object.freeze([
+      Object.freeze({ id: 'decode', label: 'Decode this instruction', href: 'visualizer.html?course=computer-architecture&activity=architecture-decode-instruction', kind: 'primary' }),
+      Object.freeze({ id: 'practice-fetch', label: 'Practice fetch', href: 'computer-architecture-practice.html#fetch', kind: 'secondary' }),
+    ]),
+    source: Object.freeze(ComputerArchitectureMachine.MICRO_OPERATION_LABELS.slice(0, 5)),
     sourceFor() { return this.source; },
     run(options = {}, playbackOptions = {}) {
       return ComputerArchitectureMachine.run(options.preset || this.input.defaultPreset, playbackOptions);
+    },
+  });
+  const decodeActivity = Object.freeze({
+    id: 'architecture-decode-instruction',
+    contentVersion: CONTENT_VERSION,
+    module: 1,
+    topic: 'CPU and Instruction Flow',
+    family: 'CPU and Instruction Flow',
+    title: 'Decode one instruction',
+    subtitle: 'Break the fetched word in IR into fields and determine what the CPU must do next.',
+    engine: 'guided-teaching-cpu',
+    renderer: 'cpu-instruction-decode',
+    workspaceKind: 'cpu-lab',
+    workspaceComposition: 'cpu-decode',
+    mobileViews: Object.freeze([
+      Object.freeze({ id: 'decode', label: 'Decode', icon: 'grid' }),
+      Object.freeze({ id: 'fields', label: 'Fields', icon: 'registers' }),
+      Object.freeze({ id: 'steps', label: 'Steps', icon: 'list' }),
+      Object.freeze({ id: 'more', label: 'More', icon: 'more' }),
+    ]),
+    evidenceViews: Object.freeze(['micro-operations', 'cpu-decode-fields', 'cpu-machine-state', 'cpu-decode-meaning']),
+    inputControlIds: fetchActivity.inputControlIds,
+    input: Object.freeze({
+      kind: 'cpu-preset',
+      editable: false,
+      defaultPreset: ComputerArchitectureMachine.PRESETS[0].id,
+      presets: ComputerArchitectureMachine.PRESETS,
+    }),
+    completionActions: Object.freeze([
+      Object.freeze({ id: 'execute-add', label: 'Run 5 + 13', href: 'visualizer.html?course=computer-architecture&activity=architecture-add-immediate', kind: 'primary' }),
+      Object.freeze({ id: 'practice-decode', label: 'Practice decoding', href: 'computer-architecture-practice.html#decode', kind: 'secondary' }),
+    ]),
+    metrics: Object.freeze([]),
+    source: Object.freeze(ComputerArchitectureMachine.DECODE_OPERATION_LABELS),
+    sourceFor() { return this.source; },
+    run(options = {}, playbackOptions = {}) {
+      return ComputerArchitectureMachine.runDecode(options.preset || this.input.defaultPreset, playbackOptions);
     },
   });
   const executionActivity = Object.freeze({
@@ -57,6 +98,10 @@ const ComputerArchitectureActivities = (() => {
       defaultPreset: ComputerArchitectureMachine.EXECUTION_PRESETS[0].id,
       presets: ComputerArchitectureMachine.EXECUTION_PRESETS,
     }),
+    completionActions: Object.freeze([
+      Object.freeze({ id: 'practice-execution', label: 'Practice execution', href: 'computer-architecture-practice.html#execute', kind: 'primary' }),
+      Object.freeze({ id: 'fetch-again', label: 'Fetch another instruction', href: 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', kind: 'secondary' }),
+    ]),
     metrics: Object.freeze([]),
     source: Object.freeze(ComputerArchitectureMachine.EXECUTION_MICRO_OPERATION_LABELS),
     sourceFor() { return this.source; },
@@ -64,7 +109,7 @@ const ComputerArchitectureActivities = (() => {
       return ComputerArchitectureMachine.runExecution(options.preset || this.input.defaultPreset, playbackOptions);
     },
   });
-  const byId = new Map([[fetchActivity.id, fetchActivity], [executionActivity.id, executionActivity]]);
+  const byId = new Map([[fetchActivity.id, fetchActivity], [decodeActivity.id, decodeActivity], [executionActivity.id, executionActivity]]);
   return Object.freeze({
     SCHEMA_VERSION: 1,
     CONTENT_VERSION,

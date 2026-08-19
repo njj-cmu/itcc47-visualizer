@@ -787,14 +787,14 @@ ComputerArchitecture.PRESETS.forEach((preset) => {
   const sequenceFrames = events.flatMap((event) => event.transition?.phases?.map((item) => item.frame) || [event.frame]);
   const microFrames = micro.events.map((event) => event.frame);
   const transfers = sequenceFrames.map((frame) => frame.transfer).filter(Boolean);
-  ok(`${preset.id}: emits six deterministic immutable operations`, events.length === 6 && JSON.stringify(first) === JSON.stringify(second) && events.every((event) => Object.isFrozen(event) && Object.isFrozen(event.frame)));
-  ok(`${preset.id}: operation identities are unique and stable`, new Set(ids).size === 6 && ids.every((id) => id.startsWith(`architecture-fetch-cycle:${preset.id}:operation:`)));
-  ok(`${preset.id}: fetch operations occur in the required order`, events.map((event) => event.type).join(',') === 'locate-pc,copy-pc-mar,read-memory-mdr,transfer-mdr-ir,increment-pc,decode-instruction');
+  ok(`${preset.id}: emits five deterministic immutable fetch operations`, events.length === 5 && JSON.stringify(first) === JSON.stringify(second) && events.every((event) => Object.isFrozen(event) && Object.isFrozen(event.frame)));
+  ok(`${preset.id}: operation identities are unique and stable`, new Set(ids).size === 5 && ids.every((id) => id.startsWith(`architecture-fetch-cycle:${preset.id}:operation:`)));
+  ok(`${preset.id}: fetch operations stop after advancing PC`, events.map((event) => event.type).join(',') === 'locate-pc,copy-pc-mar,read-memory-mdr,transfer-mdr-ir,increment-pc');
   ok(`${preset.id}: first frame highlights only PC without changing state`, events[0].frame.activeComponents.join(',') === 'PC' && events[0].frame.transfer === null && events[0].frame.signals.every((signal) => !signal.active) && events[0].frame.memory.selectedAddress === null && events[0].frame.registers.MAR.value === 0);
   ok(`${preset.id}: operation sequences expose immutable phases and duration contracts`, events.slice(1).every((event) => event.transition.kind === 'cpu-operation' && event.transition.sequenceId && event.transition.durationUnits > 0 && event.transition.phases.every((item) => Object.isFrozen(item.frame))));
   ok(`${preset.id}: stable address and word tokens survive compound transfers`, transfers.filter((item) => item.kind === 'address').every((item) => item.id === `address-token:${preset.id}`) && transfers.filter((item) => item.id === `instruction-word:${preset.id}`).every((item) => item.kind === 'instruction'));
-  ok(`${preset.id}: micro mode exposes the same graph as twenty-two individual phases`, micro.events.length === 22 && micro.events.every((event) => event.frame.playbackGranularity === 'micro') && micro.events.map((event) => event.frame.operation.id).filter((id, index, items) => index === 0 || id !== items[index - 1]).join(',') === events.map((event) => event.frame.operation.id).join(','));
-  ok(`${preset.id}: all twenty-two phases expose immutable PowerPoint-style animation metadata`, microFrames.length === 22 && microFrames.every((frame) => ComputerArchitecture.ANIMATION_STAGES.includes(frame.animation.stage) && frame.animation.sourceId && Object.isFrozen(frame.animation) && Object.isFrozen(frame.animation.timing) && Object.isFrozen(frame.animation.controlCues)));
+  ok(`${preset.id}: micro mode exposes the same graph as nineteen individual phases`, micro.events.length === 19 && micro.events.every((event) => event.frame.playbackGranularity === 'micro') && micro.events.map((event) => event.frame.operation.id).filter((id, index, items) => index === 0 || id !== items[index - 1]).join(',') === events.map((event) => event.frame.operation.id).join(','));
+  ok(`${preset.id}: all nineteen phases expose immutable PowerPoint-style animation metadata`, microFrames.length === 19 && microFrames.every((frame) => ComputerArchitecture.ANIMATION_STAGES.includes(frame.animation.stage) && frame.animation.sourceId && Object.isFrozen(frame.animation) && Object.isFrozen(frame.animation.timing) && Object.isFrozen(frame.animation.controlCues)));
   ok(`${preset.id}: emitting phases hold and retain cues while non-emitting phases do not`, microFrames.every((frame) => {
     const timing = frame.animation.timing;
     if (frame.animation.stage === 'arm') return timing.spawnHoldUnits === 1.54 && timing.movementUnits === 1.25 && timing.retainAtEndpoint && frame.microStep.durationWeight === 2.79;
@@ -821,11 +821,32 @@ ComputerArchitecture.PRESETS.forEach((preset) => {
       && phases[5].frame.transfer.from === 'memory' && phases[5].frame.transfer.to === 'MDR'
       && phases[6].frame.registers.MDR.value === preset.word;
   })());
-  ok(`${preset.id}: final state retains address and word while advancing PC`, finalFrame.registers.MAR.value === preset.pc && finalFrame.registers.MDR.value === preset.word && finalFrame.registers.IR.value === preset.word && finalFrame.registers.PC.value === ((preset.pc + 1) & 0xFF));
+  ok(`${preset.id}: final state retains address and fetched word without decoding`, finalFrame.registers.MAR.value === preset.pc && finalFrame.registers.MDR.value === preset.word && finalFrame.registers.IR.value === preset.word && finalFrame.registers.PC.value === ((preset.pc + 1) & 0xFF) && finalFrame.instruction.available && !finalFrame.instruction.decoded);
   ok(`${preset.id}: fetch never changes memory and leaves all signals inactive`, finalFrame.memory.unchanged && finalFrame.memory.snapshot[preset.pc] === preset.word && finalFrame.signals.every((signal) => !signal.active));
   ok(`${preset.id}: operation and micro timelines commit identical machine state`, ['PC', 'MAR', 'MDR', 'IR', 'R0', 'R1', 'R2', 'R3'].every((id) => finalFrame.registers[id].value === micro.result.finalFrame.registers[id].value) && JSON.stringify(finalFrame.memory.snapshot) === JSON.stringify(micro.result.finalFrame.memory.snapshot));
 });
 ok('ADDI preset demonstrates 8-bit PC wraparound', ComputerArchitecture.run('addi-r3-07').events.at(-1).frame.registers.PC.value === 0x00);
+ComputerArchitecture.PRESETS.forEach((preset) => {
+  const operationRun = ComputerArchitecture.runDecode(preset.id, { granularity: 'operation' });
+  const repeatedRun = ComputerArchitecture.runDecode(preset.id, { granularity: 'operation' });
+  const microRun = ComputerArchitecture.runDecode(preset.id, { granularity: 'micro' });
+  const events = operationRun.events;
+  const frames = microRun.events.map((event) => event.frame);
+  const firstFrame = events[0].frame;
+  const finalFrame = events.at(-1).frame;
+  const expectedProfile = preset.id === 'store-r2-b0'
+    ? ['source', 'address', 'Write R2 into Main Memory[0xB0].']
+    : preset.id === 'addi-r3-07'
+      ? ['read-write', 'immediate', 'Add immediate 0x07 to R3 and write the result back to R3.']
+      : ['destination', 'address', 'Read Main Memory[0xA4] and write the word into R1.'];
+  ok(`${preset.id}: decode emits six deterministic immutable operations and sixteen phases`, events.length === 6 && microRun.events.length === 16 && JSON.stringify(operationRun) === JSON.stringify(repeatedRun) && frames.every((frame) => Object.isFrozen(frame) && Object.isFrozen(frame.instruction)));
+  ok(`${preset.id}: decode starts from completed fetch state with only IR focused`, firstFrame.activeComponents.join(',') === 'IR' && firstFrame.registers.PC.value === ((preset.pc + 1) & 0xFF) && firstFrame.registers.MAR.value === preset.pc && firstFrame.registers.MDR.value === preset.word && firstFrame.registers.IR.value === preset.word && firstFrame.signals.every((signal) => !signal.active));
+  ok(`${preset.id}: decode operations follow locate, split, interpret, and assemble order`, events.map((event) => event.type).join(',') === 'locate-ir-word,split-instruction-fields,interpret-opcode,interpret-register,interpret-operand,assemble-instruction');
+  ok(`${preset.id}: decode reveals correct roles, operand kind, and next action`, finalFrame.instruction.decoded && finalFrame.instruction.decodeStage === 'complete' && finalFrame.instruction.revealedFields.join(',') === 'opcode,register,operand' && finalFrame.instruction.registerRole === expectedProfile[0] && finalFrame.instruction.operandKind === expectedProfile[1] && finalFrame.instruction.nextAction === expectedProfile[2]);
+  ok(`${preset.id}: decode mutates neither registers nor Main Memory`, frames.every((frame) => ['PC', 'MAR', 'MDR', 'IR', 'R0', 'R1', 'R2', 'R3'].every((id) => frame.registers[id].value === firstFrame.registers[id].value) && JSON.stringify(frame.memory.snapshot) === JSON.stringify(firstFrame.memory.snapshot) && frame.memory.unchanged));
+  ok(`${preset.id}: decode invents no control signals and preserves immutable animation identities`, frames.every((frame) => frame.signals.every((signal) => !signal.active) && frame.animation.controlCues.length === 0 && Object.isFrozen(frame.animation)) && new Set(frames.map((frame) => frame.microStep.id)).size === 16);
+  ok(`${preset.id}: operation and micro decode timelines commit identical state`, ['PC', 'MAR', 'MDR', 'IR', 'R0', 'R1', 'R2', 'R3'].every((id) => finalFrame.registers[id].value === microRun.result.finalFrame.registers[id].value) && finalFrame.instruction.mnemonic === microRun.result.finalFrame.instruction.mnemonic);
+});
 ok('guided execution preset encodes 5 + 13 as ADDI R1, #0x0D', (() => {
   const preset = ComputerArchitecture.EXECUTION_PRESETS[0];
   const decoded = ComputerArchitecture.decodeInstruction(preset.word);
@@ -876,9 +897,18 @@ ok('computer architecture course and fetch activity expose their public contract
 ok('computer architecture catalog exposes the guided 5 + 13 activity', (() => {
   const activity = ComputerArchitectureCatalog.get('architecture-add-immediate');
   const finalFrame = activity.run().events.at(-1).frame;
-  return ComputerArchitectureCatalog.list().length === 2 && activity.title === 'Add 5 + 13'
+  return ComputerArchitectureCatalog.list().length === 3 && activity.title === 'Add 5 + 13'
     && activity.input.defaultPreset === 'addi-five-thirteen'
     && activity.source.length === 10 && finalFrame.registers.R1.value === 18;
+})());
+ok('computer architecture catalog exposes Decode with focused renderer and immutable completion actions', (() => {
+  const decode = ComputerArchitectureCatalog.get('architecture-decode-instruction');
+  const fetch = ComputerArchitectureCatalog.get('architecture-fetch-cycle');
+  return decode.renderer === 'cpu-instruction-decode' && decode.workspaceComposition === 'cpu-decode'
+    && decode.source.length === 6 && decode.evidenceViews.join(',') === 'micro-operations,cpu-decode-fields,cpu-machine-state,cpu-decode-meaning'
+    && decode.completionActions[0].href.includes('architecture-add-immediate')
+    && fetch.completionActions[0].href.includes('architecture-decode-instruction')
+    && Object.isFrozen(decode.completionActions) && Object.isFrozen(fetch.completionActions);
 })());
 ComputerArchitectureRegistry.registerEvidenceView('metadata-test', function MetadataTest() {}, { label: 'Metadata test', icon: 'cpu' });
 ok('evidence registration retains component compatibility and label/icon metadata',
@@ -892,6 +922,10 @@ ok('practice storage normalizes to contentVersion and valid unique solved IDs on
 ok('practice storage rejects outdated and malformed state',
   ComputerArchitecturePractice.normalize({ contentVersion: 0, solvedIds: ['fetch-order'] }).solvedIds.length === 0
   && ComputerArchitecturePractice.normalize(null).contentVersion === 1);
+ok('practice bank preserves three fetch IDs and adds four unsolved decode and execute checks',
+  ComputerArchitecturePractice.QUESTIONS.length === 7
+  && ComputerArchitecturePractice.QUESTIONS.slice(0, 3).map((question) => question.id).join(',') === 'fetch-order,mar-versus-mdr,predict-final-state'
+  && ComputerArchitecturePractice.normalize({ contentVersion: 1, solvedIds: ['fetch-order'] }).solvedIds.join(',') === 'fetch-order');
 
 const oopEngine = load(['course-catalog.js', 'playback.js', 'itcc45-activities.js', 'itcc45-practice-data.js'], { setTimeout, clearTimeout });
 const Courses = oopEngine.get('BSITLearningLab');

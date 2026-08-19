@@ -6,7 +6,7 @@ const instructorAccessToken = fs.readFileSync(path.resolve(__dirname, '..', '.in
 const instructorAccessRecord = { schemaVersion: 1, profileId: 'itcc47-2026-2027-s1', profileVersion: 5, token: instructorAccessToken };
 const instructorPreviewRecord = { schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 5, currentCheckpointId: 'm8-dp' };
 
-const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'computer-architecture.html', 'computer-architecture-modules.html', 'computer-architecture-practice.html', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=deque-sliding-window&preview=1', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', 'visualizer.html?course=computer-architecture&activity=architecture-add-immediate', 'industry-workbench.html', 'industry-workbench.html?scenario=industry-priority-range-recall&preview=1', 'writer.html', 'tracer.html', 'problems.html', 'problems.html?view=visualizations', 'problems.html?view=workbenches', 'lesson.html?checkpoint=m2-selection-sort', 'student-materials.html', 'problem-list.html?module=1', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count'];
+const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'computer-architecture.html', 'computer-architecture-modules.html', 'computer-architecture-practice.html', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=deque-sliding-window&preview=1', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', 'visualizer.html?course=computer-architecture&activity=architecture-decode-instruction', 'visualizer.html?course=computer-architecture&activity=architecture-add-immediate', 'industry-workbench.html', 'industry-workbench.html?scenario=industry-priority-range-recall&preview=1', 'writer.html', 'tracer.html', 'problems.html', 'problems.html?view=visualizations', 'problems.html?view=workbenches', 'lesson.html?checkpoint=m2-selection-sort', 'student-materials.html', 'problem-list.html?module=1', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count'];
 
 const studentStateTests = new Set([
   'curriculum roadmap expands the current module and compacts locked modules',
@@ -188,8 +188,9 @@ test('computer architecture roadmap exposes one current module and two non-click
   await page.goto('/computer-architecture-modules.html');
   await expect(page.locator('.ca-module-card')).toHaveCount(3);
   await expect(page.locator('.ca-module-card.is-current')).toContainText('Fetch one instruction');
+  await expect(page.locator('.ca-module-card.is-current')).toContainText('Decode one instruction');
   await expect(page.locator('.ca-module-card.is-current')).toContainText('Add 5 + 13');
-  await expect(page.locator('.ca-module-card.is-current .ca-module-activity')).toHaveCount(2);
+  await expect(page.locator('.ca-module-card.is-current .ca-module-activity')).toHaveCount(3);
   await expect(page.locator('.ca-module-card.is-planned')).toHaveCount(2);
   await expect(page.locator('.ca-module-card.is-planned a')).toHaveCount(0);
   await expect(page.locator('.topbar-nav a[href="computer-architecture-modules.html"]')).toHaveAttribute('aria-current', 'page');
@@ -204,7 +205,7 @@ test('computer architecture practice stores only version and solved IDs and can 
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('computer-architecture.practice:v1')));
   expect(stored).toEqual({ contentVersion: 1, solvedIds: ['fetch-order'] });
   await page.getByRole('button', { name: 'Reset progress' }).click();
-  await expect(page.locator('#ca-practice-progress')).toHaveText('0 / 3 complete');
+  await expect(page.locator('#ca-practice-progress')).toHaveText('0 / 7 complete');
   expect(await page.evaluate(() => localStorage.getItem('computer-architecture.practice:v1'))).toBeNull();
 });
 
@@ -212,21 +213,21 @@ test('CPU Lab preset rebuilds playback while number format remains view-only', a
   await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
   await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
   await expect(page.getByRole('heading', { name: 'Fetch one instruction' })).toBeVisible();
-  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 5');
   await page.getByRole('button', { name: 'Step' }).click();
-  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 5');
   await page.getByRole('button', { name: 'BIN' }).click();
-  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 5');
   await expect(page.locator('.cpu-register-box').first()).toContainText('0b');
   await page.getByLabel('Instruction preset').selectOption('addi-r3-07');
-  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 5');
   await expect(page.locator(testInfo.project.name === 'phone' ? '.cpu-memory-pane' : '.cpu-main-memory')).toContainText('0b11111111');
   const timeline = await visualizerTimeline(page);
-  await timeline.fill('5');
-  await expect(page.locator('.integrated-step strong')).toHaveText('6 / 6');
+  await timeline.fill('4');
+  await expect(page.locator('.integrated-step strong')).toHaveText('5 / 5');
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'More' }).click();
   await page.getByRole('tab', { name: 'Instruction' }).click();
-  await expect(page.locator(testInfo.project.name === 'phone' ? '.mobile-evidence .cpu-instruction-evidence' : '.desktop-evidence .cpu-instruction-evidence')).toContainText('ADDI R3');
+  await expect(page.locator(testInfo.project.name === 'phone' ? '.mobile-evidence .cpu-instruction-evidence' : '.desktop-evidence .cpu-instruction-evidence')).toContainText('not been interpreted');
 });
 
 test('CPU Lab starts at the source and treats the memory handshake as one operation', async ({ page }, testInfo) => {
@@ -245,10 +246,10 @@ test('CPU Lab starts at the source and treats the memory handshake as one operat
 
   const timeline = await visualizerTimeline(page);
   await timeline.fill('1');
-  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 5');
   await installCpuAnimationProbe(page);
   await page.getByRole('button', { name: 'Step' }).click();
-  await expect(page.locator('.integrated-step strong')).toHaveText('3 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('3 / 5');
   await expect(page.getByRole('button', { name: 'Step' })).toBeEnabled({ timeout: 15000 });
   await expect(page.locator('[data-component-id="MDR"]')).toContainText('0x31A4');
   const samples = await collectCpuAnimationSamples(page);
@@ -408,17 +409,17 @@ test('CPU Lab switches between operation and micro playback without returning to
   await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
   const timeline = await visualizerTimeline(page);
   await timeline.fill('2');
-  await expect(page.locator('.integrated-step strong')).toHaveText('3 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('3 / 5');
 
   await page.getByRole('button', { name: 'Micro', exact: true }).click();
-  await expect(page.locator('.integrated-step strong')).toHaveText('6 / 22');
-  await expect(page.locator('.cpu-canvas-heading')).toContainText('Operation 3 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('6 / 19');
+  await expect(page.locator('.cpu-canvas-heading')).toContainText('Operation 3 / 5');
   await expect(page.locator('.cpu-canvas-heading')).toContainText('1 / 7 · Focus MAR');
   await page.getByRole('button', { name: 'Step' }).click();
-  await expect(page.locator('.integrated-step strong')).toHaveText('7 / 22');
+  await expect(page.locator('.integrated-step strong')).toHaveText('7 / 19');
 
   await page.getByRole('button', { name: 'Operation', exact: true }).click();
-  await expect(page.locator('.integrated-step strong')).toHaveText('3 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('3 / 5');
   await expect(page.locator('[data-component-id="MDR"]')).toContainText('0x31A4');
 });
 
@@ -439,9 +440,9 @@ test('CPU control unit explains readable signals, the current action, and what h
   await expect(controlUnit.locator('.cpu-svg-next')).toHaveAttribute('aria-label', 'Move the address.');
   await expect(controlUnit).not.toContainText('ANIMATION STAGE');
 
-  await timeline.fill('21');
-  await expect(controlUnit.locator('.cpu-svg-guidance').first()).toHaveAttribute('aria-label', 'LOAD R1, [0xA4] is ready for execution.');
-  await expect(controlUnit.locator('.cpu-svg-next')).toHaveAttribute('aria-label', 'Execute LOAD R1, [0xA4]; execution is outside this activity.');
+  await timeline.fill('18');
+  await expect(controlUnit.locator('.cpu-svg-guidance').first()).toHaveAttribute('aria-label', 'PC becomes 0x13.');
+  await expect(controlUnit.locator('.cpu-svg-next')).toHaveAttribute('aria-label', 'Decode the word 0x31A4 now stored in IR.');
 
   await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-add-immediate');
   await page.getByRole('button', { name: 'Micro', exact: true }).click();
@@ -456,13 +457,134 @@ test('CPU mobile datapath keeps the next-action note without exposing animation-
   await openMobilePlaybackDetails(page);
   await page.locator('.mobile-playback-details').getByRole('button', { name: 'Micro', exact: true }).click();
   const timeline = await visualizerTimeline(page);
-  await timeline.fill('21');
+  await timeline.fill('18');
   await page.locator('.mobile-playback-details > summary').click();
 
-  await expect(page.locator('.cpu-mobile-phase')).toContainText('Operation 6 / 6 · Decode the instruction');
+  await expect(page.locator('.cpu-mobile-phase')).toContainText('Operation 5 / 5 · Increment the PC');
   await expect(page.locator('.cpu-mobile-phase')).not.toContainText('arrive');
-  await expect(page.locator('.cpu-mobile-next')).toContainText('Execute LOAD R1, [0xA4]; execution is outside this activity.');
+  await expect(page.locator('.cpu-mobile-next')).toContainText('Decode the word 0x31A4 now stored in IR.');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('Decode activity starts from completed fetch state and progressively explains 4 / 4 / 8 fields', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-decode-instruction');
+  await expect(page.getByRole('heading', { name: 'Decode one instruction' })).toBeVisible();
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 6');
+  await expect(page.locator('.cpu-decode-full')).toBeVisible();
+  await expect(page.locator('.cpu-decode-bit')).toHaveCount(16);
+  expect(await page.locator('.cpu-decode-bit').allTextContents()).toEqual('0011000110100100'.split(''));
+  await expect(page.locator('.cpu-decode-components [data-component-state="is-source"]')).toHaveCount(2);
+  await expect(page.locator('.cpu-decode-ir')).toHaveClass(/is-source/);
+  await expect(page.locator('.cpu-decode-callout')).toContainText('PC advanced · memory idle');
+  await expect(page.locator('.cpu-decode-context-cell').filter({ hasText: 'PC' })).toContainText('0x13');
+  await expect(page.locator('.cpu-control-cue')).toHaveCount(0);
+  await expect(page.locator('.cpu-completion-actions')).toHaveCount(0);
+
+  const binaryBits = await page.locator('.cpu-decode-bit').allTextContents();
+  await page.getByRole('button', { name: 'DEC' }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 6');
+  expect(await page.locator('.cpu-decode-bit').allTextContents()).toEqual(binaryBits);
+  await expect(page.locator('.cpu-decode-ir')).toContainText('12708');
+
+  const timeline = await visualizerTimeline(page);
+  await timeline.fill('5');
+  await expect(page.locator('.cpu-decode-summary')).toContainText('LOAD R1, [0xA4]');
+  await expect(page.locator('.cpu-decode-summary')).toContainText('Read Main Memory');
+  await expect(page.locator('.cpu-completion-actions')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Run 5 \+ 13/ })).toHaveAttribute('href', /architecture-add-immediate/);
+  await expect(page.getByRole('link', { name: /Practice decoding/ })).toHaveAttribute('href', /#decode$/);
+  await page.getByRole('tab', { name: 'Fields' }).click();
+  await expect(page.locator('.desktop-evidence .cpu-decode-evidence-fields')).toContainText('destination');
+  await page.getByRole('tab', { name: 'Machine state' }).click();
+  await expect(page.locator('.desktop-evidence .cpu-register-evidence')).toContainText('MAR');
+  await page.getByRole('tab', { name: 'Meaning' }).click();
+  await expect(page.locator('.desktop-evidence .cpu-decode-meaning-evidence')).toContainText('does not execute');
+
+  await page.getByLabel('Instruction preset').selectOption('store-r2-b0');
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 6');
+  await expect(page.locator('.cpu-decode-ir')).toContainText('17072');
+  await expect(page.locator('.cpu-completion-actions')).toHaveCount(0);
+});
+
+test('Decode activity exposes sixteen latched micro-steps without control signals', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-decode-instruction');
+  await page.getByRole('button', { name: 'Micro', exact: true }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 16');
+  const timeline = await visualizerTimeline(page);
+  await timeline.fill('1');
+  await expect(page.locator('.cpu-decode-renderer')).toHaveAttribute('data-animation-stage', 'travel');
+  await expect(page.locator('[data-active-route-id="decode-word"]')).toHaveCount(1);
+  await expect(page.locator('.cpu-value-cue')).toHaveCount(1);
+  await expect(page.locator('.cpu-control-cue')).toHaveCount(0);
+  await timeline.fill('5');
+  await expect(page.locator('.cpu-decode-renderer')).toHaveAttribute('data-active-field', 'opcode');
+  await expect(page.locator('[data-active-route-id="decode-opcode"]')).toHaveCount(1);
+  await expect(page.locator('.cpu-value-cue')).toHaveCount(1);
+  await timeline.fill('15');
+  await expect(page.locator('.integrated-step strong')).toHaveText('16 / 16');
+  await expect(page.locator('.cpu-decode-summary')).toContainText('LOAD R1, [0xA4]');
+});
+
+test('Decode desktop board stays collision-free at both supported desktop widths', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  for (const viewport of [{ width: 1366, height: 768 }, { width: 1905, height: 921 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-decode-instruction');
+    await expect(page.locator('.cpu-decode-full')).toBeVisible();
+    const geometry = await page.evaluate(() => {
+      const svg = document.querySelector('.cpu-decode-full').getBoundingClientRect();
+      const texts = [...document.querySelectorAll('.cpu-decode-full text')];
+      const clippedText = texts.filter((node) => {
+        const box = node.getBoundingClientRect();
+        return box.left < svg.left - 1 || box.right > svg.right + 1 || box.top < svg.top - 1 || box.bottom > svg.bottom + 1;
+      }).length;
+      const cards = [...document.querySelectorAll('.cpu-decode-field-card > rect')].map((node) => node.getBoundingClientRect());
+      const cardCollisions = cards.some((box, index) => cards.some((other, otherIndex) => otherIndex > index && box.left < other.right - 1 && box.right > other.left + 1 && box.top < other.bottom - 1 && box.bottom > other.top + 1));
+      return {
+        bits: document.querySelectorAll('.cpu-decode-bit').length,
+        markers: document.querySelectorAll('.cpu-decode-full marker').length,
+        horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth,
+        clippedText,
+        cardCollisions,
+      };
+    });
+    expect(geometry).toEqual({ bits: 16, markers: 0, horizontalOverflow: 0, clippedText: 0, cardCollisions: false });
+  }
+});
+
+test('Decode mobile tabs preserve playback and never overflow the page', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-decode-instruction');
+  await expect(page.locator('.cpu-decode-mobile')).toBeVisible();
+  await expect(page.locator('.cpu-decode-mobile-bits b')).toHaveCount(16);
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await page.getByRole('tab', { name: 'Fields' }).click();
+  await expect(page.locator('.cpu-decode-fields-pane')).toBeVisible();
+  await page.getByRole('tab', { name: 'Steps' }).click();
+  await expect(page.locator('.mobile-evidence .cpu-micro-operations')).toBeVisible();
+  await page.getByRole('tab', { name: 'Decode' }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await expect(page.getByRole('button', { name: 'Step' })).toBeInViewport();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test('Computer Architecture terminal actions connect Fetch, Decode, Add, and Practice', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
+  await (await visualizerTimeline(page)).fill('4');
+  await expect(page.getByRole('link', { name: /Decode this instruction/ })).toHaveAttribute('href', /architecture-decode-instruction/);
+  await expect(page.getByRole('link', { name: /Practice fetch/ })).toHaveAttribute('href', /#fetch$/);
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-add-immediate');
+  await (await visualizerTimeline(page)).fill('9');
+  await expect(page.getByRole('link', { name: /Practice execution/ })).toHaveAttribute('href', /#execute$/);
+  await expect(page.getByRole('link', { name: /Fetch another instruction/ })).toHaveAttribute('href', /architecture-fetch-cycle/);
 });
 
 test('CPU Lab animates active-only paths and executes the guided 5 + 13 operation', async ({ page }, testInfo) => {
@@ -523,14 +645,14 @@ test('CPU Lab mobile tabs keep playback state and the sticky dock reachable', as
   await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
   await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
   await page.getByRole('button', { name: 'Step' }).click();
-  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 5');
   await page.getByRole('tab', { name: 'Memory' }).click();
   await expect(page.locator('.cpu-memory-pane')).toBeVisible();
   await page.getByRole('tab', { name: 'Steps' }).click();
   await expect(page.locator('.mobile-evidence .cpu-micro-operations')).toBeVisible();
   await page.getByRole('tab', { name: 'Datapath' }).click();
   await expect(page.locator('.cpu-mobile-transfer')).toBeVisible();
-  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 5');
   await expect(page.getByRole('button', { name: 'Step' })).toBeInViewport();
 });
 
@@ -542,7 +664,7 @@ test('CPU Lab respects reduced motion and direct file operation', async ({ page 
   await expect(page.getByRole('heading', { name: 'Fetch one instruction' })).toBeVisible();
   await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-reduced/);
   await page.getByRole('button', { name: 'Step' }).click();
-  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 6');
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 5');
 });
 
 test('start page gives students a clear route into the current practice bank', async ({ page }) => {
@@ -1989,7 +2111,7 @@ test('cached navigation remains available offline', async ({ page, context }, te
   await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle');
   await expect(page.getByRole('heading', { name: 'Fetch one instruction' })).toBeVisible();
   await page.goto('/computer-architecture-practice.html');
-  await expect(page.getByRole('heading', { name: 'Check the fetch path.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Practice the instruction flow.' })).toBeVisible();
   await page.goto('/visualizer.html?activity=linked-list-traversal');
   await expect(page.getByRole('heading', { name: 'Traverse a singly linked list' })).toBeVisible();
   await page.goto('/problem-list.html?module=3');

@@ -84,9 +84,10 @@ It should define:
 
 ### Activity roadmap
 
-`architecture-fetch-cycle` and the narrow guided example
-`architecture-add-immediate` are now available. Broader execution activities
-below remain follow-on work and are not implied to exist in the current release.
+`architecture-fetch-cycle`, `architecture-decode-instruction`, and the narrow
+guided example `architecture-add-immediate` are now available. Broader
+execution activities below remain follow-on work and are not implied to exist
+in the current release.
 
 1. **Meet the datapath** — identify the program counter, instruction register,
    memory registers, accumulator/general registers, ALU, control unit, buses,
@@ -94,8 +95,9 @@ below remain follow-on work and are not implied to exist in the current release.
 2. **Fetch an instruction** — step through PC, MAR, the address bus, memory,
    the data bus, MDR, IR, the memory-complete handshake, and PC increment. This
    is the first vertical slice to implement.
-3. **Decode an instruction** — relate mnemonic, opcode, operand/address fields,
-   machine encoding, and the required control actions.
+3. **Decode an instruction** — implemented as a focused `4 / 4 / 8` field
+   activity that relates mnemonic, opcode, register role, operand/address
+   meaning, and the next CPU action without executing it.
 4. **Load from memory** — fetch, decode, read an operand, and update a register.
 5. **Add two values** — the current guided slice routes `5` and immediate `13`
    through the ALU and writes `18` to R1. A broader version can later add

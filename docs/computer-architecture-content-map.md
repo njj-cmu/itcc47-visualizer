@@ -44,15 +44,15 @@ The notes naturally divide into three kinds of learning experiences:
 
 This is the launch scope and should establish the shared machine model.
 
-| Provisional activity | Note basis | Student-visible result |
-|---|---|---|
-| `architecture-system-map` | Part I-C | Relate input, output, memory, control, and datapath without implying that every connection is the same kind of bus. |
-| `architecture-meet-the-cpu` | Part II-A | Identify the control unit, registers, ALU, main memory, and the address, data, and control paths. |
-| `architecture-fetch-cycle` | Parts II-A, II-B, and III-A | Follow one instruction from the PC through MAR, memory, MDR, and IR, including the PC update and memory-complete handshake. |
-| `architecture-add-immediate` | Parts II-A and II-B | Fetch `ADDI R1, #13`, route the starting value `5` and immediate `13` into the ALU, produce `18`, and write it back to R1. |
-| `architecture-decode-instruction` | Parts II-A and II-B | Split a machine word into opcode and operand/address fields and connect mnemonic, encoding, and required control actions. |
-| `architecture-load-execute-store` | Parts II-A and II-B | Run a short load, arithmetic, and store sequence while registers, ALU inputs, flags, memory, and buses change. |
-| `architecture-control-signals` | Part II-B | Compare the same instruction as a sequence of control signals, then explain hardwired versus microprogrammed control. |
+| Activity | Status | Note basis | Student-visible result |
+|---|---|---|---|
+| `architecture-system-map` | Planned | Part I-C | Relate input, output, memory, control, and datapath without implying that every connection is the same kind of bus. |
+| `architecture-meet-the-cpu` | Planned | Part II-A | Identify the control unit, registers, ALU, Main Memory, and the address, data, and control paths. |
+| `architecture-fetch-cycle` | Implemented | Parts II-A, II-B, and III-A | Follow one instruction from the PC through MAR, Main Memory, MDR, and IR, including the PC update and memory-complete handshake. |
+| `architecture-decode-instruction` | Implemented | Parts II-A and II-B | Split a machine word into 4-bit opcode, 4-bit register, and 8-bit operand fields, then explain the next CPU action without executing it. |
+| `architecture-add-immediate` | Implemented | Parts II-A and II-B | Fetch `ADDI R1, #13`, route the starting value `5` and immediate `13` into the ALU, produce `18`, and write it back to R1. |
+| `architecture-load-execute-store` | Planned | Parts II-A and II-B | Run a short load, arithmetic, and store sequence while registers, ALU inputs, flags, Main Memory, and buses change. |
+| `architecture-control-signals` | Planned | Part II-B | Compare the same instruction as a sequence of control signals, then explain hardwired versus microprogrammed control. |
 
 ### Release B: performance and pipelining
 
@@ -80,9 +80,9 @@ processor packaging, vendor history, overclocking, cooling, system-on-chip,
 multicore, and processor surveys can become guided explainers after the core
 state-flow labs are stable. They should not block the launch visualizer.
 
-## First vertical slice: fetch one instruction
+## Implemented vertical slice: fetch one instruction
 
-The first implementation should be `architecture-fetch-cycle`. It connects
+The first implementation is `architecture-fetch-cycle`. It connects
 four supplied lecture sections and exercises nearly every extension point the
 new subject will need.
 

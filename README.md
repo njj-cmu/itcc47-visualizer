@@ -42,20 +42,20 @@ root learning page is now [`itcc47.html`](itcc47.html).
 ### Computer Architecture
 
 The CPU Lab uses a deterministic 16-bit teaching machine with an 8-bit address
-space. Its first production activity follows one instruction through
-`PC → MAR → memory → MDR → IR`, including the memory handshake, control
-signals, and PC increment. A second guided activity fetches `ADDI R1, #13`,
-routes `5 + 13` through the ALU, and writes `18` back to R1. Three curated
-fetch presets, HEX/BIN/DEC views, textual evidence, and three local practice
-checks work without an account or network.
+space. Three Module 1 activities now form one learning sequence: fetch a word
+through `PC → MAR → Main Memory → MDR → IR`, decode its `4 / 4 / 8` fields,
+then run the guided `5 + 13` ADDI example through the ALU. Three curated
+presets, HEX/BIN/DEC views, textual evidence, and seven local practice checks
+work without an account or network.
 
 | Page | Purpose |
 |---|---|
 | [`computer-architecture.html`](computer-architecture.html) | Subject home and learning path |
 | [`computer-architecture-modules.html`](computer-architecture-modules.html) | Current and planned module roadmap |
 | [`visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle`](visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle) | Fetch-cycle CPU Lab |
+| [`visualizer.html?course=computer-architecture&activity=architecture-decode-instruction`](visualizer.html?course=computer-architecture&activity=architecture-decode-instruction) | Focused instruction-decoding lab |
 | [`visualizer.html?course=computer-architecture&activity=architecture-add-immediate`](visualizer.html?course=computer-architecture&activity=architecture-add-immediate) | Guided `5 + 13` fetch-and-execute CPU Lab |
-| [`computer-architecture-practice.html`](computer-architecture-practice.html) | Three local fetch-cycle checks |
+| [`computer-architecture-practice.html`](computer-architecture-practice.html) | Seven local Fetch, Decode, and Execute checks |
 
 The root [`index.html`](index.html) is the **BSIT Learning Lab** subject chooser.
 
@@ -116,11 +116,12 @@ catalogs. `BSITPlayback` and `BSITVisualizerRegistry` are course-neutral shared
 contracts; the original `ITCC47*` globals remain compatibility APIs.
 
 Computer Architecture adds a framework-neutral `ComputerArchitectureMachine`
-and uses registered `cpu-datapath` rendering, evidence-view metadata, and
-`cpu-preset` input controls. A shared hierarchical graph produces six fetch
-operations or ten guided-addition operations, plus 22 or 37 optional micro
-phases. Compound timing, presentation coordinates, and React state remain
-separate from committed machine state.
+and uses registered `cpu-datapath` and `cpu-instruction-decode` rendering,
+evidence-view metadata, and `cpu-preset` input controls. Shared hierarchical
+graphs produce five fetch operations, six decode operations, or ten guided-
+addition operations, with 19, 16, or 37 optional micro phases respectively.
+Compound timing, presentation coordinates, and React state remain separate
+from committed machine state.
 
 CPU cues pause at their source, pulse the emitting value or signal, travel over
 collision-free SVG routes, and remain latched with the active path until the

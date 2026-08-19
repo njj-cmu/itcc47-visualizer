@@ -7,7 +7,7 @@ module.exports = defineConfig({
   fullyParallel: true,
   // The visualizer cases are rendering-heavy; cap parallel browsers so the
   // longest portfolio audits do not time out under local or CI contention.
-  workers: 4,
+  workers: 2,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: `http://127.0.0.1:${testPort}`,

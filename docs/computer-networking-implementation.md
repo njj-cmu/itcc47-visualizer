@@ -1,6 +1,31 @@
 # Computer networking implementation plan
 
-Status: ready for the Phase 3 vertical slice on `codex/computer-networking`.
+Status: port-accurate vertical slice implemented on `codex/computer-networking-slice-a`.
+
+## Supplied curriculum reconciliation
+
+The implementation was checked against the read-only source set under the main
+worktree's `context/NETWORKING` directory. The institutional subject is **IT 53 —
+Fundamentals of Networking** (three units; two lecture hours and three laboratory
+hours weekly). The learner-facing title remains **Introduction to Networking** and
+the compact shell code remains `NET`.
+
+The current ARP slice is grounded in ITN Module 8 (same-network versus remote-network
+forwarding decisions) and Module 9 (ARP purpose, lookup, request broadcast, reply,
+and learned mapping). Physical NIC, interface, UTP, and RJ45 language is grounded in
+Modules 2 and 4. Switch source-MAC learning and flooding appear only as evidence
+needed to explain the Module 9 ARP path; the supplied Modules 6, 7, and 16 are marked
+not included and are not promoted as standalone roadmap modules.
+
+The reconciled sequence keeps router configuration/default gateways, addressing and
+subnetting, ICMP, transport, DNS, DHCP, and small-network troubleshooting as planned
+later course modules. IPv6 Neighbor Discovery is a later Module 9 companion activity.
+VLAN separation is explicitly labeled a possible extension outside the currently
+included IT 53 sequence, pending approved course material.
+
+Accepted implementation and QA references are stored in
+[`docs/design/networking/`](design/networking/README.md). The physical-port detail is
+authoritative where a full-screen concept is visually ambiguous.
 
 ## Outcome
 
@@ -18,8 +43,7 @@ drift; and use the same activity on laptop, phone, `file://`, and offline.
 
 - Public title: **Introduction to Networking**.
 - Internal course ID: `computer-networking`.
-- Provisional compatibility code: `NET`; replace it if the institutional
-  course outline supplies an official code before publication.
+- Compact shell code: `NET`; the supplied institutional course code is `IT 53`.
 - Short title: **Network Lab**.
 - Initial module: **Local Network Delivery**.
 - First activity: **Discover a neighbor with ARP**.
@@ -39,7 +63,8 @@ it can send an IPv4 packet on the local LAN. The learner follows these decisions
 1. Host A applies its subnet mask and concludes that Host B is local.
 2. Host A checks its ARP cache and finds no matching entry.
 3. Host A creates an ARP Request inside a broadcast Ethernet frame.
-4. The switch learns Host A's source MAC address and floods the broadcast.
+4. The teaching switch learns Host A's source MAC address and floods the
+   broadcast to its only other port as narrow evidence for the ARP lesson.
 5. Host B recognizes its IPv4 address and creates an ARP Reply.
 6. The switch learns Host B's source MAC address and unicasts the reply.
 7. Host A records the IP-to-MAC mapping in its ARP cache.

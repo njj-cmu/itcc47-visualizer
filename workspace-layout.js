@@ -126,4 +126,30 @@
     read: readComputerArchitecture,
     write: writeComputerArchitecture,
   });
+
+  const COMPUTER_NETWORKING_STORAGE_KEY = 'computer-networking.workspace-layout:v1';
+  function computerNetworkingDefaults() {
+    return { version: VERSION, evidence: 'expanded' };
+  }
+  function normalizeComputerNetworking(value) {
+    const fallback = computerNetworkingDefaults();
+    if (!value || value.version !== VERSION) return fallback;
+    return { version: VERSION, evidence: normalizeEvidence(value.evidence, fallback.evidence) };
+  }
+  function readComputerNetworking(storage) {
+    return readStored(storage, COMPUTER_NETWORKING_STORAGE_KEY, computerNetworkingDefaults, normalizeComputerNetworking);
+  }
+  function writeComputerNetworking(storage, value) {
+    const next = normalizeComputerNetworking({ ...value, version: VERSION });
+    return writeStored(storage, COMPUTER_NETWORKING_STORAGE_KEY, next);
+  }
+
+  root.ComputerNetworkingWorkspaceLayout = Object.freeze({
+    VERSION,
+    STORAGE_KEY: COMPUTER_NETWORKING_STORAGE_KEY,
+    defaults: computerNetworkingDefaults,
+    normalize: normalizeComputerNetworking,
+    read: readComputerNetworking,
+    write: writeComputerNetworking,
+  });
 })(typeof window !== 'undefined' ? window : globalThis);

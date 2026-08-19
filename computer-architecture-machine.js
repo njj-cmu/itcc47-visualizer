@@ -437,21 +437,24 @@ const ComputerArchitectureMachine = (() => {
         id: 'locate-ir-word', label: DECODE_OPERATION_LABELS[0],
         summary: `Begin with fetched word ${formatValue(preset.word, 16)} in IR.`,
         phases: [phase('decode-focus-ir', 'Find the fetched word', `IR already holds fetched word ${formatValue(preset.word, 16)}.`, {
-          decodeStage: 'locate', activeComponents: ['IR'], animation: animation('focus', 'IR'), durationWeight: DURATION_WEIGHTS.focus,
+          decodeStage: 'locate', decodeBoardStage: 'empty', activeComponents: ['IR'], animation: animation('focus', 'IR'), durationWeight: DURATION_WEIGHTS.focus,
         })],
       },
       {
         id: 'split-instruction-fields', label: DECODE_OPERATION_LABELS[1],
         summary: 'Divide the 16-bit instruction into 4-bit opcode, 4-bit register, and 8-bit operand fields.',
         phases: [
-          phase('decode-move-word', 'Move the word to the decode board', 'The complete 16-bit word moves from IR into the decode board.', {
-            decodeStage: 'split', transfer: { id: wordTokenId, kind: 'instruction', role: 'instruction', width: 16, value: preset.word, from: 'IR', to: 'DecodeBoard' }, animation: animation('travel', 'IR', 'DecodeBoard', ROUTE_IDS.decodeWord), durationWeight: DURATION_WEIGHTS.travel,
+          phase('decode-move-word', 'Send the complete word', 'IR sends one complete 16-bit instruction word to the decode board.', {
+            decodeStage: 'split', decodeBoardStage: 'empty', transfer: { id: wordTokenId, kind: 'instruction', role: 'instruction', width: 16, value: preset.word, from: 'IR', to: 'DecodeBoard' }, animation: animation('travel', 'IR', 'DecodeBoard', ROUTE_IDS.decodeWord), durationWeight: DURATION_WEIGHTS.travel,
           }),
-          phase('decode-split-groups', 'Separate the bit groups', 'The word separates into fields of 4 bits, 4 bits, and 8 bits.', {
-            decodeStage: 'split', activeComponents: ['DecodeBoard'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('arrive', 'IR', 'DecodeBoard', ROUTE_IDS.decodeWord), durationWeight: DURATION_WEIGHTS.arrive,
+          phase('decode-load-word', 'Load the complete word', 'The decoder receives the instruction as one complete 16-bit word.', {
+            decodeStage: 'split', decodeBoardStage: 'whole-word', activeComponents: ['DecodeBoard'], transfer: { id: wordTokenId, kind: 'instruction', role: 'instruction', width: 16, value: preset.word, from: 'IR', to: 'DecodeBoard' }, animation: animation('arrive', 'IR', 'DecodeBoard', ROUTE_IDS.decodeWord), durationWeight: DURATION_WEIGHTS.arrive,
+          }),
+          phase('decode-split-groups', 'Separate the bit groups', 'The loaded word separates into groups of 4 bits, 4 bits, and 8 bits.', {
+            decodeStage: 'split', decodeBoardStage: 'segmented', activeComponents: ['DecodeBoard'], animation: animation('arrive', 'DecodeBoard', 'DecodeBoard'), durationWeight: DURATION_WEIGHTS.arrive,
           }),
           phase('decode-label-ranges', 'Label the field ranges', 'Bits 15–12 are the opcode, 11–8 select a register, and 7–0 hold the operand.', {
-            decodeStage: 'split', activeComponents: ['DecodeBoard'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('focus', 'DecodeBoard'), durationWeight: DURATION_WEIGHTS.focus,
+            decodeStage: 'split', decodeBoardStage: 'labeled', activeComponents: ['DecodeBoard'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('focus', 'DecodeBoard'), durationWeight: DURATION_WEIGHTS.focus,
           }),
         ],
       },
@@ -460,13 +463,13 @@ const ComputerArchitectureMachine = (() => {
         summary: `Interpret opcode ${decoded.fields.opcode.bits} as ${decoded.opcodeName}.`,
         phases: [
           phase('decode-focus-opcode', 'Focus bits 15–12', `Opcode bits ${decoded.fields.opcode.bits} are selected.`, {
-            decodeStage: 'opcode', activeField: 'opcode', activeComponents: ['field:opcode'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('focus', 'field:opcode', 'card:opcode', ROUTE_IDS.decodeOpcode), durationWeight: DURATION_WEIGHTS.focus,
+            decodeStage: 'opcode', decodeBoardStage: 'labeled', activeField: 'opcode', activeComponents: ['field:opcode'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('focus', 'field:opcode', 'card:opcode', ROUTE_IDS.decodeOpcode), durationWeight: DURATION_WEIGHTS.focus,
           }),
           phase('decode-move-opcode', 'Convert the opcode value', `${decoded.fields.opcode.bits} is ${decoded.opcode} in decimal.`, {
-            decodeStage: 'opcode', activeField: 'opcode', activeComponents: ['field:opcode', 'card:opcode'], revealedFields: ['opcode', 'register', 'operand'], transfer: { id: fieldToken('opcode'), kind: 'field', role: 'operand', fieldId: 'opcode', width: 4, value: decoded.opcode, from: 'field:opcode', to: 'card:opcode' }, animation: animation('travel', 'field:opcode', 'card:opcode', ROUTE_IDS.decodeOpcode), durationWeight: DURATION_WEIGHTS.travel,
+            decodeStage: 'opcode', decodeBoardStage: 'labeled', activeField: 'opcode', activeComponents: ['field:opcode', 'card:opcode'], revealedFields: ['opcode', 'register', 'operand'], transfer: { id: fieldToken('opcode'), kind: 'field', role: 'operand', fieldId: 'opcode', width: 4, value: decoded.opcode, from: 'field:opcode', to: 'card:opcode' }, animation: animation('travel', 'field:opcode', 'card:opcode', ROUTE_IDS.decodeOpcode), durationWeight: DURATION_WEIGHTS.travel,
           }),
           phase('decode-reveal-opcode', 'Reveal the operation', `Opcode ${decoded.opcode} means ${decoded.opcodeName}.`, {
-            decodeStage: 'opcode', activeField: 'opcode', activeComponents: ['card:opcode'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('arrive', 'field:opcode', 'card:opcode', ROUTE_IDS.decodeOpcode), durationWeight: DURATION_WEIGHTS.arrive,
+            decodeStage: 'opcode', decodeBoardStage: 'labeled', activeField: 'opcode', activeComponents: ['card:opcode'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('arrive', 'field:opcode', 'card:opcode', ROUTE_IDS.decodeOpcode), durationWeight: DURATION_WEIGHTS.arrive,
           }),
         ],
       },
@@ -475,13 +478,13 @@ const ComputerArchitectureMachine = (() => {
         summary: `Interpret register bits ${decoded.fields.register.bits} as R${decoded.register}, the ${profile.registerRole} register.`,
         phases: [
           phase('decode-focus-register', 'Focus bits 11–8', `Register bits ${decoded.fields.register.bits} are selected.`, {
-            decodeStage: 'register', activeField: 'register', activeComponents: ['field:register'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('focus', 'field:register', 'card:register', ROUTE_IDS.decodeRegister), durationWeight: DURATION_WEIGHTS.focus,
+            decodeStage: 'register', decodeBoardStage: 'labeled', activeField: 'register', activeComponents: ['field:register'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('focus', 'field:register', 'card:register', ROUTE_IDS.decodeRegister), durationWeight: DURATION_WEIGHTS.focus,
           }),
           phase('decode-move-register', 'Convert the register index', `${decoded.fields.register.bits} is register index ${decoded.register}.`, {
-            decodeStage: 'register', activeField: 'register', activeComponents: ['field:register', 'card:register'], revealedFields: ['opcode', 'register', 'operand'], transfer: { id: fieldToken('register'), kind: 'field', role: 'operand', fieldId: 'register', width: 4, value: decoded.register, from: 'field:register', to: 'card:register' }, animation: animation('travel', 'field:register', 'card:register', ROUTE_IDS.decodeRegister), durationWeight: DURATION_WEIGHTS.travel,
+            decodeStage: 'register', decodeBoardStage: 'labeled', activeField: 'register', activeComponents: ['field:register', 'card:register'], revealedFields: ['opcode', 'register', 'operand'], transfer: { id: fieldToken('register'), kind: 'field', role: 'operand', fieldId: 'register', width: 4, value: decoded.register, from: 'field:register', to: 'card:register' }, animation: animation('travel', 'field:register', 'card:register', ROUTE_IDS.decodeRegister), durationWeight: DURATION_WEIGHTS.travel,
           }),
           phase('decode-reveal-register', 'Explain the register role', `R${decoded.register} is the ${profile.registerRole} register for ${decoded.opcodeName}.`, {
-            decodeStage: 'register', activeField: 'register', activeComponents: ['card:register'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('arrive', 'field:register', 'card:register', ROUTE_IDS.decodeRegister), durationWeight: DURATION_WEIGHTS.arrive,
+            decodeStage: 'register', decodeBoardStage: 'labeled', activeField: 'register', activeComponents: ['card:register'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('arrive', 'field:register', 'card:register', ROUTE_IDS.decodeRegister), durationWeight: DURATION_WEIGHTS.arrive,
           }),
         ],
       },
@@ -490,13 +493,13 @@ const ComputerArchitectureMachine = (() => {
         summary: `Interpret operand bits ${decoded.fields.operand.bits} as an ${profile.operandKind}.`,
         phases: [
           phase('decode-focus-operand', 'Focus bits 7–0', `Operand bits ${decoded.fields.operand.bits} are selected.`, {
-            decodeStage: 'operand', activeField: 'operand', activeComponents: ['field:operand'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('focus', 'field:operand', 'card:operand', ROUTE_IDS.decodeOperand), durationWeight: DURATION_WEIGHTS.focus,
+            decodeStage: 'operand', decodeBoardStage: 'labeled', activeField: 'operand', activeComponents: ['field:operand'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('focus', 'field:operand', 'card:operand', ROUTE_IDS.decodeOperand), durationWeight: DURATION_WEIGHTS.focus,
           }),
           phase('decode-move-operand', 'Convert the operand value', `${decoded.fields.operand.bits} is ${formatValue(decoded.operand, 8)}.`, {
-            decodeStage: 'operand', activeField: 'operand', activeComponents: ['field:operand', 'card:operand'], revealedFields: ['opcode', 'register', 'operand'], transfer: { id: fieldToken('operand'), kind: 'field', role: 'operand', fieldId: 'operand', width: 8, value: decoded.operand, from: 'field:operand', to: 'card:operand' }, animation: animation('travel', 'field:operand', 'card:operand', ROUTE_IDS.decodeOperand), durationWeight: DURATION_WEIGHTS.travel,
+            decodeStage: 'operand', decodeBoardStage: 'labeled', activeField: 'operand', activeComponents: ['field:operand', 'card:operand'], revealedFields: ['opcode', 'register', 'operand'], transfer: { id: fieldToken('operand'), kind: 'field', role: 'operand', fieldId: 'operand', width: 8, value: decoded.operand, from: 'field:operand', to: 'card:operand' }, animation: animation('travel', 'field:operand', 'card:operand', ROUTE_IDS.decodeOperand), durationWeight: DURATION_WEIGHTS.travel,
           }),
           phase('decode-reveal-operand', `Identify the ${profile.operandKind}`, `${formatValue(decoded.operand, 8)} is used as an ${profile.operandKind}.`, {
-            decodeStage: 'operand', activeField: 'operand', activeComponents: ['card:operand'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('arrive', 'field:operand', 'card:operand', ROUTE_IDS.decodeOperand), durationWeight: DURATION_WEIGHTS.arrive,
+            decodeStage: 'operand', decodeBoardStage: 'labeled', activeField: 'operand', activeComponents: ['card:operand'], revealedFields: ['opcode', 'register', 'operand'], animation: animation('arrive', 'field:operand', 'card:operand', ROUTE_IDS.decodeOperand), durationWeight: DURATION_WEIGHTS.arrive,
           }),
         ],
       },
@@ -505,13 +508,13 @@ const ComputerArchitectureMachine = (() => {
         summary: `Assemble the fields as ${decoded.mnemonic}.`,
         phases: [
           phase('decode-combine-fields', 'Combine the interpreted fields', 'Opcode, register, and operand meanings move into one instruction.', {
-            decodeStage: 'complete', activeComponents: ['DecodeBoard', 'DecodedInstruction'], revealedFields: ['opcode', 'register', 'operand'], transfer: { id: `decode-assembly:${preset.id}`, kind: 'instruction', role: 'instruction', width: 16, value: preset.word, from: 'DecodeBoard', to: 'DecodedInstruction' }, animation: animation('travel', 'DecodeBoard', 'DecodedInstruction', ROUTE_IDS.decodeAssemble), durationWeight: DURATION_WEIGHTS.travel,
+            decodeStage: 'complete', decodeBoardStage: 'labeled', activeComponents: ['DecodeBoard', 'DecodedInstruction'], revealedFields: ['opcode', 'register', 'operand'], transfer: { id: `decode-assembly:${preset.id}`, kind: 'instruction', role: 'instruction', width: 16, value: preset.word, from: 'DecodeBoard', to: 'DecodedInstruction' }, animation: animation('travel', 'DecodeBoard', 'DecodedInstruction', ROUTE_IDS.decodeAssemble), durationWeight: DURATION_WEIGHTS.travel,
           }),
           phase('decode-reveal-mnemonic', 'Reveal the complete instruction', `The complete instruction is ${decoded.mnemonic}.`, {
-            decodeStage: 'complete', activeComponents: ['DecodedInstruction'], revealedFields: ['opcode', 'register', 'operand'], decodedAvailable: true, animation: animation('arrive', 'DecodeBoard', 'DecodedInstruction', ROUTE_IDS.decodeAssemble), durationWeight: DURATION_WEIGHTS.arrive,
+            decodeStage: 'complete', decodeBoardStage: 'labeled', activeComponents: ['DecodedInstruction'], revealedFields: ['opcode', 'register', 'operand'], decodedAvailable: true, animation: animation('arrive', 'DecodeBoard', 'DecodedInstruction', ROUTE_IDS.decodeAssemble), durationWeight: DURATION_WEIGHTS.arrive,
           }),
           phase('decode-explain-next-action', 'State what the CPU does next', profile.nextAction, {
-            decodeStage: 'complete', activeComponents: ['DecodedInstruction'], revealedFields: ['opcode', 'register', 'operand'], decodedAvailable: true, animation: animation('focus', 'DecodedInstruction'), terminal: true, durationWeight: DURATION_WEIGHTS.focus,
+            decodeStage: 'complete', decodeBoardStage: 'labeled', activeComponents: ['DecodedInstruction'], revealedFields: ['opcode', 'register', 'operand'], decodedAvailable: true, animation: animation('focus', 'DecodedInstruction'), terminal: true, durationWeight: DURATION_WEIGHTS.focus,
           }),
         ],
       },
@@ -543,7 +546,7 @@ const ComputerArchitectureMachine = (() => {
           instruction: Object.freeze({
             id: `instruction-word:${preset.id}`, word: preset.word, available: true, decoded: !!spec.decodedAvailable,
             opcodeName: decoded.opcodeName, mnemonic: decoded.mnemonic, fields: decoded.fields,
-            decodeStage: spec.decodeStage || 'locate', activeField: spec.activeField || null, revealedFields,
+            decodeStage: spec.decodeStage || 'locate', decodeBoardStage: spec.decodeBoardStage || 'empty', activeField: spec.activeField || null, revealedFields,
             registerRole: profile.registerRole, operandKind: profile.operandKind, nextAction: profile.nextAction,
           }),
           transfer,

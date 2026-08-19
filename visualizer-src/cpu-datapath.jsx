@@ -4,12 +4,12 @@ import { m } from 'motion/react';
 const DATAPATH_ROUTES = Object.freeze([
   Object.freeze({ id: 'pc-mar', from: 'PC', to: 'MAR', d: 'M480 106 H525', x: [480, 525], y: [106, 106], times: [0, 1], tone: 'address-path' }),
   Object.freeze({ id: 'mar-memory', from: 'MAR', to: 'memory', d: 'M590 72 V60 H246', x: [590, 590, 246], y: [72, 60, 60], times: [0, .05, 1], tone: 'address-path' }),
-  Object.freeze({ id: 'memory-mdr', from: 'memory', to: 'MDR', d: 'M246 372 H525', x: [246, 525], y: [372, 372], times: [0, 1], tone: 'data-path' }),
-  Object.freeze({ id: 'mdr-ir', from: 'MDR', to: 'IR', d: 'M655 372 H675 V106 H700', x: [655, 675, 675, 700], y: [372, 372, 106, 106], times: [0, .08, .9, 1], tone: 'data-path' }),
+  Object.freeze({ id: 'memory-mdr', from: 'memory', to: 'MDR', d: 'M246 372 H350', x: [246, 350], y: [372, 372], times: [0, 1], tone: 'data-path' }),
+  Object.freeze({ id: 'mdr-ir', from: 'MDR', to: 'IR', d: 'M480 372 H742 V150 H680 V106 H700', x: [480, 742, 742, 680, 680, 700], y: [372, 372, 150, 150, 106, 106], times: [0, .37, .69, .78, .94, 1], tone: 'data-path' }),
   Object.freeze({ id: 'ir-decoder', from: 'IR', to: 'Decoder', d: 'M870 106 H930', x: [870, 930], y: [106, 106], times: [0, 1], tone: 'data-path' }),
-  Object.freeze({ id: 'r1-alu', from: 'R1', to: 'ALU', d: 'M486 252 V304 H710 V338', x: [486, 486, 710, 710], y: [252, 304, 304, 338], times: [0, .13, .87, 1], tone: 'operand-path' }),
-  Object.freeze({ id: 'decoder-alu', from: 'Decoder', to: 'ALU', d: 'M1005 140 V156 H740 V372', x: [1005, 1005, 740, 740], y: [140, 156, 156, 372], times: [0, .07, .65, 1], tone: 'operand-path' }),
-  Object.freeze({ id: 'alu-r1', from: 'ALU', to: 'R1', d: 'M710 338 V304 H486 V252', x: [710, 710, 486, 486], y: [338, 304, 304, 252], times: [0, .13, .87, 1], tone: 'result-path' }),
+  Object.freeze({ id: 'r1-alu', from: 'R1', to: 'ALU', d: 'M486 252 V282 H542 V326', x: [486, 486, 542, 542], y: [252, 282, 282, 326], times: [0, .22, .73, 1], tone: 'operand-path' }),
+  Object.freeze({ id: 'decoder-alu', from: 'Decoder', to: 'ALU', d: 'M1005 140 V156 H720 V278 H608 V326', x: [1005, 1005, 720, 720, 608, 608], y: [140, 156, 156, 278, 278, 326], times: [0, .05, .46, .65, .89, 1], tone: 'operand-path' }),
+  Object.freeze({ id: 'alu-r1', from: 'ALU', to: 'R1', d: 'M514 394 H494 V282 H486 V252', x: [514, 494, 494, 486, 486], y: [394, 394, 282, 282, 252], times: [0, .12, .74, .88, 1], tone: 'result-path' }),
 ]);
 
 const CONTROL_CONNECTIONS = Object.freeze([
@@ -19,8 +19,8 @@ const CONTROL_CONNECTIONS = Object.freeze([
   Object.freeze({ id: 'control-decoder', d: 'M962 170 V156 H1005 V140', x: [962, 962, 1005, 1005], y: [170, 156, 156, 140], times: [0, .2, .8, 1], signals: Object.freeze(['IMMout']) }),
   Object.freeze({ id: 'control-r1', d: 'M800 170 V158 H486 V184', x: [800, 800, 486, 486], y: [170, 158, 158, 184], times: [0, .08, .92, 1], signals: Object.freeze(['R1out', 'R1in']) }),
   Object.freeze({ id: 'control-memory', d: 'M760 280 H738 V310 H266 V286 H246', x: [760, 738, 738, 266, 266, 246], y: [280, 280, 310, 310, 286, 286], times: [0, .06, .15, .78, .92, 1], signals: Object.freeze(['READ', 'MFC']) }),
-  Object.freeze({ id: 'control-mdr', d: 'M760 328 H660 V372 H655', x: [760, 660, 660, 655], y: [328, 328, 372, 372], times: [0, .58, .94, 1], signals: Object.freeze(['MDRin', 'MDRout']) }),
-  Object.freeze({ id: 'control-alu', d: 'M760 354 H745', x: [760, 745], y: [354, 354], times: [0, 1], signals: Object.freeze(['ALUinA', 'ALUinB', 'ALUadd', 'ALUout']) }),
+  Object.freeze({ id: 'control-mdr', d: 'M760 328 H742 V372 H480', x: [760, 742, 742, 480], y: [328, 328, 372, 372], times: [0, .08, .2, 1], signals: Object.freeze(['MDRin', 'MDRout']) }),
+  Object.freeze({ id: 'control-alu', d: 'M760 354 H730', x: [760, 730], y: [354, 354], times: [0, 1], signals: Object.freeze(['ALUinA', 'ALUinB', 'ALUadd', 'ALUout']) }),
 ]);
 
 function format(value, width, numberFormat) {
@@ -101,22 +101,58 @@ function ValueCue({ route, transfer, motionMode, spawnHoldDuration, movementDura
   </g>;
 }
 
-function ControlCue({ cue, route, motionMode, spawnHoldDuration, movementDuration, staggerDuration }) {
+function ControlCue({ cue, route, motionMode, spawnHoldDuration, movementDuration, durationUnit }) {
   if (!cue || !route) return null;
   const reversed = cue.direction === 'to-cu';
   const x = reversed ? [...route.x].reverse() : route.x;
   const y = reversed ? [...route.y].reverse() : route.y;
   const times = reversed ? route.times.map((value) => 1 - value).reverse() : route.times;
-  const departureStagger = (cue.order - 1) * staggerDuration;
-  const delay = spawnHoldDuration + departureStagger;
-  const cueDuration = Math.max(.2, movementDuration - departureStagger);
+  const activationDelay = durationUnit * (cue.activationOffsetUnits || 0);
+  const delay = activationDelay + spawnHoldDuration;
   const animate = motionMode === 'on' && movementDuration > 0;
   const last = x.length - 1;
-  const width = Math.max(44, 18 + cue.signalId.length * 6.4);
-  const content = <g className="cpu-control-pill"><rect x={-width / 2} y="-10" width={width} height="20" rx="10"/><text x="0" y="4" textAnchor="middle">{cue.signalId}</text></g>;
-  return <g className="cpu-control-cue" data-control-cue-id={cue.id} data-signal-direction={cue.direction} data-cue-origin={cue.originId} data-retain-at-endpoint="true">
-    {animate ? <m.g data-motion-role="control-signal" initial={{ x: x[0], y: y[0], opacity: 1 }} animate={{ x, y, opacity: 1 }} transition={{ x: { delay, duration: cueDuration, ease: 'easeInOut', times }, y: { delay, duration: cueDuration, ease: 'easeInOut', times }, opacity: { duration: 0 } }}>{content}</m.g>
+  const width = Math.max(52, 18 + cue.label.length * 6.4);
+  const content = <g className="cpu-control-pill"><rect x={-width / 2} y="-10" width={width} height="20" rx="10"/><text x="0" y="4" textAnchor="middle">{cue.label}</text></g>;
+  return <g className="cpu-control-cue" data-control-cue-id={cue.id} data-control-signal-id={cue.signalId} data-signal-direction={cue.direction} data-cue-origin={cue.originId} data-cue-order={cue.order} data-cue-role={cue.semanticRole} data-activation-delay-ms={Math.round(activationDelay * 1000)} data-retain-at-endpoint="true">
+    {animate ? <m.g data-motion-role="control-signal" initial={{ x: x[0], y: y[0], opacity: 0 }} animate={{ x, y, opacity: 1 }} transition={{ x: { delay, duration: movementDuration, ease: 'easeInOut', times }, y: { delay, duration: movementDuration, ease: 'easeInOut', times }, opacity: { delay: activationDelay, duration: .01 } }}>{content}</m.g>
       : <g className="is-static" data-motion-role="control-signal" transform={`translate(${x[last]} ${y[last]})`}>{content}</g>}
+  </g>;
+}
+
+function AluSvg({ execution, animationMetadata }) {
+  const alu = execution?.alu || { stage: 'idle', inputA: null, inputB: null, operation: null, result: null };
+  const state = componentState(animationMetadata, 'ALU');
+  const resultEmitting = isTransferSource(animationMetadata, 'ALU');
+  const inputAActive = ['loading-a', 'input-a'].includes(alu.stage);
+  const inputBActive = ['loading-b', 'inputs-ready'].includes(alu.stage);
+  const operationActive = alu.stage === 'operation';
+  const resultActive = ['result', 'output', 'complete'].includes(alu.stage);
+  return <g className={`cpu-component cpu-context-unit cpu-alu-unit ${state}`} data-component-id="ALU" data-component-state={state || 'idle'} data-alu-stage={alu.stage} data-alu-input-a={alu.inputA ?? ''} data-alu-input-b={alu.inputB ?? ''} data-alu-operation={alu.operation ?? ''} data-alu-result={alu.result ?? ''}>
+    <rect className="cpu-alu-shell" x="500" y="292" width="230" height="134" rx="10"/>
+    <text className="cpu-svg-label" x="514" y="314">TEACHING ALU</text>
+    <text className="cpu-svg-width" x="716" y="314" textAnchor="end">16-bit</text>
+    <g className={`cpu-alu-slot is-input-a ${inputAActive ? 'is-active' : ''}`}>
+      <rect x="514" y="324" width="58" height="38" rx="6"/>
+      <text className="cpu-alu-slot-label" x="543" y="338" textAnchor="middle">INPUT A</text>
+      <text className="cpu-alu-slot-value" x="543" y="354" textAnchor="middle">{alu.inputA ?? '—'}</text>
+    </g>
+    <g className={`cpu-alu-slot is-input-b ${inputBActive ? 'is-active' : ''}`}>
+      <rect x="579" y="324" width="58" height="38" rx="6"/>
+      <text className="cpu-alu-slot-label" x="608" y="338" textAnchor="middle">INPUT B</text>
+      <text className="cpu-alu-slot-value" x="608" y="354" textAnchor="middle">{alu.inputB ?? '—'}</text>
+    </g>
+    <g className={`cpu-alu-slot is-operation ${operationActive ? 'is-active' : ''}`}>
+      <rect x="644" y="324" width="72" height="38" rx="6"/>
+      <text className="cpu-alu-slot-label" x="680" y="338" textAnchor="middle">OPERATION</text>
+      <text className="cpu-alu-slot-value" x="680" y="354" textAnchor="middle">{alu.operation ?? '—'}</text>
+    </g>
+    <path className="cpu-alu-internal-path" d="M543 362 V370 H680 M608 362 V370 H680 M680 362 V374"/>
+    <g className={`cpu-alu-slot is-result ${resultActive ? 'is-active' : ''}`}>
+      <rect x="514" y="374" width="202" height="38" rx="6"/>
+      <text className="cpu-alu-slot-label" x="526" y="389">RESULT LATCH</text>
+      <text className={`cpu-alu-result-value ${resultEmitting ? 'is-emitting' : ''}`} data-source-pulse={resultEmitting ? 'ALU' : undefined} x="702" y="400" textAnchor="end">{alu.result ?? '—'}</text>
+      {alu.result != null ? <text className="cpu-alu-equation" x="615" y="400" textAnchor="middle">{execution.left} + {execution.right} = {execution.result}</text> : null}
+    </g>
   </g>;
 }
 
@@ -156,11 +192,12 @@ export const CpuDatapathRenderer = memo(function CpuDatapathRenderer({ frame, nu
   const registers = frame.registers || {};
   const activeComponents = new Set(frame.activeComponents || []);
   const activeSignals = frame.signals.filter((signal) => signal.active);
-  const activeSignalIds = new Set(activeSignals.map((signal) => signal.id));
   const animationMetadata = frame.animation || { stage: transfer ? 'travel' : 'focus', sourceId: [...activeComponents][0] || null, targetId: transfer?.to || null, routeId: null, controlCues: [] };
+  const orderedControlCues = [...(animationMetadata.controlCues || [])].sort((left, right) => left.order - right.order);
+  const activeSignalById = new Map(activeSignals.map((signal) => [signal.id, signal]));
+  const orderedSignals = orderedControlCues.length ? orderedControlCues.map((cue) => activeSignalById.get(cue.signalId)).filter(Boolean) : activeSignals;
   const activeRoute = DATAPATH_ROUTES.find((route) => route.id === animationMetadata.routeId)
     || (transfer ? DATAPATH_ROUTES.find((route) => route.from === transfer.from && route.to === transfer.to) : null);
-  const activeControlRoutes = CONTROL_CONNECTIONS.filter((route) => route.signals.some((signal) => activeSignalIds.has(signal)));
   const showDataRoute = activeRoute && animationMetadata.stage === 'travel';
   const showControlRoutes = animationMetadata.stage === 'arm';
   const timing = animationMetadata.timing || { spawnHoldUnits: 0, movementUnits: 0, retainAtEndpoint: false };
@@ -168,22 +205,24 @@ export const CpuDatapathRenderer = memo(function CpuDatapathRenderer({ frame, nu
   const durationUnit = duration > 0 ? duration / phaseWeight : 0;
   const spawnHoldDuration = durationUnit * timing.spawnHoldUnits;
   const movementDuration = durationUnit * timing.movementUnits;
-  const staggerDuration = durationUnit * .21;
-  const controlPulseSignals = new Set(animationMetadata.stage === 'arm'
-    ? (animationMetadata.controlCues || []).filter((cue) => cue.originId === 'CONTROL').map((cue) => cue.signalId)
-    : []);
+  const finalCueActivationDelay = durationUnit * (orderedControlCues.at(-1)?.activationOffsetUnits || 0);
+  const controlCueBySignal = new Map(orderedControlCues.map((cue) => [cue.signalId, cue]));
+  const controlPulseSignals = new Set(animationMetadata.stage === 'arm' ? orderedControlCues.filter((cue) => cue.originId === 'CONTROL').map((cue) => cue.signalId) : []);
   const execution = frame.execution || null;
   const aluDetail = execution?.status === 'calculated' || execution?.resultAvailable ? `${execution.left} + ${execution.right} = ${execution.result}` : componentState(animationMetadata, 'ALU') ? 'ready for input' : 'idle';
   const transferText = transfer ? `${transfer.from} transfers ${format(transfer.value, transfer.width, numberFormat)} to ${transfer.to}.` : frame.displayStep.detail;
-  const signalText = activeSignals.map((signal) => signal.label).join(', ') || 'none';
+  const signalText = orderedSignals.map((signal) => signal.label).join(' → ') || 'none';
+  const signalSequenceText = orderedSignals.length > 1
+    ? orderedSignals.map((signal, index) => `${index === 0 ? 'First' : index === orderedSignals.length - 1 ? 'Then' : 'Next'}: ${signal.description}`).join(' ')
+    : orderedSignals.map((signal) => signal.description).join(' ');
   const teachingText = activeSignals.length
-    ? activeSignals.map((signal) => signal.description).join(' ')
+    ? signalSequenceText
     : frame.displayStep.detail;
   const nextText = nextTeachingNote(frame, numberFormat);
   const stageText = animationMetadata.stage === 'focus'
     ? `${animationMetadata.sourceId} is highlighted as the source.`
     : animationMetadata.stage === 'arm'
-      ? `The control unit sends ${signalText}.`
+      ? `${signalSequenceText} These cues are ordered for explanation inside one operation.`
       : animationMetadata.stage === 'travel'
         ? transferText
         : `${animationMetadata.targetId || animationMetadata.sourceId} receives the value.`;
@@ -213,7 +252,11 @@ export const CpuDatapathRenderer = memo(function CpuDatapathRenderer({ frame, nu
 
       <g className="cpu-svg-layer cpu-active-route-layer" data-layer="active-connections">
         {showDataRoute ? <m.path className={`cpu-path-trace ${activeRoute.tone} is-${animationMetadata.stage}`} d={activeRoute.d} data-active-route-id={activeRoute.id} initial={motionMode === 'on' && animationMetadata.stage === 'travel' ? { pathLength: 0, opacity: .35 } : false} animate={{ pathLength: 1, opacity: 1 }} transition={{ duration: motionMode === 'on' && animationMetadata.stage === 'travel' ? Math.min(duration * .34, .3) : 0, ease: 'easeOut' }}/> : null}
-        {showControlRoutes ? activeControlRoutes.map((connection) => <path className="cpu-control-path is-active" d={connection.d} data-active-control-id={connection.id} key={connection.id}/>) : null}
+        {showControlRoutes ? orderedControlCues.map((cue) => {
+          const connection = CONTROL_CONNECTIONS.find((route) => route.id === cue.routeId);
+          const activationDelay = durationUnit * (cue.activationOffsetUnits || 0);
+          return <m.path className="cpu-control-path is-active" d={connection.d} data-active-control-id={connection.id} data-control-signal-id={cue.signalId} data-cue-order={cue.order} initial={motionMode === 'on' ? { pathLength: 0, opacity: 0 } : false} animate={{ pathLength: 1, opacity: 1 }} transition={{ pathLength: { delay: activationDelay + spawnHoldDuration, duration: Math.min(movementDuration, .34), ease: 'easeOut' }, opacity: { delay: activationDelay + spawnHoldDuration, duration: .08 } }} key={cue.id}/>;
+        }) : null}
       </g>
 
       <g className="cpu-svg-layer cpu-component-layer" data-layer="components-and-text">
@@ -245,42 +288,50 @@ export const CpuDatapathRenderer = memo(function CpuDatapathRenderer({ frame, nu
           })}
         </g>
 
-        <RegisterBox id="MDR" x={525} y={338} register={registers.MDR} animationMetadata={animationMetadata} numberFormat={numberFormat}/>
-        <g className={`cpu-component cpu-context-unit cpu-alu-unit ${componentState(animationMetadata, 'ALU')}`} data-component-id="ALU" data-component-state={componentState(animationMetadata, 'ALU') || 'idle'}>
-          <rect x="675" y="338" width="70" height="68" rx="8"/>
-          <text className="cpu-svg-label" x="710" y="365" textAnchor="middle">ALU</text>
-          <text className={`cpu-svg-muted cpu-svg-alu-equation ${isTransferSource(animationMetadata, 'ALU') ? 'is-emitting' : ''}`} data-source-pulse={isTransferSource(animationMetadata, 'ALU') ? 'ALU' : undefined} x="710" y="389" textAnchor="middle">{aluDetail}</text>
-        </g>
+        <RegisterBox id="MDR" x={350} y={338} register={registers.MDR} animationMetadata={animationMetadata} numberFormat={numberFormat}/>
+        <AluSvg execution={execution} animationMetadata={animationMetadata}/>
 
         <g className={`cpu-component cpu-control-unit ${activeSignals.length ? 'is-active' : ''}`} data-component-id="CONTROL" data-component-state={activeSignals.length ? 'active' : 'idle'}>
-          <rect x="760" y="170" width="320" height="250" rx="11"/>
+          <rect x="760" y="170" width="320" height="270" rx="11"/>
           <text className="cpu-svg-label" x="782" y="199">CONTROL UNIT</text>
           <text className="cpu-svg-signal-label" x="782" y="222">CONTROL SIGNALS</text>
-          {activeSignals.length ? activeSignals.map((signal, index) => <g className={controlPulseSignals.has(signal.id) ? 'is-emitting' : ''} data-source-pulse={controlPulseSignals.has(signal.id) ? `CONTROL:${signal.id}` : undefined} key={signal.id}>
-            <rect className="cpu-signal-chip" x={782 + (index % 4) * 70} y={232 + Math.floor(index / 4) * 28} width="62" height="22" rx="5"/>
-            <text className="cpu-svg-signal" x={813 + (index % 4) * 70} y={247 + Math.floor(index / 4) * 28} textAnchor="middle">{signal.label}</text>
-          </g>) : <text className="cpu-svg-muted" x="782" y="248">No control signal is active</text>}
-          <path className="cpu-control-divider" d="M782 272 H1058"/>
-          <text className="cpu-svg-signal-label" x="782" y="294">WHAT IS HAPPENING</text>
-          <SvgTeachingNote className="cpu-svg-guidance" text={teachingText} x={782} y={315}/>
-          <text className="cpu-svg-signal-label cpu-svg-next-label" x="782" y="360">UP NEXT</text>
-          <SvgTeachingNote className="cpu-svg-guidance cpu-svg-next" text={nextText} x={782} y={381}/>
+          {orderedSignals.length ? orderedSignals.map((signal, index) => {
+            const cue = controlCueBySignal.get(signal.id);
+            const cueDelay = durationUnit * (cue?.activationOffsetUnits || 0);
+            return <m.g className={controlPulseSignals.has(signal.id) ? 'is-emitting' : ''} data-source-pulse={controlPulseSignals.has(signal.id) ? `CONTROL:${signal.id}` : undefined} data-cue-order={cue?.order} initial={motionMode === 'on' && cue ? { opacity: cue.order === 1 ? 1 : .34 } : false} animate={{ opacity: 1 }} transition={{ delay: cueDelay, duration: .08 }} style={{ '--cpu-cue-delay': `${cueDelay}s` }} key={signal.id}>
+              <rect className="cpu-signal-chip" x={782 + (index % 3) * 90} y={232 + Math.floor(index / 3) * 28} width="82" height="22" rx="5"/>
+              <text className="cpu-svg-signal" x={823 + (index % 3) * 90} y={247 + Math.floor(index / 3) * 28} textAnchor="middle">{cue ? `${cue.order} · ${signal.label}` : signal.label}</text>
+            </m.g>;
+          }) : <text className="cpu-svg-muted" x="782" y="248">No control signal is active</text>}
+          <path className="cpu-control-divider" d="M782 292 H1058"/>
+          <text className="cpu-svg-signal-label" x="782" y="314">WHAT IS HAPPENING</text>
+          <SvgTeachingNote className="cpu-svg-guidance" text={teachingText} x={782} y={335}/>
+          <text className="cpu-svg-signal-label cpu-svg-next-label" x="782" y="380">UP NEXT</text>
+          <SvgTeachingNote className="cpu-svg-guidance cpu-svg-next" text={nextText} x={782} y={401}/>
+          {orderedSignals.length > 1 ? <text className="cpu-svg-sequence-note" x="782" y="430">Teaching order · one semantic operation</text> : null}
         </g>
       </g>
 
       <g className="cpu-svg-layer cpu-cue-layer" data-layer="traveling-cues-and-arrivals">
-        {animationMetadata.stage === 'arm' ? (animationMetadata.controlCues || []).map((cue) => <ControlCue cue={cue} route={CONTROL_CONNECTIONS.find((route) => route.id === cue.routeId)} motionMode={motionMode} spawnHoldDuration={spawnHoldDuration} movementDuration={movementDuration} staggerDuration={staggerDuration} key={cue.id}/>) : null}
+        {animationMetadata.stage === 'arm' ? orderedControlCues.map((cue) => <ControlCue cue={cue} route={CONTROL_CONNECTIONS.find((route) => route.id === cue.routeId)} motionMode={motionMode} spawnHoldDuration={spawnHoldDuration} movementDuration={movementDuration} durationUnit={durationUnit} key={cue.id}/>) : null}
         {animationMetadata.stage === 'travel' ? <ValueCue route={activeRoute} transfer={transfer} motionMode={motionMode} spawnHoldDuration={spawnHoldDuration} movementDuration={movementDuration} numberFormat={numberFormat}/> : null}
       </g>
     </svg>
 
-    <div className="cpu-mobile-transfer" aria-label="Current CPU explanation">
+    <div className={`cpu-mobile-transfer ${execution ? 'has-execution' : ''}`} aria-label="Current CPU explanation">
       <span className="cpu-mobile-phase">Operation {frame.operation.index} / {frame.operation.total} · {frame.operation.label}</span>
       <div className={`cpu-mobile-control-unit ${controlPulseSignals.size ? 'is-emitting' : ''}`}><strong>Control Unit</strong><span>{activeSignals.map((signal) => signal.label).join(' · ') || 'No active signal'}</span></div>
       {animationMetadata.stage === 'focus' ? <div className="cpu-mobile-focus-scene"><div><span>Source component</span><b>{animationMetadata.sourceId}</b><code>{mobileSourceValue}</code></div><p>{frame.displayStep.detail}</p></div> : <div className="cpu-mobile-active-path" data-animation-stage={animationMetadata.stage}>
-        <b className={`${componentState(animationMetadata, animationMetadata.sourceId)} ${animationMetadata.stage === 'travel' ? 'is-emitting' : ''}`}>{mobilePath.from}</b><span className={animationMetadata.stage === 'travel' || animationMetadata.stage === 'arm' ? 'is-live' : ''}><m.i initial={{ x: '0%' }} animate={motionMode === 'on' && (animationMetadata.stage === 'travel' || animationMetadata.stage === 'arm') ? { x: ['0%', '500%'] } : { x: '500%' }} transition={{ delay: spawnHoldDuration, duration: movementDuration, ease: 'linear' }}/></span><strong className={animationMetadata.stage === 'arm' ? 'is-control-cue' : ''}>{mobilePath.value}</strong><span className={animationMetadata.stage === 'travel' || animationMetadata.stage === 'arm' ? 'is-live' : ''}><m.i initial={{ x: '0%' }} animate={motionMode === 'on' && (animationMetadata.stage === 'travel' || animationMetadata.stage === 'arm') ? { x: ['0%', '500%'] } : { x: '500%' }} transition={{ delay: spawnHoldDuration + staggerDuration, duration: Math.max(.2, movementDuration - staggerDuration), ease: 'linear' }}/></span><b className={componentState(animationMetadata, animationMetadata.targetId)}>{mobilePath.to}</b>
+        <b className={`${componentState(animationMetadata, animationMetadata.sourceId)} ${animationMetadata.stage === 'travel' ? 'is-emitting' : ''}`}>{mobilePath.from}</b><span className={animationMetadata.stage === 'travel' || animationMetadata.stage === 'arm' ? 'is-live' : ''}><m.i initial={{ x: '0%' }} animate={motionMode === 'on' && (animationMetadata.stage === 'travel' || animationMetadata.stage === 'arm') ? { x: ['0%', '500%'] } : { x: '500%' }} transition={{ delay: spawnHoldDuration, duration: movementDuration, ease: 'linear' }}/></span><strong className={animationMetadata.stage === 'arm' ? 'is-control-cue' : ''}>{mobilePath.value}</strong><span className={animationMetadata.stage === 'travel' || animationMetadata.stage === 'arm' ? 'is-live' : ''}><m.i initial={{ x: '0%' }} animate={motionMode === 'on' && (animationMetadata.stage === 'travel' || animationMetadata.stage === 'arm') ? { x: ['0%', '500%'] } : { x: '500%' }} transition={{ delay: spawnHoldDuration + finalCueActivationDelay, duration: movementDuration, ease: 'linear' }}/></span><b className={componentState(animationMetadata, animationMetadata.targetId)}>{mobilePath.to}</b>
       </div>}
       <div className="cpu-mobile-bus-legend"><span>Address bus</span><span>Data bus</span><span>Control bus</span></div>
+      {execution ? <div className="cpu-mobile-alu" data-alu-stage={execution.alu.stage}>
+        <strong>Teaching ALU</strong>
+        <span><small>Input A</small><b>{execution.alu.inputA ?? '—'}</b></span>
+        <span><small>Input B</small><b>{execution.alu.inputB ?? '—'}</b></span>
+        <span><small>Operation</small><b>{execution.alu.operation ?? '—'}</b></span>
+        <span><small>Result</small><b>{execution.alu.result ?? '—'}</b></span>
+      </div> : null}
       <div className="cpu-mobile-context-strip">
         {['PC','MAR','MDR','IR','R1'].map((id) => <span className={componentState(animationMetadata, id)} key={id}><small>{id}</small><code>{format(registers[id].value, registers[id].width, numberFormat)}</code></span>)}
         {['Decoder','ALU','Memory'].map((id) => <span className={componentState(animationMetadata, id === 'Memory' ? 'memory' : id)} key={id}><small>{id}</small><code>{id === 'Memory' ? frame.memory.state : id === 'ALU' && execution?.resultAvailable ? String(execution.result) : 'idle'}</code></span>)}

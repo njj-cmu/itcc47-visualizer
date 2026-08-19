@@ -65,6 +65,7 @@ const ComputerArchitectureMachine = (() => {
     decodeOperand: 'decode-operand', decodeAssemble: 'decode-assemble',
   });
   const CUE_SPAWN_HOLD_UNITS = 1.54;
+  const CONTROL_CUE_SEQUENCE_GAP_UNITS = 0.58;
   const ANIMATION_TIMING = Object.freeze({
     focus: Object.freeze({ spawnHoldUnits: 0, movementUnits: 0, retainAtEndpoint: false }),
     arm: Object.freeze({ spawnHoldUnits: CUE_SPAWN_HOLD_UNITS, movementUnits: 1.25, retainAtEndpoint: true }),
@@ -72,6 +73,11 @@ const ComputerArchitectureMachine = (() => {
     arrive: Object.freeze({ spawnHoldUnits: 0, movementUnits: 0, retainAtEndpoint: false }),
   });
   const DURATION_WEIGHTS = Object.freeze({ focus: 0.87, arm: 2.79, travel: 3.27, arrive: 0.77 });
+  const CONTROL_CUE_ROLES = Object.freeze({
+    PCout: 'source-enable', MARout: 'source-enable', MDRout: 'source-enable', R1out: 'source-enable', IMMout: 'source-enable', ALUout: 'source-enable',
+    MARin: 'destination-latch', MDRin: 'destination-latch', IRin: 'destination-latch', ALUinA: 'destination-latch', ALUinB: 'destination-latch', R1in: 'destination-latch',
+    READ: 'memory-request', MFC: 'memory-complete', PCinc: 'state-update', ALUadd: 'alu-operation',
+  });
   const CONTROL_CUE_BY_SIGNAL = Object.freeze({
     PCout: Object.freeze({ routeId: 'control-pc', direction: 'from-cu' }),
     PCinc: Object.freeze({ routeId: 'control-pc', direction: 'from-cu' }),
@@ -202,7 +208,11 @@ const ComputerArchitectureMachine = (() => {
   }
 
   function phase(id, label, message, options = {}) {
-    return Object.freeze({ id, label, message, durationWeight: options.durationWeight || 1, ...options });
+    const cueCount = Array.isArray(options.signals) ? options.signals.length : 0;
+    const sequenceExtension = options.durationWeight === DURATION_WEIGHTS.arm && cueCount > 1
+      ? (cueCount - 1) * CONTROL_CUE_SEQUENCE_GAP_UNITS
+      : 0;
+    return Object.freeze({ id, label, message, ...options, durationWeight: (options.durationWeight || 1) + sequenceExtension });
   }
 
   function animation(stage, sourceId, targetId = null, routeId = null) {
@@ -217,10 +227,13 @@ const ComputerArchitectureMachine = (() => {
       return Object.freeze({
         id: `control-cue:${phaseId}:${signalId}`,
         signalId,
+        label: SIGNAL_DEFINITIONS[signalId].label,
         routeId: route.routeId,
         direction: route.direction,
         originId: route.direction === 'to-cu' ? 'memory' : 'CONTROL',
         order: index + 1,
+        semanticRole: CONTROL_CUE_ROLES[signalId],
+        activationOffsetUnits: index * CONTROL_CUE_SEQUENCE_GAP_UNITS,
       });
     }));
   }
@@ -295,20 +308,20 @@ const ComputerArchitectureMachine = (() => {
         id: 'r1-alu-a', label: EXECUTION_MICRO_OPERATION_LABELS[6],
         summary: `Send R1 value ${left} to ALU input A.`,
         phases: [
-          phase('focus-r1', 'Focus R1', `R1 is the source and holds ${left}.`, { activeComponents: ['R1'], animation: animation('focus', 'R1', 'ALU', ROUTE_IDS.r1Alu), executionPatch: { status: 'loading-operands', activeOperand: 'left' }, durationWeight: DURATION_WEIGHTS.focus }),
+          phase('focus-r1', 'Focus R1', `R1 is the source and holds ${left}.`, { activeComponents: ['R1'], animation: animation('focus', 'R1', 'ALU', ROUTE_IDS.r1Alu), executionPatch: { status: 'loading-operands', activeOperand: 'left', alu: { stage: 'loading-a' } }, durationWeight: DURATION_WEIGHTS.focus }),
           phase('enable-r1-alu', 'Enable R1 and ALU A', 'The control unit turns on R1-out and ALU-A-in.', { signals: ['R1out', 'ALUinA'], activeComponents: ['R1', 'ALU'], animation: animation('arm', 'R1', 'ALU', ROUTE_IDS.r1Alu), durationWeight: DURATION_WEIGHTS.arm }),
           phase('move-r1-alu', 'Move operand 5', `${left} travels from R1 to ALU input A.`, { signals: ['R1out', 'ALUinA'], transfer: { id: `left-operand:${preset.id}`, kind: 'operand', role: 'operand', width: 16, value: left, from: 'R1', to: 'ALU' }, animation: animation('travel', 'R1', 'ALU', ROUTE_IDS.r1Alu), durationWeight: DURATION_WEIGHTS.travel }),
-          phase('latch-alu-a', 'Latch ALU input A', `ALU input A now holds ${left}.`, { activeComponents: ['ALU'], animation: animation('arrive', 'R1', 'ALU', ROUTE_IDS.r1Alu), durationWeight: DURATION_WEIGHTS.arrive }),
+          phase('latch-alu-a', 'Latch ALU input A', `ALU input A now holds ${left}.`, { activeComponents: ['ALU'], animation: animation('arrive', 'R1', 'ALU', ROUTE_IDS.r1Alu), executionPatch: { alu: { stage: 'input-a', inputA: left } }, durationWeight: DURATION_WEIGHTS.arrive }),
         ],
       },
       {
         id: 'immediate-alu-b', label: EXECUTION_MICRO_OPERATION_LABELS[7],
         summary: `Send immediate value ${right} to ALU input B.`,
         phases: [
-          phase('focus-immediate', 'Focus the decoded immediate', `The decoder supplies immediate value ${right}.`, { activeComponents: ['Decoder'], animation: animation('focus', 'Decoder', 'ALU', ROUTE_IDS.decoderAlu), executionPatch: { status: 'loading-operands', activeOperand: 'right' }, durationWeight: DURATION_WEIGHTS.focus }),
+          phase('focus-immediate', 'Focus the decoded immediate', `The decoder supplies immediate value ${right}.`, { activeComponents: ['Decoder'], animation: animation('focus', 'Decoder', 'ALU', ROUTE_IDS.decoderAlu), executionPatch: { status: 'loading-operands', activeOperand: 'right', alu: { stage: 'loading-b' } }, durationWeight: DURATION_WEIGHTS.focus }),
           phase('enable-immediate-alu', 'Enable immediate and ALU B', 'The control unit turns on IMM-out and ALU-B-in.', { signals: ['IMMout', 'ALUinB'], activeComponents: ['Decoder', 'ALU'], animation: animation('arm', 'Decoder', 'ALU', ROUTE_IDS.decoderAlu), durationWeight: DURATION_WEIGHTS.arm }),
           phase('move-immediate-alu', 'Move operand 13', `${right} travels from the decoder to ALU input B.`, { signals: ['IMMout', 'ALUinB'], transfer: { id: `right-operand:${preset.id}`, kind: 'operand', role: 'operand', width: 16, value: right, from: 'Decoder', to: 'ALU' }, animation: animation('travel', 'Decoder', 'ALU', ROUTE_IDS.decoderAlu), durationWeight: DURATION_WEIGHTS.travel }),
-          phase('latch-alu-b', 'Latch ALU input B', `ALU input B now holds ${right}.`, { activeComponents: ['ALU'], animation: animation('arrive', 'Decoder', 'ALU', ROUTE_IDS.decoderAlu), durationWeight: DURATION_WEIGHTS.arrive }),
+          phase('latch-alu-b', 'Latch ALU input B', `ALU input B now holds ${right}.`, { activeComponents: ['ALU'], animation: animation('arrive', 'Decoder', 'ALU', ROUTE_IDS.decoderAlu), executionPatch: { alu: { stage: 'inputs-ready', inputB: right } }, durationWeight: DURATION_WEIGHTS.arrive }),
         ],
       },
       {
@@ -316,18 +329,18 @@ const ComputerArchitectureMachine = (() => {
         summary: `Add ${left} + ${right} inside the ALU.`,
         phases: [
           phase('focus-alu-inputs', 'Focus both ALU inputs', `The ALU has ${left} and ${right}.`, { activeComponents: ['ALU'], animation: animation('focus', 'ALU', 'ALU'), durationWeight: DURATION_WEIGHTS.focus }),
-          phase('assert-aluadd', 'Enable addition', 'The control unit turns on ALU-add.', { signals: ['ALUadd'], activeComponents: ['ALU'], animation: animation('arm', 'ALU', 'ALU'), durationWeight: DURATION_WEIGHTS.arm }),
-          phase('alu-result', 'Produce the result', `${left} + ${right} produces ${result}.`, { activeComponents: ['ALU'], animation: animation('arrive', 'ALU', 'ALU'), executionPatch: { status: 'calculated', resultAvailable: true }, durationWeight: DURATION_WEIGHTS.arrive }),
+          phase('assert-aluadd', 'Enable addition', 'The control unit selects ADD after both ALU inputs are ready.', { signals: ['ALUadd'], activeComponents: ['ALU'], animation: animation('arm', 'ALU', 'ALU'), executionPatch: { alu: { stage: 'operation', operation: 'ADD' } }, durationWeight: DURATION_WEIGHTS.arm }),
+          phase('alu-result', 'Produce the result', `${left} + ${right} produces ${result}.`, { activeComponents: ['ALU'], animation: animation('arrive', 'ALU', 'ALU'), executionPatch: { status: 'calculated', resultAvailable: true, alu: { stage: 'result', result } }, durationWeight: DURATION_WEIGHTS.arrive }),
         ],
       },
       {
         id: 'write-r1', label: EXECUTION_MICRO_OPERATION_LABELS[9],
         summary: `Write ALU result ${result} back into R1.`,
         phases: [
-          phase('focus-alu-result', 'Focus the ALU result', `The ALU is the source and holds ${result}.`, { activeComponents: ['ALU'], animation: animation('focus', 'ALU', 'R1', ROUTE_IDS.aluR1), executionPatch: { status: 'write-back', resultAvailable: true }, durationWeight: DURATION_WEIGHTS.focus }),
+          phase('focus-alu-result', 'Focus the ALU result', `The ALU result latch is the source and holds ${result}.`, { activeComponents: ['ALU'], animation: animation('focus', 'ALU', 'R1', ROUTE_IDS.aluR1), executionPatch: { status: 'write-back', resultAvailable: true, alu: { stage: 'output' } }, durationWeight: DURATION_WEIGHTS.focus }),
           phase('enable-alu-r1', 'Enable ALU and R1', 'The control unit turns on ALU-out and R1-in.', { signals: ['ALUout', 'R1in'], activeComponents: ['ALU', 'R1'], animation: animation('arm', 'ALU', 'R1', ROUTE_IDS.aluR1), durationWeight: DURATION_WEIGHTS.arm }),
           phase('move-alu-r1', 'Move result 18', `${result} travels from the ALU to R1.`, { signals: ['ALUout', 'R1in'], transfer: { id: `addition-result:${preset.id}`, kind: 'result', role: 'result', width: 16, value: result, from: 'ALU', to: 'R1' }, animation: animation('travel', 'ALU', 'R1', ROUTE_IDS.aluR1), durationWeight: DURATION_WEIGHTS.travel }),
-          phase('capture-r1', 'Capture the result in R1', `R1 now contains ${result}; Main Memory is unchanged.`, { activeComponents: ['R1'], animation: animation('arrive', 'ALU', 'R1', ROUTE_IDS.aluR1), mutate(next) { next.R1 = result; }, executionPatch: { status: 'complete', resultAvailable: true, complete: true }, terminal: true, durationWeight: DURATION_WEIGHTS.arrive }),
+          phase('capture-r1', 'Capture the result in R1', `R1 now contains ${result}; Main Memory is unchanged.`, { activeComponents: ['R1'], animation: animation('arrive', 'ALU', 'R1', ROUTE_IDS.aluR1), mutate(next) { next.R1 = result; }, executionPatch: { status: 'complete', resultAvailable: true, complete: true, alu: { stage: 'complete' } }, terminal: true, durationWeight: DURATION_WEIGHTS.arrive }),
         ],
       },
     );
@@ -357,6 +370,7 @@ const ComputerArchitectureMachine = (() => {
     let execution = includeExecution ? {
       kind: 'add-immediate', equation: `${preset.equation.left} + ${preset.equation.right}`,
       ...preset.equation, status: 'fetching', activeOperand: null, resultAvailable: false, complete: false,
+      alu: { stage: 'idle', inputA: null, inputB: null, operation: null, result: null },
     } : null;
 
     const operations = specs.map((operation, operationIndex) => {
@@ -369,7 +383,11 @@ const ComputerArchitectureMachine = (() => {
         if (spec.selectedAddress !== undefined) selectedAddress = spec.selectedAddress;
         if (spec.instructionAvailable !== undefined) instructionAvailable = spec.instructionAvailable;
         if (spec.decodedAvailable !== undefined) decodedAvailable = spec.decodedAvailable;
-        if (execution && spec.executionPatch) execution = { ...execution, ...spec.executionPatch };
+        if (execution && spec.executionPatch) execution = {
+          ...execution,
+          ...spec.executionPatch,
+          alu: spec.executionPatch.alu ? { ...execution.alu, ...spec.executionPatch.alu } : execution.alu,
+        };
         if (execution && spec.id === 'decoded') execution = { ...execution, status: 'decoded' };
         const signals = spec.signals || [];
         const animationMetadata = Object.freeze({
@@ -397,7 +415,7 @@ const ComputerArchitectureMachine = (() => {
           animation: animationMetadata,
           activeComponents: Object.freeze(activeComponents),
           preset: Object.freeze({ id: preset.id, label: preset.label, mnemonic: preset.mnemonic }),
-          ...(execution ? { execution: Object.freeze({ ...execution }) } : {}),
+          ...(execution ? { execution: Object.freeze({ ...execution, alu: Object.freeze({ ...execution.alu }) }) } : {}),
         };
         return Object.freeze({ id: `${operation.id}:${spec.id}`, label: spec.label, message: spec.message, durationWeight: spec.durationWeight, terminal: !!spec.terminal, frame: Object.freeze(frame) });
       });
@@ -672,7 +690,7 @@ const ComputerArchitectureMachine = (() => {
 
   return Object.freeze({
     WIDTHS, SIGNAL_IDS, SIGNAL_DEFINITIONS, OPCODES, PRESETS, EXECUTION_PRESETS,
-    ANIMATION_STAGES, ROUTE_IDS, DURATION_WEIGHTS,
+    ANIMATION_STAGES, ROUTE_IDS, DURATION_WEIGHTS, CONTROL_CUE_SEQUENCE_GAP_UNITS,
     MICRO_OPERATION_LABELS, EXECUTION_MICRO_OPERATION_LABELS, DECODE_OPERATION_LABELS,
     validatePreset, decodeInstruction, formatValue, normalizeGranularity,
     getPreset(id) { return PRESET_BY_ID.get(id) || null; },

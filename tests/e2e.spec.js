@@ -383,7 +383,7 @@ test('CPU Lab starts at the source and treats the memory handshake as one operat
   await expect(page.locator('[data-component-id="PC"]')).toHaveClass(/is-source/);
   await expect(page.locator('.cpu-main-memory .cpu-memory-row.is-selected')).toHaveCount(0);
   await expect(page.locator('[data-route-id="mar-memory"]')).toHaveAttribute('d', 'M590 72 V60 H246');
-  await expect(page.locator('[data-route-id="memory-mdr"]')).toHaveAttribute('d', 'M246 372 H525');
+  await expect(page.locator('[data-route-id="memory-mdr"]')).toHaveAttribute('d', 'M246 372 H350');
 
   const timeline = await visualizerTimeline(page);
   await timeline.fill('1');
@@ -431,6 +431,10 @@ test('CPU Lab stages source, control cues, value travel, and target arrival with
   expect(Math.abs(center(heldBox).x - center(spawnBox).x) + Math.abs(center(heldBox).y - center(spawnBox).y)).toBeLessThan(2);
 
   await expect(page.locator('.cpu-control-cue')).toHaveCount(2);
+  await expect(page.locator('.cpu-control-cue[data-control-signal-id="PCout"]')).toHaveAttribute('data-cue-order', '1');
+  await expect(page.locator('.cpu-control-cue[data-control-signal-id="MARin"]')).toHaveAttribute('data-cue-order', '2');
+  await expect(page.locator('.cpu-control-cue[data-control-signal-id="PCout"]')).toHaveAttribute('data-cue-role', 'source-enable');
+  await expect(page.locator('.cpu-control-cue[data-control-signal-id="MARin"]')).toHaveAttribute('data-cue-role', 'destination-latch');
   await expect(page.locator('[data-component-id="PC"]')).toHaveClass(/is-source/);
   await expect(page.locator('[data-component-id="MAR"]')).toHaveClass(/is-ready/);
   await expect(page.locator('[data-source-pulse^="CONTROL:"]')).toHaveCount(2);
@@ -528,6 +532,8 @@ test('CPU desktop datapath remains a collision-free one-screen scene at supporte
         clippedText,
         binaryTextOverflow,
         marMemoryCrossesPc,
+        aluWidth: rect('.cpu-alu-unit')?.right - rect('.cpu-alu-unit')?.left,
+        aluParts: document.querySelectorAll('.cpu-alu-slot').length,
         layers: [...document.querySelectorAll('.cpu-datapath-full [data-layer]')].map((node) => node.getAttribute('data-layer')),
       };
     });
@@ -539,6 +545,8 @@ test('CPU desktop datapath remains a collision-free one-screen scene at supporte
       clippedText: 0,
       binaryTextOverflow: 0,
       marMemoryCrossesPc: false,
+      aluWidth: expect.any(Number),
+      aluParts: 4,
       layers: ['structural-connections', 'active-connections', 'components-and-text', 'traveling-cues-and-arrivals'],
     });
   }
@@ -576,7 +584,7 @@ test('CPU control unit explains readable signals, the current action, and what h
   await expect(controlUnit).toContainText('PC-out');
   await expect(controlUnit).toContainText('MAR-in');
   await expect(controlUnit).toContainText('WHAT IS HAPPENING');
-  await expect(controlUnit.locator('.cpu-svg-guidance').first()).toHaveAttribute('aria-label', 'PC sends its address. MAR accepts the address.');
+  await expect(controlUnit.locator('.cpu-svg-guidance').first()).toHaveAttribute('aria-label', 'First: PC sends its address. Then: MAR accepts the address.');
   await expect(controlUnit).toContainText('UP NEXT');
   await expect(controlUnit.locator('.cpu-svg-next')).toHaveAttribute('aria-label', 'Move the address.');
   await expect(controlUnit).not.toContainText('ANIMATION STAGE');
@@ -820,11 +828,54 @@ test('CPU Lab animates active-only paths and executes the guided 5 + 13 operatio
   await expect(page.locator('.integrated-step strong')).toHaveText('9 / 10');
   await expect(page.locator('.cpu-alu-unit')).toHaveClass(/is-received/);
   await expect(page.locator('.cpu-alu-unit')).toContainText('5 + 13 = 18');
+  await expect(page.locator('.cpu-alu-unit')).toHaveAttribute('data-alu-result', '18');
+  expect(await page.locator('.cpu-alu-unit').evaluate((node) => node.getBoundingClientRect().width)).toBeGreaterThan(190);
 
   await timeline.fill('9');
   await page.getByRole('tab', { name: 'Registers' }).click();
   const r1Evidence = page.locator('.desktop-evidence .cpu-register-evidence > div').filter({ hasText: 'R1' });
   await expect(r1Evidence).toContainText('0x0012');
+});
+
+test('ADDI teaches ALU internals progressively and fires ALU-out before R1-in', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'on'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-add-immediate');
+  await (await visualizerSpeed(page)).selectOption('3');
+  await page.getByRole('button', { name: 'Micro', exact: true }).click();
+  const timeline = await visualizerTimeline(page);
+
+  await timeline.fill('25');
+  await expect(page.locator('.cpu-alu-unit')).toHaveAttribute('data-alu-stage', 'input-a');
+  await expect(page.locator('.cpu-alu-unit')).toHaveAttribute('data-alu-input-a', '5');
+  await expect(page.locator('.cpu-alu-unit')).toHaveAttribute('data-alu-input-b', '');
+  await timeline.fill('29');
+  await expect(page.locator('.cpu-alu-unit')).toHaveAttribute('data-alu-stage', 'inputs-ready');
+  await expect(page.locator('.cpu-alu-unit')).toHaveAttribute('data-alu-input-b', '13');
+  await timeline.fill('31');
+  await expect(page.locator('.cpu-alu-unit')).toHaveAttribute('data-alu-operation', 'ADD');
+  await timeline.fill('32');
+  await expect(page.locator('.cpu-alu-unit')).toHaveAttribute('data-alu-result', '18');
+
+  await timeline.fill('33');
+  await page.getByRole('button', { name: 'Step' }).click();
+  await expect(page.locator('.cpu-datapath-renderer')).toHaveAttribute('data-animation-stage', 'arm');
+  const aluOut = page.locator('.cpu-control-cue[data-control-signal-id="ALUout"]');
+  const r1In = page.locator('.cpu-control-cue[data-control-signal-id="R1in"]');
+  await expect(aluOut).toHaveAttribute('data-cue-order', '1');
+  await expect(aluOut).toHaveAttribute('data-cue-role', 'source-enable');
+  await expect(aluOut).toHaveAttribute('data-activation-delay-ms', '0');
+  await expect(r1In).toHaveAttribute('data-cue-order', '2');
+  await expect(r1In).toHaveAttribute('data-cue-role', 'destination-latch');
+  await expect(r1In).toHaveAttribute('data-activation-delay-ms', '464');
+  await page.waitForTimeout(520);
+  expect(await r1In.locator('[data-motion-role="control-signal"]').evaluate((node) => Number(getComputedStyle(node).opacity))).toBeGreaterThan(.9);
+  await expect(page.locator('.cpu-control-unit')).toContainText('Teaching order · one semantic operation');
+  await expect(page.locator('.cpu-control-unit')).toContainText('First');
+  await expect(page.locator('.cpu-control-unit')).toContainText('Then');
+  await expect(page.getByRole('button', { name: 'Step' })).toBeEnabled({ timeout: 6000 });
+  await expect(aluOut).toHaveCount(1);
+  await expect(r1In).toHaveCount(1);
 });
 
 test('CPU Lab evidence is registered, collapsible, and keyboard reachable', async ({ page }, testInfo) => {
@@ -855,6 +906,24 @@ test('CPU Lab mobile tabs keep playback state and the sticky dock reachable', as
   await page.getByRole('tab', { name: 'Datapath' }).click();
   await expect(page.locator('.cpu-mobile-transfer')).toBeVisible();
   await expect(page.locator('.integrated-step strong')).toHaveText('2 / 5');
+  await expect(page.getByRole('button', { name: 'Step' })).toBeInViewport();
+});
+
+test('ADDI mobile datapath exposes the progressive ALU without horizontal overflow', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
+  await page.goto('/visualizer.html?course=computer-architecture&activity=architecture-add-immediate');
+  await page.getByRole('tab', { name: 'Steps', exact: true }).click();
+  await page.getByRole('button', { name: /9 Add 5 \+ 13 inside the ALU/ }).click();
+  await page.getByRole('tab', { name: 'Datapath', exact: true }).click();
+  const mobileAlu = page.locator('.cpu-mobile-alu');
+  await expect(mobileAlu).toBeVisible();
+  await expect(mobileAlu).toHaveAttribute('data-alu-stage', 'result');
+  await expect(mobileAlu).toContainText('Input A5');
+  await expect(mobileAlu).toContainText('Input B13');
+  await expect(mobileAlu).toContainText('OperationADD');
+  await expect(mobileAlu).toContainText('Result18');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await expect(page.getByRole('button', { name: 'Step' })).toBeInViewport();
 });
 

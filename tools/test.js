@@ -797,7 +797,8 @@ ComputerArchitecture.PRESETS.forEach((preset) => {
   ok(`${preset.id}: all nineteen phases expose immutable PowerPoint-style animation metadata`, microFrames.length === 19 && microFrames.every((frame) => ComputerArchitecture.ANIMATION_STAGES.includes(frame.animation.stage) && frame.animation.sourceId && Object.isFrozen(frame.animation) && Object.isFrozen(frame.animation.timing) && Object.isFrozen(frame.animation.controlCues)));
   ok(`${preset.id}: emitting phases hold and retain cues while non-emitting phases do not`, microFrames.every((frame) => {
     const timing = frame.animation.timing;
-    if (frame.animation.stage === 'arm') return timing.spawnHoldUnits === 1.54 && timing.movementUnits === 1.25 && timing.retainAtEndpoint && frame.microStep.durationWeight === 2.79;
+    if (frame.animation.stage === 'arm') return timing.spawnHoldUnits === 1.54 && timing.movementUnits === 1.25 && timing.retainAtEndpoint
+      && frame.microStep.durationWeight === 2.79 + Math.max(0, frame.animation.controlCues.length - 1) * ComputerArchitecture.CONTROL_CUE_SEQUENCE_GAP_UNITS;
     if (frame.animation.stage === 'travel') return timing.spawnHoldUnits === 1.54 && timing.movementUnits === 1.73 && timing.retainAtEndpoint && frame.microStep.durationWeight === 3.27;
     return timing.spawnHoldUnits === 0 && timing.movementUnits === 0 && !timing.retainAtEndpoint;
   }));
@@ -805,7 +806,7 @@ ComputerArchitecture.PRESETS.forEach((preset) => {
   ok(`${preset.id}: control cues have stable unique identities and declared directions`, (() => {
     const cues = microFrames.flatMap((frame) => frame.animation.controlCues);
     return new Set(cues.map((cue) => cue.id)).size === cues.length
-      && cues.every((cue) => cue.id.startsWith('control-cue:') && cue.routeId.startsWith('control-') && cue.order > 0)
+      && cues.every((cue) => cue.id.startsWith('control-cue:') && cue.routeId.startsWith('control-') && cue.order > 0 && cue.label && cue.semanticRole && cue.activationOffsetUnits >= 0)
       && cues.filter((cue) => cue.signalId === 'MFC').every((cue) => cue.direction === 'to-cu')
       && cues.filter((cue) => cue.signalId === 'MFC').every((cue) => cue.originId === 'memory')
       && cues.filter((cue) => cue.signalId !== 'MFC').every((cue) => cue.direction === 'from-cu' && cue.originId === 'CONTROL');
@@ -883,6 +884,26 @@ ok('5 + 13 exposes active components and stable operand/result transfers',
   additionEvents[6].transition.phases.some((item) => item.frame.transfer?.id === 'left-operand:addi-five-thirteen')
   && additionEvents[7].transition.phases.some((item) => item.frame.transfer?.id === 'right-operand:addi-five-thirteen')
   && additionEvents[9].transition.phases.some((item) => item.frame.transfer?.id === 'addition-result:addi-five-thirteen'));
+ok('5 + 13 exposes immutable progressive ALU input, operation, result, and output stages', (() => {
+  const stages = additionMicroFrames.map((frame) => frame.execution.alu.stage);
+  return additionMicroFrames.every((frame) => Object.isFrozen(frame.execution) && Object.isFrozen(frame.execution.alu))
+    && stages[22] === 'loading-a' && stages[25] === 'input-a' && additionMicroFrames[25].execution.alu.inputA === 5
+    && stages[26] === 'loading-b' && stages[29] === 'inputs-ready' && additionMicroFrames[29].execution.alu.inputB === 13
+    && stages[31] === 'operation' && additionMicroFrames[31].execution.alu.operation === 'ADD'
+    && stages[32] === 'result' && additionMicroFrames[32].execution.alu.result === 18
+    && stages[33] === 'output' && stages[36] === 'complete';
+})());
+ok('multi-signal phases teach source or completion before destination latching', (() => {
+  const readCues = additionMicroFrames[9].animation.controlCues;
+  const writeCues = additionMicroFrames[34].animation.controlCues;
+  return ComputerArchitecture.CONTROL_CUE_SEQUENCE_GAP_UNITS === 0.58
+    && readCues.map((cue) => cue.signalId).join(',') === 'MFC,MDRin'
+    && readCues.map((cue) => cue.semanticRole).join(',') === 'memory-complete,destination-latch'
+    && writeCues.map((cue) => cue.signalId).join(',') === 'ALUout,R1in'
+    && writeCues.map((cue) => cue.semanticRole).join(',') === 'source-enable,destination-latch'
+    && writeCues.map((cue) => cue.activationOffsetUnits).join(',') === '0,0.58'
+    && additionMicroFrames[34].microStep.durationWeight === ComputerArchitecture.DURATION_WEIGHTS.arm + ComputerArchitecture.CONTROL_CUE_SEQUENCE_GAP_UNITS;
+})());
 ok('5 + 13 writes unsigned result 18 to R1 without changing memory',
   additionFinal.registers.R1.value === 18 && additionFinal.registers.PC.value === 0x21
   && additionFinal.registers.MAR.value === 0x20 && additionFinal.registers.IR.value === 0x610D

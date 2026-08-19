@@ -8,18 +8,19 @@
 <header class="topbar"><div class="topbar-title">Introduction to Networking</div><nav class="topbar-nav"></nav></header>
 <main class="net-home-main">
   <section class="net-home-hero">
-    <div class="net-home-copy"><span class="net-course-code">IT 53 · Fundamentals of Networking</span><h1>See why a host asks before it sends.</h1><p>Follow one same-LAN IPv4 decision from an empty ARP table to a confirmed MAC address, with every frame attached to the physical port that carries it.</p><div class="start-actions"><a class="btn net-primary" href="visualizer.html?course=computer-networking&amp;activity=networking-arp-neighbor-discovery" data-icon="play">Open the ARP lab</a><a class="btn net-secondary" href="computer-networking-modules.html" data-icon="modules">View course roadmap</a></div></div>
-    <div class="net-path-preview" tabindex="0" aria-label="Host A eth0 connects to switch Fa0/1, and switch Fa0/2 connects to Host B eth0">
-      <div class="net-preview-host"><small>192.168.10.10/24</small><strong>Host A</strong><span><i></i>eth0</span></div>
-      <div class="net-preview-cable"><em>ARP request</em><b aria-hidden="true">→</b></div>
-      <div class="net-preview-switch"><small>2-port teaching switch</small><strong>Switch 1</strong><span><i></i>Fa0/1</span><span><i></i>Fa0/2</span></div>
-      <div class="net-preview-cable"><em>broadcast copy</em><b aria-hidden="true">→</b></div>
-      <div class="net-preview-host"><small>192.168.10.20/24</small><strong>Host B</strong><span><i></i>eth0</span></div>
+    <div class="net-home-copy"><span class="net-course-code">IT 53 · Fundamentals of Networking</span><h1>Read the network before tracing its traffic.</h1><p>Begin with the people, devices, interfaces, media, and network scope in one connected classroom. Then preview how those foundations support address resolution in Topic 6.</p><div class="start-actions"><a class="btn net-primary" href="visualizer.html?course=computer-networking&amp;activity=networking-read-classroom-network" data-icon="play">Start Module 1</a><a class="btn net-secondary" href="visualizer.html?course=computer-networking&amp;activity=networking-arp-neighbor-discovery" data-icon="network">Preview Topic 6: ARP</a><a class="btn net-secondary" href="computer-networking-modules.html" data-icon="modules">View roadmap</a></div></div>
+    <div class="net-path-preview net-foundation-preview" tabindex="0" aria-label="A student laptop connects wirelessly to an access point, then through the classroom edge to a remote learning server">
+      <div class="net-preview-host"><small>End device · client</small><strong>Student laptop</strong><span><i></i>wlan0</span></div>
+      <div class="net-preview-cable"><em>wireless LAN</em><b aria-hidden="true">→</b></div>
+      <div class="net-preview-switch"><small>Intermediary</small><strong>Access + edge</strong><span><i></i>radio0</span><span><i></i>WAN0</span></div>
+      <div class="net-preview-cable"><em>WAN path</em><b aria-hidden="true">→</b></div>
+      <div class="net-preview-host"><small>End device · server</small><strong>Learning service</strong><span><i></i>eth0</span></div>
     </div>
   </section>
   <ol class="net-learning-path" aria-label="IT 53 learning path">
-    <li><b>01</b><span><strong>Networking Foundations</strong>Networks, device configuration, models, media, and number systems.</span><em>Course foundation</em></li>
-    <li class="is-current"><b>02</b><span><strong>Network Layer &amp; ARP</strong>Classify a destination, inspect the ARP table, and resolve a local peer.</span><em>Lab available</em></li>
+    <li class="is-current"><b>01</b><span><strong>Networking Today</strong>Read components, roles, media, representations, scope, reliability, trends, and professional practice.</span><em>Current module</em></li>
+    <li><b>02–05</b><span><strong>Configuration to Number Systems</strong>Configure devices, model communication, inspect physical media, and represent addresses.</span><em>Planned in sequence</em></li>
+    <li><b>06</b><span><strong>Network Layer &amp; ARP</strong>Classify a destination, inspect the ARP table, and resolve a local peer.</span><em>Preview available</em></li>
     <li><b>03</b><span><strong>Addressing to Small Networks</strong>Routing, IPv4/IPv6, ICMP, transport, applications, and troubleshooting.</span><em>Planned</em></li>
   </ol>
 </main>

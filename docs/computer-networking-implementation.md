@@ -1,6 +1,26 @@
 # Computer networking implementation plan
 
-Status: port-accurate vertical slice implemented on `codex/computer-networking-slice-a`.
+Status: ARP vertical slice implemented; Module 1 sequence and physical-port fidelity correction implemented on `codex/networking-module-1-sequence`.
+
+## 2026-08-19 course-sequence correction
+
+The subject now opens with **Module 1 — Networking Today**, following the supplied
+course syllabus before exposing the existing ARP activity. The default activity is
+`networking-read-classroom-network`, a fixed classroom scenario with eight Overview
+operations and 24 Detailed phases covering network purpose, end-device roles,
+intermediaries, interfaces and media, physical/logical representations, LAN/WAN
+scope, reliable-network qualities, trends, and professional practice.
+
+The deterministic ARP activity remains available as a clearly labeled **Topic 6
+preview** grounded in ITN Modules 8 and 9. It is not a progression lock and it is no
+longer described as Module 1. Topics 2–5 remain visible in their required order as
+planned course modules.
+
+The ARP renderer retains the fixed two-port switch and exact interface/link/packet
+identities. Its physical treatment now uses large RJ45 openings, visible plug heads,
+latches, molded boots, cable tails, insertion anchors, and a synchronized physical-
+path statement. The four-port switch in the visual reference is not copied; only
+the two interfaces used by the teaching model are rendered.
 
 ## Supplied curriculum reconciliation
 
@@ -10,7 +30,7 @@ Fundamentals of Networking** (three units; two lecture hours and three laborator
 hours weekly). The learner-facing title remains **Introduction to Networking** and
 the compact shell code remains `NET`.
 
-The current ARP slice is grounded in ITN Module 8 (same-network versus remote-network
+The Module 1 classroom activity is grounded in ITN Module 1. The ARP slice is grounded in ITN Module 8 (same-network versus remote-network
 forwarding decisions) and Module 9 (ARP purpose, lookup, request broadcast, reply,
 and learned mapping). Physical NIC, interface, UTP, and RJ45 language is grounded in
 Modules 2 and 4. Switch source-MAC learning and flooding appear only as evidence
@@ -30,8 +50,9 @@ authoritative where a full-screen concept is visually ambiguous.
 ## Outcome
 
 Add **Introduction to Networking** as an independent BSIT Learning Lab subject.
-The first release will teach how a host discovers a same-subnet peer with ARP,
-using a deterministic, curated topology and a packet inspector. It will not be
+The first course activity teaches learners how to read a classroom network. The
+available Topic 6 preview teaches how a host discovers a same-subnet peer with ARP,
+using a deterministic, curated topology and a packet inspector. Neither activity is
 a general network simulator or a Packet Tracer replacement.
 
 The vertical slice is complete when a learner can step from an empty ARP cache
@@ -45,8 +66,9 @@ drift; and use the same activity on laptop, phone, `file://`, and offline.
 - Internal course ID: `computer-networking`.
 - Compact shell code: `NET`; the supplied institutional course code is `IT 53`.
 - Short title: **Network Lab**.
-- Initial module: **Local Network Delivery**.
-- First activity: **Discover a neighbor with ARP**.
+- Initial module: **Networking Today**.
+- First activity: **Read a classroom network**.
+- Available preview: **Topic 6 — Discover a neighbor with ARP**.
 - Curated topology: Host A, one Layer 2 switch, and Host B on one `/24` subnet.
 - No editable topology, arbitrary packet construction, vendor CLI emulation,
   STP, dynamic routing, wireless behavior, or real socket/network access.
@@ -132,7 +154,7 @@ Do not infer table changes from animation position in the renderer.
 Create `computer-networking-activities.js` and register it through
 `BSITLearningLab.registerActivities('computer-networking', ...)`.
 
-The first activity uses:
+The Topic 6 ARP preview uses:
 
 - ID `networking-arp-neighbor-discovery`;
 - engine `guided-network-model`;
@@ -202,8 +224,9 @@ Add the same minimal route family used by Computer Architecture:
 - `computer-networking.html` — subject home and learning path;
 - `computer-networking-modules.html` — current and planned modules;
 - `computer-networking-practice.html` plus local data/controller files — three
-  checks covering local-subnet choice, Ethernet broadcast destination, and ARP
-  cache outcome;
+  Module 1 checks followed by three Topic 6 checks covering local-subnet choice,
+  Ethernet broadcast destination, and ARP cache outcome;
+- `visualizer.html?course=computer-networking&activity=networking-read-classroom-network`;
 - `visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery`.
 
 Register the course in `course-catalog.js`, add it to the subject chooser and

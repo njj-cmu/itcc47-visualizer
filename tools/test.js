@@ -953,10 +953,11 @@ ok('practice bank preserves three fetch IDs and adds four unsolved decode and ex
 
 section('computer networking teaching machine');
 const computerNetworkingEngine = load([
-  'course-catalog.js', 'playback.js', 'computer-networking-machine.js',
+  'course-catalog.js', 'playback.js', 'computer-networking-machine.js', 'computer-networking-foundations-machine.js',
   'computer-networking-activities.js', 'computer-networking-practice-data.js',
 ], { setTimeout, clearTimeout });
 const ComputerNetworking = computerNetworkingEngine.get('ComputerNetworkingMachine');
+const ComputerNetworkingFoundations = computerNetworkingEngine.get('ComputerNetworkingFoundationsMachine');
 const ComputerNetworkingCatalog = computerNetworkingEngine.get('ComputerNetworkingActivities');
 const ComputerNetworkingCourses = computerNetworkingEngine.get('BSITLearningLab');
 const ComputerNetworkingPractice = computerNetworkingEngine.get('ComputerNetworkingPractice');
@@ -968,18 +969,40 @@ const networkingEvents = networkingFirst.events;
 const networkingFrames = networkingEvents.map((event) => event.frame);
 const networkingDetailedFrames = networkingMicro.events.map((event) => event.frame);
 const networkingFinal = networkingFrames.at(-1);
+const foundationsPreset = ComputerNetworkingFoundations.PRESETS[0];
+const foundationsFirst = ComputerNetworkingFoundations.run(foundationsPreset.id);
+const foundationsSecond = ComputerNetworkingFoundations.run(foundationsPreset.id);
+const foundationsMicro = ComputerNetworkingFoundations.run(foundationsPreset.id, { granularity: 'micro' });
 
-ok('networking course and ARP activity expose the planned public contracts', (() => {
+ok('networking course exposes Module 1 first and ARP as a Topic 6 preview', (() => {
   const course = ComputerNetworkingCourses.getCourse('computer-networking');
+  const foundations = ComputerNetworkingCatalog.get('networking-read-classroom-network');
   const activity = ComputerNetworkingCatalog.get('networking-arp-neighbor-discovery');
   const registered = ComputerNetworkingCourses.getActivity('computer-networking', activity.id);
   return course.code === 'NET' && course.title === 'Introduction to Networking'
     && course.shortTitle === 'Network Lab' && course.home === 'computer-networking.html'
-    && ComputerNetworkingCourses.listActivities('computer-networking').length === 1 && registered === activity
-    && activity.contentVersion === 1 && activity.engine === 'guided-network-model'
+    && course.nav[1].href.includes('networking-read-classroom-network')
+    && ComputerNetworkingCourses.listActivities('computer-networking').map((item) => item.id).join(',') === 'networking-read-classroom-network,networking-arp-neighbor-discovery'
+    && ComputerNetworkingCatalog.get('unknown') === foundations && registered === activity
+    && foundations.module === 1 && foundations.topic === 'Networking Today' && foundations.renderer === 'network-foundations'
+    && activity.module === 6 && activity.topic === 'Network Layer & Address Resolution'
+    && activity.contentVersion === 2 && activity.engine === 'guided-network-model'
     && activity.renderer === 'network-topology' && activity.workspaceKind === 'network-lab'
     && activity.input.kind === 'network-preset' && !activity.input.editable
     && activity.evidenceViews.join(',') === 'packet-inspector,network-decisions,arp-table,mac-table';
+})());
+ok('Networking Today emits eight deterministic immutable Overview frames and 24 Detailed phases',
+  foundationsFirst.events.length === 8 && foundationsMicro.events.length === 24
+  && ComputerNetworkingFoundations.OPERATIONS.length === 8 && ComputerNetworkingFoundations.DETAILS.length === 24
+  && JSON.stringify(foundationsFirst) === JSON.stringify(foundationsSecond)
+  && [...foundationsFirst.events, ...foundationsMicro.events].every((event) => Object.isFrozen(event) && Object.isFrozen(event.frame) && Object.isFrozen(event.frame.topology.devices)));
+ok('Networking Today keeps stable interface-owned links and equal final state in both granularities', (() => {
+  const frames = [...foundationsFirst.events, ...foundationsMicro.events].map((event) => event.frame);
+  const declaredInterfaces = new Set(ComputerNetworkingFoundations.ENTITY_IDS.interfaces);
+  return frames.every((frame) => frame.topology.devices.map((item) => item.id).join(',') === ComputerNetworkingFoundations.ENTITY_IDS.devices.join(',')
+    && frame.topology.links.map((item) => item.id).join(',') === ComputerNetworkingFoundations.ENTITY_IDS.links.join(',')
+    && frame.topology.links.every((link) => declaredInterfaces.has(link.fromInterfaceId) && declaredInterfaces.has(link.toInterfaceId)))
+    && JSON.stringify(foundationsFirst.result.finalState) === JSON.stringify(foundationsMicro.result.finalState);
 })());
 ok('canonical ARP preset is valid, curated, and stays on one /24 LAN',
   ComputerNetworking.PRESETS.length === 1 && ComputerNetworking.validatePreset(networkingPreset)
@@ -1073,14 +1096,16 @@ ok('backward timeline inspection restores the earlier empty cache without mutati
 ok('networking activity delegates to the canonical deterministic model', (() => {
   const activity = ComputerNetworkingCatalog.get('networking-arp-neighbor-discovery');
   const run = activity.run();
-  return ComputerNetworkingCatalog.list().length === 1
+  return ComputerNetworkingCatalog.list().length === 2
     && activity.input.defaultPreset === 'arp-same-lan'
     && activity.source.length === 8
     && run.result.finalFrame.phase.id === 'ready-for-ipv4';
 })());
 const normalizedNetworkingPractice = ComputerNetworkingPractice.normalize({ contentVersion: 1, solvedIds: ['classify-local-peer', 'classify-local-peer', 'unknown', 12] });
 ok('networking practice is versioned, identity-free, and keeps only unique known checks',
-  ComputerNetworkingPractice.QUESTIONS.length === 3
+  ComputerNetworkingPractice.QUESTIONS.length === 6
+  && ComputerNetworkingPractice.QUESTIONS.slice(0, 3).every((question) => question.module === 1)
+  && ComputerNetworkingPractice.QUESTIONS.slice(3).every((question) => question.module === 6)
   && JSON.stringify(normalizedNetworkingPractice) === JSON.stringify({ contentVersion: 1, solvedIds: ['classify-local-peer'] })
   && ComputerNetworkingPractice.normalize({ contentVersion: 0, solvedIds: ['classify-local-peer'] }).solvedIds.length === 0);
 const ComputerNetworkingLayout = workspaceLayoutEngine.get('ComputerNetworkingWorkspaceLayout');
@@ -1095,7 +1120,10 @@ ok('network renderer declares interface-owned jack bounds and link-owned cable e
   && networkingRendererSource.includes('data-jack-x={x}')
   && networkingRendererSource.includes('data-link-id={link.id}')
   && networkingRendererSource.includes('data-from-interface-id={link.fromInterfaceId}')
-  && networkingRendererSource.includes('data-to-interface-id={link.toInterfaceId}'));
+  && networkingRendererSource.includes('data-to-interface-id={link.toInterfaceId}')
+  && networkingRendererSource.includes('data-jack-opening-x={opening.x}')
+  && networkingRendererSource.includes('data-plug-interface-id={interfaceId}')
+  && networkingRendererSource.includes('data-plug-tip-x={geometry.cx}'));
 ok('packet movement reuses the active cable path and preserves the 0.8s hold plus 0.9s travel contract',
   networkingRendererSource.includes('<mpath href={`#${linkPathId}`}/>')
   && networkingRendererSource.includes('dur="0.9s" begin="0.8s"')

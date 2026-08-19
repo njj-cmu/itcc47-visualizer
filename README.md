@@ -59,20 +59,22 @@ work without an account or network.
 
 ### IT 53 — Introduction to Networking
 
-The Network Lab follows one same-LAN IPv4 forwarding decision through ARP. Its
-deterministic teaching topology has two hosts and a deliberately simplified two-port
-switch. Every cable and packet path terminates inside the named physical RJ45 jack:
-Host A `eth0` ↔ `Fa0/1`, then `Fa0/2` ↔ Host B `eth0`. Overview shows eight major
-decisions; Detailed shows 24 immutable phases with synchronized packet, decision,
-ARP-table, and MAC-table evidence. It is a guided classroom lab, not an editable
-topology or Packet Tracer replacement.
+The Network Lab begins with Module 1, **Networking Today**, in a deterministic
+classroom scene that teaches components, roles, interfaces, media, representations,
+scope, reliability, trends, and professional practice. A Topic 6 preview then follows
+one same-LAN IPv4 forwarding decision through ARP. Its two-host, two-port topology
+uses visible plugs seated in named physical RJ45 jacks: Host A `eth0` ↔ `Fa0/1`, then
+`Fa0/2` ↔ Host B `eth0`. Both activities provide eight Overview operations and 24
+immutable Detailed phases. They are guided classroom labs, not editable topologies
+or Packet Tracer replacements.
 
 | Page | Purpose |
 |---|---|
 | [`computer-networking.html`](computer-networking.html) | IT 53 subject home and learning path |
 | [`computer-networking-modules.html`](computer-networking-modules.html) | Curriculum-reconciled module roadmap |
-| [`visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery`](visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery) | Port-accurate ARP Network Lab |
-| [`computer-networking-practice.html`](computer-networking-practice.html) | Three identity-free local ARP checks |
+| [`visualizer.html?course=computer-networking&activity=networking-read-classroom-network`](visualizer.html?course=computer-networking&activity=networking-read-classroom-network) | Module 1 classroom Network Lab |
+| [`visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery`](visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery) | Topic 6 port-accurate ARP preview |
+| [`computer-networking-practice.html`](computer-networking-practice.html) | Six identity-free Module 1 and Topic 6 checks |
 
 The root [`index.html`](index.html) is the **BSIT Learning Lab** subject chooser.
 
@@ -145,11 +147,12 @@ collision-free SVG routes, and remain latched with the active path until the
 next micro phase. The same settled evidence is available with reduced or
 disabled motion.
 
-Introduction to Networking adds a framework-neutral `ComputerNetworkingMachine`
-with stable device, interface, link, packet, ARP-entry, and MAC-entry identities.
-The same eight-operation final state is produced by the 24-phase Detailed timeline.
-Separate fixed desktop and phone SVG coordinate maps resolve cable endpoints from
-interface IDs; packet motion references those exact cable paths.
+Introduction to Networking adds framework-neutral foundations and ARP machines with
+stable device, interface, and link identities; ARP also preserves packet and table-row
+identities. Each eight-operation Overview reaches the same final state as its 24-phase
+Detailed timeline. Separate fixed desktop and phone SVG coordinate maps resolve cable
+endpoints and plug tips from interface IDs; ARP packet motion references those exact
+cable paths.
 
 This repository is public practice, not an academic record. It stores no
 identity, grades, timestamps, authentication, or authoritative submissions.

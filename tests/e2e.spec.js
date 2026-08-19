@@ -6,7 +6,7 @@ const instructorAccessToken = fs.readFileSync(path.resolve(__dirname, '..', '.in
 const instructorAccessRecord = { schemaVersion: 1, profileId: 'itcc47-2026-2027-s1', profileVersion: 5, token: instructorAccessToken };
 const instructorPreviewRecord = { schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 5, currentCheckpointId: 'm8-dp' };
 
-const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'computer-architecture.html', 'computer-architecture-modules.html', 'computer-architecture-practice.html', 'computer-networking.html', 'computer-networking-modules.html', 'computer-networking-practice.html', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=deque-sliding-window&preview=1', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', 'visualizer.html?course=computer-architecture&activity=architecture-decode-instruction', 'visualizer.html?course=computer-architecture&activity=architecture-add-immediate', 'visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery', 'industry-workbench.html', 'industry-workbench.html?scenario=industry-priority-range-recall&preview=1', 'writer.html', 'tracer.html', 'problems.html', 'problems.html?view=visualizations', 'problems.html?view=workbenches', 'lesson.html?checkpoint=m2-selection-sort', 'student-materials.html', 'problem-list.html?module=1', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count'];
+const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'computer-architecture.html', 'computer-architecture-modules.html', 'computer-architecture-practice.html', 'computer-networking.html', 'computer-networking-modules.html', 'computer-networking-practice.html', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=deque-sliding-window&preview=1', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', 'visualizer.html?course=computer-architecture&activity=architecture-decode-instruction', 'visualizer.html?course=computer-architecture&activity=architecture-add-immediate', 'visualizer.html?course=computer-networking&activity=networking-read-classroom-network', 'visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery', 'industry-workbench.html', 'industry-workbench.html?scenario=industry-priority-range-recall&preview=1', 'writer.html', 'tracer.html', 'problems.html', 'problems.html?view=visualizations', 'problems.html?view=workbenches', 'lesson.html?checkpoint=m2-selection-sort', 'student-materials.html', 'problem-list.html?module=1', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count'];
 
 const studentStateTests = new Set([
   'curriculum roadmap expands the current module and compacts locked modules',
@@ -159,7 +159,7 @@ test('subject chooser launches Computer Architecture and Introduction to Network
   await expect(networkingCard).toContainText('Introduction to Networking');
   await networkingCard.click();
   await expect(page).toHaveURL(/computer-networking\.html$/);
-  await expect(page.getByRole('heading', { name: 'See why a host asks before it sends.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Read the network before tracing its traffic.' })).toBeVisible();
 });
 
 test('subject chooser remains usable when the catalog grows to ten courses', async ({ page }) => {
@@ -218,9 +218,11 @@ test('computer architecture practice stores only version and solved IDs and can 
 test('networking roadmap follows the supplied IT 53 sequence and preserves explicit non-goals', async ({ page }) => {
   await page.goto('/computer-networking-modules.html');
   await expect(page.locator('.net-module-card')).toHaveCount(12);
-  await expect(page.locator('.net-module-card.is-current')).toContainText('Network Layer & Address Resolution');
-  await expect(page.locator('.net-module-card.is-current')).toContainText('ITN Modules 8 & 9');
-  await expect(page.locator('.net-module-card.is-planned')).toHaveCount(5);
+  await expect(page.locator('.net-module-card.is-current')).toContainText('Networking Today');
+  await expect(page.locator('.net-module-card.is-current')).toContainText('ITN Module 1');
+  await expect(page.locator('.net-module-card.is-preview')).toContainText('Network Layer & Address Resolution');
+  await expect(page.locator('.net-module-card.is-preview')).toContainText('ITN Modules 8 & 9');
+  await expect(page.locator('.net-module-card.is-planned')).toHaveCount(9);
   await expect(page.locator('.net-module-card.is-extension')).toContainText('outside current included sequence');
   await expect(page.locator('.net-module-card.is-extension')).toContainText('VLAN Separation');
   await expect(page.locator('.topbar-nav a[href="computer-networking-modules.html"]')).toHaveAttribute('aria-current', 'page');
@@ -229,13 +231,44 @@ test('networking roadmap follows the supplied IT 53 sequence and preserves expli
 test('networking practice stores only version and solved IDs and can reset', async ({ page }) => {
   await page.goto('/computer-networking-practice.html');
   const first = page.locator('.net-practice-card').first();
-  await first.getByLabel(/Directly to Host B on the local network/).check();
+  await expect(page.locator('.net-practice-group-heading')).toHaveCount(2);
+  await first.getByLabel(/laptop and learning server are end devices/).check();
   await first.getByRole('button', { name: 'Check answer' }).click();
   await expect(first.locator('.net-practice-feedback')).toContainText('Correct.');
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('computer-networking.practice:v1')))).toEqual({ contentVersion: 1, solvedIds: ['classify-local-peer'] });
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('computer-networking.practice:v1')))).toEqual({ contentVersion: 1, solvedIds: ['identify-network-roles'] });
   await page.getByRole('button', { name: 'Reset progress' }).click();
-  await expect(page.locator('#network-practice-progress')).toHaveText('0 / 3 complete');
+  await expect(page.locator('#network-practice-progress')).toHaveText('0 / 6 complete');
   expect(await page.evaluate(() => localStorage.getItem('computer-networking.practice:v1'))).toBeNull();
+});
+
+test('Network Lab defaults to the Module 1 classroom sequence and preserves Detailed position', async ({ page }, testInfo) => {
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
+  await page.goto('/visualizer.html?course=computer-networking');
+  await expect(page).toHaveURL(/activity=networking-read-classroom-network/);
+  await expect(page.getByRole('heading', { name: 'Read a classroom network' })).toBeVisible();
+  await expect(page.locator('.activity-heading')).toContainText('Module 1 / Networking Today');
+  if (testInfo.project.name === 'phone') await openMobilePlaybackDetails(page);
+  await expect(page.getByRole('button', { name: 'Detailed', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 24');
+  await expect(page.locator('.network-operation-timeline > span')).toHaveCount(8);
+  await expect(page.locator('[data-link-id="link-instructor-switch"]')).toHaveAttribute('data-from-interface-id', 'instructor-pc-eth0');
+  await expect(page.locator('[data-link-id="link-instructor-switch"]')).toHaveAttribute('data-to-interface-id', 'classroom-switch-fa0-1');
+  await (await visualizerTimeline(page)).fill('13');
+  await expect(page.locator('.network-detail-label')).toContainText('Detail 2 of 3 · Read the logical topology');
+  await expect(page.locator('.network-foundations-renderer')).toHaveClass(/representation-logical/);
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('5 / 8');
+  await page.getByRole('button', { name: 'Detailed', exact: true }).click();
+  await expect(page.locator('.integrated-step strong')).toHaveText('14 / 24');
+  if (testInfo.project.name === 'phone') {
+    for (const name of ['Diagram', 'Concepts', 'Evidence', 'Steps']) await expect(page.getByRole('tab', { name, exact: true })).toBeVisible();
+    await page.getByRole('tab', { name: 'Concepts', exact: true }).click();
+    await expect(page.locator('.network-foundation-concepts')).toContainText('The logical view groups the classroom LAN');
+    await page.getByRole('tab', { name: 'Evidence', exact: true }).click();
+    await expect(page.locator('.network-foundation-evidence')).toContainText('Representation');
+  } else {
+    await expect(page.locator('.network-foundation-guide')).toContainText('Read the network');
+  }
 });
 
 test('Network Lab defaults to Detailed, preserves its phase through Overview, and synchronizes evidence', async ({ page }, testInfo) => {
@@ -274,6 +307,7 @@ test('Network Lab cable endpoints stay inside declared RJ45 jacks at laptop and 
   const geometry = await page.evaluate(() => {
     const ports = Object.fromEntries([...document.querySelectorAll('[data-interface-id]')].map((port) => [port.dataset.interfaceId, {
       x: Number(port.dataset.jackX), y: Number(port.dataset.jackY), width: Number(port.dataset.jackWidth), height: Number(port.dataset.jackHeight),
+      opening: { x: Number(port.dataset.jackOpeningX), y: Number(port.dataset.jackOpeningY), width: Number(port.dataset.jackOpeningWidth), height: Number(port.dataset.jackOpeningHeight) },
     }]));
     const inside = (point, bounds) => point.x >= bounds.x && point.x <= bounds.x + bounds.width && point.y >= bounds.y && point.y <= bounds.y + bounds.height;
     const links = [...document.querySelectorAll('path[data-link-id]')].map((link) => {
@@ -285,9 +319,13 @@ test('Network Lab cable endpoints stay inside declared RJ45 jacks at laptop and 
       return { id: link.dataset.linkId, from: link.dataset.fromInterfaceId, to: link.dataset.toInterfaceId, startInside: inside(start, ports[link.dataset.fromInterfaceId]), endInside: inside(end, ports[link.dataset.toInterfaceId]), wrongPortHits };
     });
     const labels = [...document.querySelectorAll('.network-port-label')].map((label) => ({ text: label.textContent, box: label.getBoundingClientRect().toJSON() }));
+    const plugs = [...document.querySelectorAll('[data-plug-interface-id]')].map((plug) => ({
+      interfaceId: plug.dataset.plugInterfaceId, linkId: plug.dataset.plugLinkId,
+      tipInsideOpening: inside({ x: Number(plug.dataset.plugTipX), y: Number(plug.dataset.plugTipY) }, ports[plug.dataset.plugInterfaceId].opening),
+    }));
     const firstCable = document.querySelector('path[data-link-id]');
     const firstDevice = document.querySelector('.network-device');
-    return { layout: document.querySelector('.network-topology-renderer').dataset.layout, links, labels, cablesAreBehindDeviceShells: Boolean(firstCable.compareDocumentPosition(firstDevice) & Node.DOCUMENT_POSITION_FOLLOWING) };
+    return { layout: document.querySelector('.network-topology-renderer').dataset.layout, links, labels, plugs, cablesAreBehindDeviceShells: Boolean(firstCable.compareDocumentPosition(firstDevice) & Node.DOCUMENT_POSITION_FOLLOWING) };
   });
   expect(geometry.layout).toBe(testInfo.project.name === 'phone' ? 'mobile' : 'desktop');
   expect(geometry.links).toEqual([
@@ -295,6 +333,9 @@ test('Network Lab cable endpoints stay inside declared RJ45 jacks at laptop and 
     expect.objectContaining({ id: 'link-switch-host-b', from: 'switch-1-p2', to: 'host-b-eth0', startInside: true, endInside: true, wrongPortHits: [] }),
   ]);
   expect(geometry.cablesAreBehindDeviceShells).toBe(true);
+  expect(geometry.plugs).toHaveLength(4);
+  expect(geometry.plugs.every((plug) => plug.tipInsideOpening)).toBe(true);
+  expect(new Set(geometry.plugs.map((plug) => plug.interfaceId)).size).toBe(4);
   expect(geometry.labels.map((item) => item.text)).toEqual(['eth0', 'Fa0/1 · Port 1', 'Fa0/2 · Port 2', 'eth0']);
   const [port1, port2] = geometry.labels.slice(1, 3).map((item) => item.box);
   expect(port1.right <= port2.left || port2.right <= port1.left || port1.bottom <= port2.top || port2.bottom <= port1.top).toBe(true);
@@ -2401,6 +2442,9 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
   await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(page.locator('#step-slider')).toHaveValue('1');
 
+  await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}?course=computer-networking&activity=networking-read-classroom-network`);
+  await expect(page.getByRole('heading', { name: 'Read a classroom network' })).toBeVisible();
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 24');
   await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}?course=computer-networking&activity=networking-arp-neighbor-discovery`);
   await (await visualizerMotion(page)).selectOption('off');
   const networkingTimeline = await visualizerTimeline(page);
@@ -2422,11 +2466,14 @@ test('cached navigation remains available offline', async ({ page, context }, te
   await expect(page.getByRole('heading', { name: 'Fetch one instruction' })).toBeVisible();
   await page.goto('/computer-architecture-practice.html');
   await expect(page.getByRole('heading', { name: 'Practice the instruction flow.' })).toBeVisible();
+  await page.goto('/visualizer.html?course=computer-networking&activity=networking-read-classroom-network');
+  await expect(page.getByRole('heading', { name: 'Read a classroom network' })).toBeVisible();
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 24');
   await page.goto('/visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery');
   await expect(page.getByRole('heading', { name: 'Discover a neighbor with ARP' })).toBeVisible();
   await expect(page.locator('.integrated-step strong')).toHaveText('1 / 24');
   await page.goto('/computer-networking-practice.html');
-  await expect(page.getByRole('heading', { name: 'Check the ARP decision path.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Check the network from foundations to ARP.' })).toBeVisible();
   await page.goto('/visualizer.html?activity=linked-list-traversal');
   await expect(page.getByRole('heading', { name: 'Traverse a singly linked list' })).toBeVisible();
   await page.goto('/problem-list.html?module=3');

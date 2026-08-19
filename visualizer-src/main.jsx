@@ -6,11 +6,13 @@ import { ConceptDomainRenderer } from './domain-renderers.jsx';
 import { LinearADTRenderer } from './linear-adt-renderer.jsx';
 import { IndustryWorkbenchApp } from './industry-workbench.jsx';
 import { CpuDatapathRenderer, CpuInstructionDecodeRenderer, DecodeFieldsPane, MainMemoryPane } from './cpu-datapath.jsx';
+import { NetworkEvidencePanel, NetworkPacketInspector, NetworkStepsView, NetworkTablesView, NetworkTopologyRenderer } from './network-topology.jsx';
 
 const MAX_VISUAL_VALUES = 18;
 const DEFAULT_SPEED = 6;
 const MOTION_STORAGE_KEY = 'itcc47:visualizer-motion:v1';
 const MOTION_DURATIONS = Object.freeze({ 3: 0.8, 6: 0.52, 9: 0.3 });
+const NETWORK_MOTION_DURATIONS = Object.freeze({ 3: 2.55, 6: 1.7, 9: 0.85 });
 
 function motionDuration(speed) { return MOTION_DURATIONS[speed] || 0.52; }
 
@@ -50,7 +52,7 @@ function useMotionPreference() {
   return { mode, override, update };
 }
 
-function useTransitionBoundary({ state, event, controller, mode }) {
+function useTransitionBoundary({ state, event, controller, mode, unitDuration = null }) {
   const completed = useRef(new Set());
   const expected = useMemo(() => new Set([
     ...(event?.transition?.moves || []).map((move) => move.entityId),
@@ -65,11 +67,11 @@ function useTransitionBoundary({ state, event, controller, mode }) {
       controller.completeTransition(state.transitionToken);
       return undefined;
     }
-    const duration = mode === 'reduced' ? .16 : motionDuration(state.speed);
+    const duration = mode === 'reduced' ? (unitDuration || .16) : (unitDuration || motionDuration(state.speed));
     const durationUnits = Number(event?.transition?.durationUnits) || 1;
     const timeout = setTimeout(() => controller.completeTransition(state.transitionToken), duration * durationUnits * 1000 + 140);
     return () => clearTimeout(timeout);
-  }, [controller, event?.id, event?.transition?.durationUnits, event?.transition?.sequenceId, expected, mode, state.speed, state.transitionToken, state.transitioning]);
+  }, [controller, event?.id, event?.transition?.durationUnits, event?.transition?.sequenceId, expected, mode, state.speed, state.transitionToken, state.transitioning, unitDuration]);
   return useCallback((entityId) => {
     if (!state.transitioning || !state.transitionToken || !expected.has(entityId)) return;
     completed.current.add(entityId);
@@ -77,7 +79,7 @@ function useTransitionBoundary({ state, event, controller, mode }) {
   }, [controller, expected, state.transitionToken, state.transitioning]);
 }
 
-function useCpuSequenceFrame({ enabled, event, frame, duration, onSequenceComplete }) {
+function useSequenceFrame({ enabled, event, frame, duration, onSequenceComplete }) {
   const sequence = enabled ? event?.transition?.phases : null;
   const sequenceId = enabled ? event?.transition?.sequenceId : null;
   const [position, setPosition] = useState({ sequenceId: null, index: 0 });
@@ -112,6 +114,8 @@ function Icon({ name, size = 20 }) {
     expandPanel: <><path d="m15 5 7 7-7 7"/><path d="M2 5v14"/></>,
     grid: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></>,
     link: <><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2"/><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2"/></>,
+    network: <><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="m7.3 10.9 9.4-3.8M7.3 13.1l9.4 3.8"/></>,
+    inspect: <><path d="M3 5h18v14H3z"/><path d="M3 9h18M8 9v10"/><circle cx="14.5" cy="14" r="2.5"/><path d="m16.5 16 2 2"/></>,
     list: <><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></>,
     menu: <><path d="M4 6h16M4 12h16M4 18h16"/></>,
     more: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
@@ -735,26 +739,26 @@ function PlaybackDock({ state, controller, activity, event, motionPreference }) 
   </footer>;
 }
 
-function GranularityControl({ value, onChange, mobile = false }) {
+function GranularityControl({ value, onChange, mobile = false, labels = null }) {
   if (!onChange) return null;
   return <fieldset className={`granularity-control ${mobile ? 'is-mobile' : ''}`}>
     <legend>Step size</legend>
-    {['operation', 'micro'].map((item) => <button type="button" aria-pressed={value === item} onClick={() => onChange(item)} key={item}>{item === 'operation' ? 'Operation' : 'Micro'}</button>)}
+    {['operation', 'micro'].map((item) => <button type="button" aria-pressed={value === item} onClick={() => onChange(item)} key={item}>{labels?.[item] || (item === 'operation' ? 'Operation' : 'Micro')}</button>)}
   </fieldset>;
 }
 
-function PlaybackSettings({ state, controller, motionPreference, mobile = false, granularity, onGranularityChange }) {
+function PlaybackSettings({ state, controller, motionPreference, mobile = false, granularity, onGranularityChange, granularityLabels }) {
   return <div className={`playback-settings-fields ${mobile ? 'is-mobile' : ''}`}>
-    {mobile ? <GranularityControl value={granularity} onChange={onGranularityChange} mobile/> : null}
+    {mobile ? <GranularityControl value={granularity} onChange={onGranularityChange} labels={granularityLabels} mobile/> : null}
     <label className="speed-control">{mobile ? 'Mobile speed' : 'Speed'}<select value={state.speed} onChange={(e) => controller.setSpeed(e.target.value)}><option value="3">0.5×</option><option value="6">1×</option><option value="9">2×</option></select></label>
     <label className="motion-control">{mobile ? 'Mobile motion' : 'Motion'}<select aria-label={mobile ? 'Mobile motion' : 'Motion preference'} value={motionPreference.override || 'device'} onChange={(e) => motionPreference.update(e.target.value)}><option value="device">Use device setting</option><option value="on">On</option><option value="reduced">Reduced</option><option value="off">Off</option></select></label>
   </div>;
 }
 
-function IntegratedPlayback({ state, controller, event, motionPreference, granularity, onGranularityChange }) {
+function IntegratedPlayback({ state, controller, event, motionPreference, granularity, onGranularityChange, granularityLabels }) {
   return <section className="integrated-playback" aria-label="Playback controls">
     <div id="result-caption" className="integrated-step" aria-live="polite"><strong>{state.total ? state.index + 1 : 0} / {state.total}</strong><span>{event?.message || 'Preparing activity…'}</span></div>
-    <GranularityControl value={granularity} onChange={onGranularityChange}/>
+    <GranularityControl value={granularity} onChange={onGranularityChange} labels={granularityLabels}/>
     <div className="transport">
       <button type="button" aria-label="Previous" onClick={() => controller.step(-1)} disabled={state.index === 0 || state.transitioning}><Icon name="previous"/></button>
       <button type="button" className="primary" aria-label={state.status === 'playing' ? 'Pause' : 'Play'} onClick={controller.toggle} disabled={state.atEnd}><Icon name={state.status === 'playing' ? 'pause' : 'play'}/><span>{state.status === 'playing' ? 'Pause' : 'Play'}</span></button>
@@ -762,7 +766,7 @@ function IntegratedPlayback({ state, controller, event, motionPreference, granul
     </div>
     <div className="timeline-control integrated-timeline"><input id="step-slider" type="range" min="0" max={Math.max(state.total - 1, 0)} value={state.index} onChange={(e) => controller.seek(Number(e.target.value))} aria-label="Timeline step"/></div>
     <details className="playback-settings"><summary aria-label="Playback settings"><Icon name="settings" size={18}/><span>Settings</span></summary><PlaybackSettings state={state} controller={controller} motionPreference={motionPreference}/></details>
-    <details className="mobile-playback-details"><summary><Icon name="settings" size={18}/><span>Timeline and settings</span></summary><input type="range" min="0" max={Math.max(state.total - 1, 0)} value={state.index} onChange={(e) => controller.seek(Number(e.target.value))} aria-label="Mobile timeline step"/><PlaybackSettings state={state} controller={controller} motionPreference={motionPreference} granularity={granularity} onGranularityChange={onGranularityChange} mobile/></details>
+    <details className="mobile-playback-details"><summary><Icon name="settings" size={18}/><span>Timeline and settings</span></summary><input type="range" min="0" max={Math.max(state.total - 1, 0)} value={state.index} onChange={(e) => controller.seek(Number(e.target.value))} aria-label="Mobile timeline step"/><PlaybackSettings state={state} controller={controller} motionPreference={motionPreference} granularity={granularity} onGranularityChange={onGranularityChange} granularityLabels={granularityLabels} mobile/></details>
   </section>;
 }
 
@@ -879,17 +883,19 @@ function LockedVisualizer({ release, requestedId }) {
 function VisualizerWorkspace({ params, courseId, requestedId }) {
   const isITCC45 = courseId === 'itcc45';
   const isComputerArchitecture = courseId === 'computer-architecture';
+  const isComputerNetworking = courseId === 'computer-networking';
   const isITCC47 = courseId === 'itcc47';
   const usesCompactWorkspace = useMediaQuery('(max-width: 1000px)');
   const [itcc45WorkspaceLayout, updateITCC45WorkspaceLayout] = useWorkspaceLayout(isITCC45, ITCC45WorkspaceLayout, true);
   const [itcc47WorkspaceLayout, updateITCC47WorkspaceLayout] = useWorkspaceLayout(isITCC47, ITCC47WorkspaceLayout);
   const [computerArchitectureWorkspaceLayout, updateComputerArchitectureWorkspaceLayout] = useWorkspaceLayout(isComputerArchitecture, ComputerArchitectureWorkspaceLayout);
-  const workspaceLayout = isITCC45 ? itcc45WorkspaceLayout : isComputerArchitecture ? computerArchitectureWorkspaceLayout : itcc47WorkspaceLayout;
-  const updateWorkspaceLayout = isITCC45 ? updateITCC45WorkspaceLayout : isComputerArchitecture ? updateComputerArchitectureWorkspaceLayout : updateITCC47WorkspaceLayout;
+  const [computerNetworkingWorkspaceLayout, updateComputerNetworkingWorkspaceLayout] = useWorkspaceLayout(isComputerNetworking, ComputerNetworkingWorkspaceLayout);
+  const workspaceLayout = isITCC45 ? itcc45WorkspaceLayout : isComputerArchitecture ? computerArchitectureWorkspaceLayout : isComputerNetworking ? computerNetworkingWorkspaceLayout : itcc47WorkspaceLayout;
+  const updateWorkspaceLayout = isITCC45 ? updateITCC45WorkspaceLayout : isComputerArchitecture ? updateComputerArchitectureWorkspaceLayout : isComputerNetworking ? updateComputerNetworkingWorkspaceLayout : updateITCC47WorkspaceLayout;
   const activity = useMemo(() => BSITLearningLab.getActivity(courseId, requestedId), [courseId, requestedId]);
   const initialInputs = useCallback((nextActivity) => {
     if (nextActivity.input.defaults) return { ...nextActivity.input.defaults };
-    if (nextActivity.input.kind === 'cpu-preset') return { preset: nextActivity.input.defaultPreset };
+    if (nextActivity.input.kind === 'cpu-preset' || nextActivity.input.kind === 'network-preset') return { preset: nextActivity.input.defaultPreset };
     return {
       values: [...(nextActivity.input.defaultValues || [])],
       target: nextActivity.input.needsTarget ? nextActivity.input.defaultValues[Math.floor(nextActivity.input.defaultValues.length / 2)] : null,
@@ -900,7 +906,9 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const [inputs, setInputs] = useState(() => initialInputs(activity));
   const [viewOptions, setViewOptions] = useState({ numberFormat: 'hex' });
   const [cpuGranularity, setCpuGranularity] = useState('operation');
+  const [networkGranularity, setNetworkGranularity] = useState('micro');
   const pendingGranularityMap = useRef(null);
+  const networkDetailedPositions = useRef(new Map());
   const primaryEvidence = activity.evidenceViews?.[0] || 'trace';
   const [evidenceTab, setEvidenceTab] = useState(primaryEvidence);
   const [mobileTab, setMobileTab] = useState(() => activity.mobileViews?.[0]?.id || 'visualize');
@@ -908,29 +916,35 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const playback = usePlayback(controller);
   const recordsStudentProgress = isITCC47 && !ITCC47Curriculum.isPreviewRequested();
   const motionPreference = useMotionPreference();
-  const result = useMemo(() => activity.run(inputs, { granularity: isComputerArchitecture ? cpuGranularity : 'operation' }), [activity, cpuGranularity, inputs, isComputerArchitecture]);
+  const activeGranularity = isComputerNetworking ? networkGranularity : cpuGranularity;
+  const result = useMemo(() => activity.run(inputs, { granularity: isComputerArchitecture || isComputerNetworking ? activeGranularity : 'operation' }), [activity, activeGranularity, inputs, isComputerArchitecture, isComputerNetworking]);
   const source = useMemo(() => activity.sourceFor ? activity.sourceFor(inputs) : activity.source, [activity, inputs]);
   const event = result.events[playback.index] || result.events[0] || null;
   const previousEvent = playback.index > 0 ? result.events[playback.index - 1] || null : null;
-  const onEntityComplete = useTransitionBoundary({ state: playback, event, controller, mode: motionPreference.mode });
   const duration = motionPreference.mode === 'on' ? motionDuration(playback.speed) : (motionPreference.mode === 'reduced' ? 0.16 : 0);
+  const networkDuration = motionPreference.mode === 'on' ? (NETWORK_MOTION_DURATIONS[playback.speed] || 1.7) : (motionPreference.mode === 'reduced' ? 0.48 : 0);
+  const onEntityComplete = useTransitionBoundary({ state: playback, event, controller, mode: motionPreference.mode, unitDuration: isComputerNetworking ? networkDuration : null });
   const visualDuration = playback.navigationSource === 'seek' || playback.navigationSource === 'load' ? 0 : duration;
+  const networkVisualDuration = playback.navigationSource === 'seek' || playback.navigationSource === 'load' ? 0 : networkDuration;
   const objectVisualDuration = playback.navigationSource === 'seek' ? 0 : duration;
-  const cpuFrame = useCpuSequenceFrame({ enabled: isComputerArchitecture, event, frame: event?.frame, duration: visualDuration, onSequenceComplete: onEntityComplete });
+  const cpuFrame = useSequenceFrame({ enabled: isComputerArchitecture, event, frame: event?.frame, duration: visualDuration, onSequenceComplete: onEntityComplete });
+  const networkFrame = useSequenceFrame({ enabled: isComputerNetworking, event, frame: event?.frame, duration: networkVisualDuration, onSequenceComplete: onEntityComplete });
   const workspaceComposition = workspaceCompositionFor(activity);
   const isCpuDecode = workspaceComposition === 'cpu-decode';
-  const [Renderer, setRenderer] = useState(() => activity.renderer === 'object-model' ? ObjectModelRenderer : activity.renderer === 'cpu-datapath' ? CpuDatapathRenderer : activity.renderer === 'cpu-instruction-decode' ? CpuInstructionDecodeRenderer : ArrayRenderer);
+  const [Renderer, setRenderer] = useState(() => activity.renderer === 'object-model' ? ObjectModelRenderer : activity.renderer === 'cpu-datapath' ? CpuDatapathRenderer : activity.renderer === 'cpu-instruction-decode' ? CpuInstructionDecodeRenderer : activity.renderer === 'network-topology' ? NetworkTopologyRenderer : ArrayRenderer);
 
   useEffect(() => {
     const mapping = pendingGranularityMap.current;
     let startIndex = 0;
-    if (isComputerArchitecture && mapping?.operationId) {
-      startIndex = result.events.findIndex((item) => item.frame?.operation?.id === mapping.operationId);
+    if ((isComputerArchitecture || isComputerNetworking) && mapping?.operationId) {
+      startIndex = result.events.findIndex((item) => item.frame?.operation?.id === mapping.operationId
+        && (!mapping.detailId || item.frame?.detail?.id === mapping.detailId));
+      if (startIndex < 0 && mapping.operationId) startIndex = result.events.findIndex((item) => item.frame?.operation?.id === mapping.operationId);
       if (startIndex < 0) startIndex = 0;
       pendingGranularityMap.current = null;
     }
     controller.load(result.events, startIndex);
-  }, [controller, isComputerArchitecture, result]);
+  }, [controller, isComputerArchitecture, isComputerNetworking, result]);
   useEffect(() => { setEvidenceTab(activity.evidenceViews?.[0] || 'trace'); setMobileTab(activity.mobileViews?.[0]?.id || 'visualize'); }, [activity.id, activity.evidenceViews, activity.mobileViews]);
   useEffect(() => () => controller.dispose(), [controller]);
   useEffect(() => {
@@ -939,6 +953,11 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   useEffect(() => {
     if (recordsStudentProgress && playback.atEnd && playback.total > 0 && typeof ITCC47VisualizerProgress !== 'undefined') ITCC47VisualizerProgress.markReviewed(activity.id);
   }, [activity.id, playback.atEnd, playback.total, recordsStudentProgress]);
+  useEffect(() => {
+    if (isComputerNetworking && networkGranularity === 'micro' && event?.frame?.operation?.id && event?.frame?.detail?.id) {
+      networkDetailedPositions.current.set(event.frame.operation.id, event.frame.detail.id);
+    }
+  }, [event?.frame?.detail?.id, event?.frame?.operation?.id, isComputerNetworking, networkGranularity]);
   useEffect(() => {
     document.body.dataset.course = courseId;
     if (courseId !== 'itcc47' || (params.get('activity') && params.get('activity') !== activity.id)) {
@@ -964,9 +983,18 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
     setCpuGranularity(next);
   }
 
+  function changeNetworkGranularity(next) {
+    if (!isComputerNetworking || next === networkGranularity || !['operation', 'micro'].includes(next)) return;
+    controller.pause();
+    const operationId = event?.frame?.operation?.id || 'evaluate-subnet';
+    if (networkGranularity === 'micro' && event?.frame?.detail?.id) networkDetailedPositions.current.set(operationId, event.frame.detail.id);
+    pendingGranularityMap.current = { operationId, detailId: next === 'micro' ? networkDetailedPositions.current.get(operationId) || null : null };
+    setNetworkGranularity(next);
+  }
+
   const mobileTabs = activity.mobileViews?.map((item) => [item.id, item.icon, item.label]) || [['visualize', 'grid', 'Visualize'], ['code', 'code', 'Code'], ['trace', 'list', courseId === 'itcc45' ? 'Steps' : 'Trace'], ['more', 'more', 'More']];
-  const backHref = isComputerArchitecture ? 'computer-architecture-modules.html' : courseId === 'itcc45' ? 'itcc45-topics.html' : 'problems.html?view=visualizations';
-  const backLabel = isComputerArchitecture ? 'Module roadmap' : courseId === 'itcc45' ? 'All examples' : 'All visualizations';
+  const backHref = isComputerArchitecture ? 'computer-architecture-modules.html' : isComputerNetworking ? 'computer-networking-modules.html' : courseId === 'itcc45' ? 'itcc45-topics.html' : 'problems.html?view=visualizations';
+  const backLabel = isComputerArchitecture || isComputerNetworking ? 'Module roadmap' : courseId === 'itcc45' ? 'All examples' : 'All visualizations';
   const topicActivities = useMemo(() => isITCC45 ? BSITLearningLab.listActivities(courseId).filter((item) => item.topicId === activity.topicId) : [], [activity.topicId, courseId, isITCC45]);
   const exampleIndex = isITCC45 ? Math.max(0, topicActivities.findIndex((item) => item.id === activity.id)) : 0;
   const previousExample = exampleIndex > 0 ? topicActivities[exampleIndex - 1] : null;
@@ -977,10 +1005,10 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
     : ITCC47CurriculumUI.href(`tracer.html?activity=${encodeURIComponent(activity.id)}`);
   const itcc47ActionLabel = activity.renderer === 'linear-adt' ? 'Practice this module' : 'Edit pseudocode';
   const mobileEvidenceActive = mobileTab === 'trace' || mobileTab === 'steps' || mobileTab === 'more';
-  return <LazyMotion features={domMax} strict><MotionConfig reducedMotion={motionPreference.mode === 'on' ? 'never' : 'always'} transition={{ duration }}><div className={`visualizer-workspace course-${courseId} evidence-${workspaceLayout.evidence} motion-${motionPreference.mode} navigation-${playback.navigationSource} composition-${workspaceComposition}`} data-motion-duration={duration} data-workspace-composition={workspaceComposition}>
+  return <LazyMotion features={domMax} strict><MotionConfig reducedMotion={motionPreference.mode === 'on' ? 'never' : 'always'} transition={{ duration }}><div className={`visualizer-workspace course-${courseId} evidence-${workspaceLayout.evidence} motion-${motionPreference.mode} navigation-${playback.navigationSource} composition-${workspaceComposition}`} data-motion-duration={isComputerNetworking ? networkDuration : duration} data-workspace-composition={workspaceComposition}>
     <main className="workspace-main">
-      <div className="activity-heading"><div>{!isComputerArchitecture ? <p><a href={isITCC45 ? backHref : ITCC47CurriculumUI.href(backHref)}><Icon name="back" size={14}/>{backLabel}</a><span>{isITCC45 ? `Topic ${activity.module} / ${activity.topic} / Example ${exampleIndex + 1} of ${topicActivities.length}` : `Module ${activity.module} / ${activity.topic}${activity.exampleKind ? ` / ${activity.exampleKind}` : ''}`}</span></p> : null}<h1>{activity.title}</h1>{isITCC45 ? <span className="activity-learning-goal"><em>{activity.context}</em>{activity.learningGoal}</span> : <span>{activity.subtitle}</span>}</div><div className="activity-action-stack">{isITCC45 ? <nav className="activity-example-nav" aria-label="Examples in this topic">{previousExample ? <a href={exampleHref(previousExample)} aria-label={`Previous example: ${previousExample.title}`}><Icon name="back" size={14}/>Previous</a> : <span aria-disabled="true"><Icon name="back" size={14}/>Previous</span>}{nextExample ? <a href={exampleHref(nextExample)} aria-label={`Next example: ${nextExample.title}`}>Next<Icon name="next" size={14}/></a> : <span aria-disabled="true">Next<Icon name="next" size={14}/></span>}</nav> : null}<div className="activity-actions">{isITCC45 ? <OOPDataControls activity={activity} inputs={inputs} setInputs={setInputs}/> : isComputerArchitecture ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : <a className="edit-code" href={itcc47ActionHref}><Icon name={activity.renderer === 'linear-adt' ? 'grid' : 'code'} size={17}/>{itcc47ActionLabel}</a>}</div></div></div>
-      {!isITCC45 && !isComputerArchitecture ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} onShuffle={shuffle} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : null}
+      <div className="activity-heading"><div>{!isComputerArchitecture ? <p><a href={isITCC45 || isComputerNetworking ? backHref : ITCC47CurriculumUI.href(backHref)}><Icon name="back" size={14}/>{backLabel}</a><span>{isITCC45 ? `Topic ${activity.module} / ${activity.topic} / Example ${exampleIndex + 1} of ${topicActivities.length}` : `Module ${activity.module} / ${activity.topic}${activity.exampleKind ? ` / ${activity.exampleKind}` : ''}`}</span></p> : null}<h1>{activity.title}</h1>{isITCC45 ? <span className="activity-learning-goal"><em>{activity.context}</em>{activity.learningGoal}</span> : <span>{activity.subtitle}</span>}</div><div className="activity-action-stack">{isITCC45 ? <nav className="activity-example-nav" aria-label="Examples in this topic">{previousExample ? <a href={exampleHref(previousExample)} aria-label={`Previous example: ${previousExample.title}`}><Icon name="back" size={14}/>Previous</a> : <span aria-disabled="true"><Icon name="back" size={14}/>Previous</span>}{nextExample ? <a href={exampleHref(nextExample)} aria-label={`Next example: ${nextExample.title}`}>Next<Icon name="next" size={14}/></a> : <span aria-disabled="true">Next<Icon name="next" size={14}/></span>}</nav> : null}<div className="activity-actions">{isITCC45 ? <OOPDataControls activity={activity} inputs={inputs} setInputs={setInputs}/> : isComputerArchitecture || isComputerNetworking ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : <a className="edit-code" href={itcc47ActionHref}><Icon name={activity.renderer === 'linear-adt' ? 'grid' : 'code'} size={17}/>{itcc47ActionLabel}</a>}</div></div></div>
+      {!isITCC45 && !isComputerArchitecture && !isComputerNetworking ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} onShuffle={shuffle} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : null}
       <div className="mobile-surface-tabs" role="tablist" aria-label="Workspace view">{mobileTabs.map(([id, icon, label]) => <button type="button" role="tab" aria-selected={mobileTab === id} className={mobileTab === id ? 'active' : ''} onClick={() => setMobileTab(id)} key={id}><Icon name={icon}/>{label}</button>)}</div>
       {isITCC45 ? <ITCC45LabStage activity={activity} event={event} previousEvent={previousEvent} index={playback.index} source={source} mobileTab={mobileTab} layout={workspaceLayout} onRatioChange={(sourceRatio) => updateWorkspaceLayout({ sourceRatio })} duration={objectVisualDuration} motionMode={motionPreference.mode}/> : isComputerArchitecture ? <div className="cpu-workbench">
         {isCpuDecode ? <div className={`cpu-auxiliary-surface mobile-surface ${mobileTab === 'fields' ? 'mobile-active' : ''}`}><DecodeFieldsPane frame={cpuFrame} numberFormat={viewOptions.numberFormat}/></div> : <div className={`cpu-memory-surface mobile-surface ${mobileTab === 'memory' ? 'mobile-active' : ''}`}><MainMemoryPane frame={cpuFrame} numberFormat={viewOptions.numberFormat}/></div>}
@@ -988,6 +1016,13 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
           <header className="cpu-canvas-heading"><strong>{isCpuDecode ? 'Instruction decoder' : 'CPU datapath'}</strong><span><b>Operation {cpuFrame?.operation?.index || 1} / {cpuFrame?.operation?.total || 1}</b><em>{cpuFrame?.microStep?.index || 1} / {cpuFrame?.microStep?.total || 1} · {cpuFrame?.microStep?.label || 'Find the source'}</em></span></header>
           <section className={`cpu-visual-canvas mobile-surface ${mobileTab === (isCpuDecode ? 'decode' : 'datapath') ? 'mobile-active' : ''}`} tabIndex="0" aria-label={isCpuDecode ? `${activity.title} focused decoder board` : `${activity.title} teaching CPU datapath`}><Renderer frame={cpuFrame} event={event} activity={activity} numberFormat={viewOptions.numberFormat} motionMode={motionPreference.mode} duration={visualDuration * (cpuFrame?.microStep?.durationWeight || 1)}/></section>
         </div>
+      </div> : isComputerNetworking ? <div className="network-workbench">
+        <section className={`network-topology-surface mobile-surface ${mobileTab === 'topology' ? 'mobile-active' : ''}`} tabIndex="0" aria-label={`${activity.title} physical-port topology`}>
+          <Renderer frame={networkFrame} event={event} activity={activity} motionMode={motionPreference.mode} duration={networkVisualDuration} navigationSource={playback.navigationSource} compact={usesCompactWorkspace}/>
+        </section>
+        <div className={`network-packet-surface mobile-surface ${mobileTab === 'packet' ? 'mobile-active' : ''}`}><NetworkPacketInspector frame={networkFrame}/></div>
+        <div className={`network-tables-surface mobile-surface ${mobileTab === 'tables' ? 'mobile-active' : ''}`}><NetworkTablesView frame={networkFrame}/></div>
+        <div className={`network-steps-surface mobile-surface ${mobileTab === 'steps' ? 'mobile-active' : ''}`}><NetworkStepsView frame={networkFrame} controller={controller}/></div>
       </div> : <div className="itcc47-workbench">
         <div className={`desktop-source mobile-surface ${mobileTab === 'code' ? 'mobile-active' : ''}`}><SourcePanel activity={activity} event={event} source={source}/></div>
         <div className="itcc47-visual-shell">
@@ -995,13 +1030,14 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
           <IntegratedPlayback state={playback} controller={controller} event={event} motionPreference={motionPreference}/>
         </div>
       </div>}
-      {usesCompactWorkspace && mobileEvidenceActive ? <div className="mobile-evidence mobile-surface mobile-active">
+      {usesCompactWorkspace && !isComputerNetworking && mobileEvidenceActive ? <div className="mobile-evidence mobile-surface mobile-active">
         <EvidenceDrawer tab={mobileTab === 'trace' || mobileTab === 'steps' ? primaryEvidence : evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/>
       </div> : null}
       {isComputerArchitecture ? <CompletionActions activity={activity} visible={playback.atEnd && !playback.transitioning}/> : null}
     </main>
-    {!usesCompactWorkspace ? <div className="desktop-evidence"><CollapsibleEvidencePanel contentId={isITCC45 ? 'itcc45-learning-evidence' : isComputerArchitecture ? 'computer-architecture-learning-evidence' : 'itcc47-learning-evidence'} expanded={workspaceLayout.evidence === 'expanded'} onExpandedChange={(expanded) => updateWorkspaceLayout({ evidence: expanded ? 'expanded' : 'collapsed' })} showCurrentLabel={isITCC45 || isComputerArchitecture} tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/></div> : null}
+    {!usesCompactWorkspace ? <div className="desktop-evidence">{isComputerNetworking ? <NetworkEvidencePanel frame={networkFrame} expanded={workspaceLayout.evidence === 'expanded'} onExpandedChange={(expanded) => updateWorkspaceLayout({ evidence: expanded ? 'expanded' : 'collapsed' })}/> : <CollapsibleEvidencePanel contentId={isITCC45 ? 'itcc45-learning-evidence' : isComputerArchitecture ? 'computer-architecture-learning-evidence' : 'itcc47-learning-evidence'} expanded={workspaceLayout.evidence === 'expanded'} onExpandedChange={(expanded) => updateWorkspaceLayout({ evidence: expanded ? 'expanded' : 'collapsed' })} showCurrentLabel={isITCC45 || isComputerArchitecture} tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/>}</div> : null}
     {isComputerArchitecture ? <IntegratedPlayback state={playback} controller={controller} event={event} motionPreference={motionPreference} granularity={cpuGranularity} onGranularityChange={changeCpuGranularity}/> : null}
+    {isComputerNetworking ? <IntegratedPlayback state={playback} controller={controller} event={event} motionPreference={motionPreference} granularity={networkGranularity} onGranularityChange={changeNetworkGranularity} granularityLabels={{ operation: 'Overview', micro: 'Detailed' }}/> : null}
     {isITCC45 ? <PlaybackDock state={playback} controller={controller} activity={activity} event={event} motionPreference={motionPreference}/> : null}
   </div></MotionConfig></LazyMotion>;
 }
@@ -1018,7 +1054,8 @@ function App() {
     const release = ITCC47Curriculum.stateForResource('activity', requestedActivity, ITCC47CurriculumUI.previewOptions());
     if (!['available', 'current'].includes(release.state)) return <LockedVisualizer release={release} requestedId={requestedActivity}/>;
   }
-  const defaultActivity = courseId === 'computer-architecture' ? 'architecture-fetch-cycle' : 'itcc45-classes-blueprint';
+  const defaultActivity = courseId === 'computer-architecture' ? 'architecture-fetch-cycle'
+    : courseId === 'computer-networking' ? 'networking-arp-neighbor-discovery' : 'itcc45-classes-blueprint';
   return <VisualizerWorkspace params={params} courseId={courseId} requestedId={requestedActivity || defaultActivity}/>;
 }
 

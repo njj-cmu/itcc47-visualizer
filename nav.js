@@ -27,6 +27,7 @@
     database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
     cpu: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v5m6-5v5M9 18v5m6-5v5M1 9h5m-5 6h5m12-6h5m-5 6h5M10 10h4v4h-4z"/>',
     memory: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h8"/>',
+    network: '<circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="m7.3 10.9 9.4-3.8M7.3 13.1l9.4 3.8"/>',
   };
 
   function svg(name) {
@@ -48,6 +49,7 @@
   const declaredCourse = document.body.dataset.course;
   const inferredCourse = requestedCourse
     || declaredCourse
+    || (page.startsWith('computer-networking') ? 'computer-networking' : null)
     || (page.startsWith('computer-architecture') ? 'computer-architecture' : null)
     || (page.startsWith('itcc45-') || page === 'itcc45.html' ? 'itcc45' : 'itcc47');
   const courseId = typeof BSITLearningLab === 'undefined' ? inferredCourse : BSITLearningLab.resolveCourse(inferredCourse);
@@ -60,9 +62,12 @@
       const title = document.querySelector('.topbar-title');
       if (title) title.innerHTML = courseId === 'computer-architecture'
         ? 'Computer Architecture'
+        : courseId === 'computer-networking'
+          ? 'Introduction to Networking'
         : `<span class="topbar-code">${course.code}</span> ${course.shortTitle || course.brandLabel || course.title}`;
       if (courseId === 'itcc45') document.title = 'ITCC45 Python Object Lab';
       else if (courseId === 'computer-architecture') document.title = 'Computer Architecture CPU Lab';
+      else if (courseId === 'computer-networking') document.title = 'Introduction to Networking · ARP Lab';
     }
     nav.querySelectorAll('[data-icon]').forEach((element) => element.insertAdjacentHTML('afterbegin', svg(element.dataset.icon)));
   }

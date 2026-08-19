@@ -57,6 +57,23 @@ work without an account or network.
 | [`visualizer.html?course=computer-architecture&activity=architecture-add-immediate`](visualizer.html?course=computer-architecture&activity=architecture-add-immediate) | Guided `5 + 13` fetch-and-execute CPU Lab |
 | [`computer-architecture-practice.html`](computer-architecture-practice.html) | Seven local Fetch, Decode, and Execute checks |
 
+### IT 53 — Introduction to Networking
+
+The Network Lab follows one same-LAN IPv4 forwarding decision through ARP. Its
+deterministic teaching topology has two hosts and a deliberately simplified two-port
+switch. Every cable and packet path terminates inside the named physical RJ45 jack:
+Host A `eth0` ↔ `Fa0/1`, then `Fa0/2` ↔ Host B `eth0`. Overview shows eight major
+decisions; Detailed shows 24 immutable phases with synchronized packet, decision,
+ARP-table, and MAC-table evidence. It is a guided classroom lab, not an editable
+topology or Packet Tracer replacement.
+
+| Page | Purpose |
+|---|---|
+| [`computer-networking.html`](computer-networking.html) | IT 53 subject home and learning path |
+| [`computer-networking-modules.html`](computer-networking-modules.html) | Curriculum-reconciled module roadmap |
+| [`visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery`](visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery) | Port-accurate ARP Network Lab |
+| [`computer-networking-practice.html`](computer-networking-practice.html) | Three identity-free local ARP checks |
+
 The root [`index.html`](index.html) is the **BSIT Learning Lab** subject chooser.
 
 ## Running it
@@ -127,6 +144,12 @@ CPU cues pause at their source, pulse the emitting value or signal, travel over
 collision-free SVG routes, and remain latched with the active path until the
 next micro phase. The same settled evidence is available with reduced or
 disabled motion.
+
+Introduction to Networking adds a framework-neutral `ComputerNetworkingMachine`
+with stable device, interface, link, packet, ARP-entry, and MAC-entry identities.
+The same eight-operation final state is produced by the 24-phase Detailed timeline.
+Separate fixed desktop and phone SVG coordinate maps resolve cable endpoints from
+interface IDs; packet motion references those exact cable paths.
 
 This repository is public practice, not an academic record. It stores no
 identity, grades, timestamps, authentication, or authoritative submissions.

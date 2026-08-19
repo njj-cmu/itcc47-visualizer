@@ -74,6 +74,18 @@ const BSITLearningLab = (() => {
       { href: 'index.html', label: 'All Subjects', icon: 'grid' },
     ],
   });
+  registerCourse({
+    id: 'computer-networking', code: 'NET', title: 'Introduction to Networking',
+    brandLabel: 'Introduction to Networking', shortTitle: 'Network Lab',
+    home: 'computer-networking.html', accent: 'green',
+    nav: [
+      { href: 'computer-networking.html', label: 'Home', icon: 'start' },
+      { href: 'visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery', label: 'Network Lab', icon: 'network' },
+      { href: 'computer-networking-modules.html', label: 'Modules', icon: 'modules' },
+      { href: 'computer-networking-practice.html', label: 'Practice', icon: 'problems' },
+      { href: 'index.html', label: 'All Subjects', icon: 'grid' },
+    ],
+  });
 
   return Object.freeze({ SCHEMA_VERSION, registerCourse, registerActivities, registerCurriculum,
     getCourse, listCourses, listActivities, getActivity, getCurriculum, resolveCourse });

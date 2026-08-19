@@ -152,6 +152,12 @@ non-goals for this release.
 
 ## Subject 2: Introduction to Networking
 
+Implementation work for this subject is tracked in
+[`computer-networking-implementation.md`](computer-networking-implementation.md). That plan
+turns the Phase 3 vertical slice into concrete course, activity, renderer,
+evidence, accessibility, offline, and test deliverables while keeping the
+curated-small-topology boundary below.
+
 ### Proposed activities
 
 - OSI/TCP-IP encapsulation and decapsulation;

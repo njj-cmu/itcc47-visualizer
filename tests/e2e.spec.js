@@ -517,21 +517,35 @@ test('CPU desktop datapath remains a collision-free one-screen scene at supporte
           return box.left < shell.left - 1 || box.right > shell.right + 1 || box.top < shell.top - 1 || box.bottom > shell.bottom + 1;
         });
       }).length;
-      const marMemory = document.querySelector('[data-route-id="mar-memory"]');
-      const pc = rect('[data-component-id="PC"]');
-      const marMemoryCrossesPc = marMemory && pc ? Array.from({ length: 81 }, (_, index) => {
-        const point = marMemory.getPointAtLength((marMemory.getTotalLength() * index) / 80);
-        const screenPoint = new DOMPoint(point.x, point.y).matrixTransform(marMemory.getScreenCTM());
-        return screenPoint.x > pc.left + 1 && screenPoint.x < pc.right - 1 && screenPoint.y > pc.top + 1 && screenPoint.y < pc.bottom - 1;
-      }).some(Boolean) : true;
+      const pathCrosses = (pathSelector, componentSelector) => {
+        const path = document.querySelector(pathSelector);
+        const component = rect(componentSelector);
+        return path && component ? Array.from({ length: 121 }, (_, index) => {
+          const point = path.getPointAtLength((path.getTotalLength() * index) / 120);
+          const screenPoint = new DOMPoint(point.x, point.y).matrixTransform(path.getScreenCTM());
+          return screenPoint.x > component.left + 1 && screenPoint.x < component.right - 1 && screenPoint.y > component.top + 1 && screenPoint.y < component.bottom - 1;
+        }).some(Boolean) : true;
+      };
       return {
         horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth,
         cuRegisterOverlap: overlaps(rect('.cpu-control-unit'), rect('.cpu-register-bank')),
         cuAluOverlap: overlaps(rect('.cpu-control-unit'), rect('.cpu-alu-unit')),
         cuMdrOverlap: overlaps(rect('.cpu-control-unit'), rect('[data-component-id="MDR"]')),
+        cuSequenceOverlap: Boolean(overlaps(rect('.cpu-control-unit .cpu-svg-sequence-note'), rect('.cpu-control-unit .cpu-svg-label'))
+          || overlaps(rect('.cpu-control-unit .cpu-svg-sequence-note'), rect('.cpu-control-unit .cpu-svg-signal-label'))),
         clippedText,
         binaryTextOverflow,
-        marMemoryCrossesPc,
+        marMemoryCrossesPc: pathCrosses('[data-route-id="mar-memory"]', '[data-component-id="PC"]'),
+        controlMemoryCrossesAlu: pathCrosses('[data-control-id="control-memory"]', '.cpu-alu-unit'),
+        controlMemoryCrossesMdr: pathCrosses('[data-control-id="control-memory"]', '[data-component-id="MDR"]'),
+        controlMemoryCrossesRegisters: pathCrosses('[data-control-id="control-memory"]', '.cpu-register-bank'),
+        controlMdrCrossesAlu: pathCrosses('[data-control-id="control-mdr"]', '.cpu-alu-unit'),
+        controlMdrCrossesRegisters: pathCrosses('[data-control-id="control-mdr"]', '.cpu-register-bank'),
+        mdrIrCrossesAlu: pathCrosses('[data-route-id="mdr-ir"]', '.cpu-alu-unit'),
+        mdrIrCrossesCu: pathCrosses('[data-route-id="mdr-ir"]', '.cpu-control-unit'),
+        aluR1CrossesMdr: pathCrosses('[data-route-id="alu-r1"]', '[data-component-id="MDR"]'),
+        aluR1CrossesCu: pathCrosses('[data-route-id="alu-r1"]', '.cpu-control-unit'),
+        cuSvgHeight: Number(document.querySelector('.cpu-control-unit > rect')?.getAttribute('height')),
         aluWidth: rect('.cpu-alu-unit')?.right - rect('.cpu-alu-unit')?.left,
         aluParts: document.querySelectorAll('.cpu-alu-slot').length,
         layers: [...document.querySelectorAll('.cpu-datapath-full [data-layer]')].map((node) => node.getAttribute('data-layer')),
@@ -542,9 +556,20 @@ test('CPU desktop datapath remains a collision-free one-screen scene at supporte
       cuRegisterOverlap: false,
       cuAluOverlap: false,
       cuMdrOverlap: false,
+      cuSequenceOverlap: false,
       clippedText: 0,
       binaryTextOverflow: 0,
       marMemoryCrossesPc: false,
+      controlMemoryCrossesAlu: false,
+      controlMemoryCrossesMdr: false,
+      controlMemoryCrossesRegisters: false,
+      controlMdrCrossesAlu: false,
+      controlMdrCrossesRegisters: false,
+      mdrIrCrossesAlu: false,
+      mdrIrCrossesCu: false,
+      aluR1CrossesMdr: false,
+      aluR1CrossesCu: false,
+      cuSvgHeight: 242,
       aluWidth: expect.any(Number),
       aluParts: 4,
       layers: ['structural-connections', 'active-connections', 'components-and-text', 'traveling-cues-and-arrivals'],
@@ -870,9 +895,16 @@ test('ADDI teaches ALU internals progressively and fires ALU-out before R1-in', 
   await expect(r1In).toHaveAttribute('data-activation-delay-ms', '464');
   await page.waitForTimeout(520);
   expect(await r1In.locator('[data-motion-role="control-signal"]').evaluate((node) => Number(getComputedStyle(node).opacity))).toBeGreaterThan(.9);
-  await expect(page.locator('.cpu-control-unit')).toContainText('Teaching order · one semantic operation');
+  await expect(page.locator('.cpu-control-unit')).toContainText('Teaching order · one operation');
   await expect(page.locator('.cpu-control-unit')).toContainText('First');
   await expect(page.locator('.cpu-control-unit')).toContainText('Then');
+  expect(await page.locator('.cpu-control-unit').evaluate((controlUnit) => {
+    const overlaps = (left, right) => left.left < right.right - 1 && left.right > right.left + 1 && left.top < right.bottom - 1 && left.bottom > right.top + 1;
+    const sequence = controlUnit.querySelector('.cpu-svg-sequence-note')?.getBoundingClientRect();
+    const title = controlUnit.querySelector('.cpu-svg-label')?.getBoundingClientRect();
+    const signalLabel = controlUnit.querySelector('.cpu-svg-signal-label')?.getBoundingClientRect();
+    return sequence && title && signalLabel ? overlaps(sequence, title) || overlaps(sequence, signalLabel) : true;
+  })).toBe(false);
   await expect(page.getByRole('button', { name: 'Step' })).toBeEnabled({ timeout: 6000 });
   await expect(aluOut).toHaveCount(1);
   await expect(r1In).toHaveCount(1);

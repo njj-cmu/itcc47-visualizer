@@ -5,22 +5,22 @@ const DATAPATH_ROUTES = Object.freeze([
   Object.freeze({ id: 'pc-mar', from: 'PC', to: 'MAR', d: 'M480 106 H525', x: [480, 525], y: [106, 106], times: [0, 1], tone: 'address-path' }),
   Object.freeze({ id: 'mar-memory', from: 'MAR', to: 'memory', d: 'M590 72 V60 H246', x: [590, 590, 246], y: [72, 60, 60], times: [0, .05, 1], tone: 'address-path' }),
   Object.freeze({ id: 'memory-mdr', from: 'memory', to: 'MDR', d: 'M246 372 H350', x: [246, 350], y: [372, 372], times: [0, 1], tone: 'data-path' }),
-  Object.freeze({ id: 'mdr-ir', from: 'MDR', to: 'IR', d: 'M480 372 H742 V150 H680 V106 H700', x: [480, 742, 742, 680, 680, 700], y: [372, 372, 150, 150, 106, 106], times: [0, .37, .69, .78, .94, 1], tone: 'data-path' }),
+  Object.freeze({ id: 'mdr-ir', from: 'MDR', to: 'IR', d: 'M415 338 V282 H338 V154 H680 V106 H700', x: [415, 415, 338, 338, 680, 680, 700], y: [338, 282, 282, 154, 154, 106, 106], times: [0, .12, .24, .48, .86, .96, 1], tone: 'data-path' }),
   Object.freeze({ id: 'ir-decoder', from: 'IR', to: 'Decoder', d: 'M870 106 H930', x: [870, 930], y: [106, 106], times: [0, 1], tone: 'data-path' }),
-  Object.freeze({ id: 'r1-alu', from: 'R1', to: 'ALU', d: 'M486 252 V282 H542 V326', x: [486, 486, 542, 542], y: [252, 282, 282, 326], times: [0, .22, .73, 1], tone: 'operand-path' }),
-  Object.freeze({ id: 'decoder-alu', from: 'Decoder', to: 'ALU', d: 'M1005 140 V156 H720 V278 H608 V326', x: [1005, 1005, 720, 720, 608, 608], y: [140, 156, 156, 278, 278, 326], times: [0, .05, .46, .65, .89, 1], tone: 'operand-path' }),
-  Object.freeze({ id: 'alu-r1', from: 'ALU', to: 'R1', d: 'M514 394 H494 V282 H486 V252', x: [514, 494, 494, 486, 486], y: [394, 394, 282, 282, 252], times: [0, .12, .74, .88, 1], tone: 'result-path' }),
+  Object.freeze({ id: 'r1-alu', from: 'R1', to: 'ALU', d: 'M486 252 V278 H543 V328', x: [486, 486, 543, 543], y: [252, 278, 278, 328], times: [0, .2, .72, 1], tone: 'operand-path' }),
+  Object.freeze({ id: 'decoder-alu', from: 'Decoder', to: 'ALU', d: 'M1005 140 V154 H726 V278 H608 V328', x: [1005, 1005, 726, 726, 608, 608], y: [140, 154, 154, 278, 278, 328], times: [0, .05, .46, .66, .9, 1], tone: 'operand-path' }),
+  Object.freeze({ id: 'alu-r1', from: 'ALU', to: 'R1', d: 'M680 296 V282 H494 V252', x: [680, 680, 494, 494], y: [296, 282, 282, 252], times: [0, .16, .8, 1], tone: 'result-path' }),
 ]);
 
 const CONTROL_CONNECTIONS = Object.freeze([
-  Object.freeze({ id: 'control-pc', d: 'M812 170 V156 H415 V140', x: [812, 812, 415, 415], y: [170, 156, 156, 140], times: [0, .08, .92, 1], signals: Object.freeze(['PCout', 'PCinc']) }),
-  Object.freeze({ id: 'control-mar', d: 'M852 170 V152 H590 V140', x: [852, 852, 590, 590], y: [170, 152, 152, 140], times: [0, .08, .92, 1], signals: Object.freeze(['MARin', 'MARout']) }),
-  Object.freeze({ id: 'control-ir', d: 'M902 170 V156 H785 V140', x: [902, 902, 785, 785], y: [170, 156, 156, 140], times: [0, .12, .88, 1], signals: Object.freeze(['IRin']) }),
-  Object.freeze({ id: 'control-decoder', d: 'M962 170 V156 H1005 V140', x: [962, 962, 1005, 1005], y: [170, 156, 156, 140], times: [0, .2, .8, 1], signals: Object.freeze(['IMMout']) }),
-  Object.freeze({ id: 'control-r1', d: 'M800 170 V158 H486 V184', x: [800, 800, 486, 486], y: [170, 158, 158, 184], times: [0, .08, .92, 1], signals: Object.freeze(['R1out', 'R1in']) }),
-  Object.freeze({ id: 'control-memory', d: 'M760 280 H738 V310 H266 V286 H246', x: [760, 738, 738, 266, 266, 246], y: [280, 280, 310, 310, 286, 286], times: [0, .06, .15, .78, .92, 1], signals: Object.freeze(['READ', 'MFC']) }),
-  Object.freeze({ id: 'control-mdr', d: 'M760 328 H742 V372 H480', x: [760, 742, 742, 480], y: [328, 328, 372, 372], times: [0, .08, .2, 1], signals: Object.freeze(['MDRin', 'MDRout']) }),
-  Object.freeze({ id: 'control-alu', d: 'M760 354 H730', x: [760, 730], y: [354, 354], times: [0, 1], signals: Object.freeze(['ALUinA', 'ALUinB', 'ALUadd', 'ALUout']) }),
+  Object.freeze({ id: 'control-pc', d: 'M812 174 V150 H415 V140', x: [812, 812, 415, 415], y: [174, 150, 150, 140], times: [0, .1, .92, 1], signals: Object.freeze(['PCout', 'PCinc']) }),
+  Object.freeze({ id: 'control-mar', d: 'M852 174 V146 H590 V140', x: [852, 852, 590, 590], y: [174, 146, 146, 140], times: [0, .1, .92, 1], signals: Object.freeze(['MARin', 'MARout']) }),
+  Object.freeze({ id: 'control-ir', d: 'M902 174 V150 H785 V140', x: [902, 902, 785, 785], y: [174, 150, 150, 140], times: [0, .16, .86, 1], signals: Object.freeze(['IRin']) }),
+  Object.freeze({ id: 'control-decoder', d: 'M962 174 V150 H1005 V140', x: [962, 962, 1005, 1005], y: [174, 150, 150, 140], times: [0, .25, .75, 1], signals: Object.freeze(['IMMout']) }),
+  Object.freeze({ id: 'control-r1', d: 'M800 174 V160 H486 V184', x: [800, 800, 486, 486], y: [174, 160, 160, 184], times: [0, .08, .92, 1], signals: Object.freeze(['R1out', 'R1in']) }),
+  Object.freeze({ id: 'control-memory', d: 'M770 196 H744 V166 H246', x: [770, 744, 744, 246], y: [196, 196, 166, 166], times: [0, .06, .14, 1], signals: Object.freeze(['READ', 'MFC']) }),
+  Object.freeze({ id: 'control-mdr', d: 'M770 304 H744 V282 H430 V338', x: [770, 744, 744, 430, 430], y: [304, 304, 282, 282, 338], times: [0, .06, .14, .86, 1], signals: Object.freeze(['MDRin', 'MDRout']) }),
+  Object.freeze({ id: 'control-alu', d: 'M770 350 H730', x: [770, 730], y: [350, 350], times: [0, 1], signals: Object.freeze(['ALUinA', 'ALUinB', 'ALUadd', 'ALUout']) }),
 ]);
 
 function format(value, width, numberFormat) {
@@ -128,25 +128,25 @@ function AluSvg({ execution, animationMetadata }) {
   const operationActive = alu.stage === 'operation';
   const resultActive = ['result', 'output', 'complete'].includes(alu.stage);
   return <g className={`cpu-component cpu-context-unit cpu-alu-unit ${state}`} data-component-id="ALU" data-component-state={state || 'idle'} data-alu-stage={alu.stage} data-alu-input-a={alu.inputA ?? ''} data-alu-input-b={alu.inputB ?? ''} data-alu-operation={alu.operation ?? ''} data-alu-result={alu.result ?? ''}>
-    <rect className="cpu-alu-shell" x="500" y="292" width="230" height="134" rx="10"/>
-    <text className="cpu-svg-label" x="514" y="314">TEACHING ALU</text>
-    <text className="cpu-svg-width" x="716" y="314" textAnchor="end">16-bit</text>
+    <rect className="cpu-alu-shell" x="500" y="296" width="230" height="126" rx="10"/>
+    <text className="cpu-svg-label" x="514" y="318">TEACHING ALU</text>
+    <text className="cpu-svg-width" x="716" y="318" textAnchor="end">16-bit</text>
     <g className={`cpu-alu-slot is-input-a ${inputAActive ? 'is-active' : ''}`}>
-      <rect x="514" y="324" width="58" height="38" rx="6"/>
-      <text className="cpu-alu-slot-label" x="543" y="338" textAnchor="middle">INPUT A</text>
-      <text className="cpu-alu-slot-value" x="543" y="354" textAnchor="middle">{alu.inputA ?? '—'}</text>
+      <rect x="514" y="328" width="58" height="36" rx="6"/>
+      <text className="cpu-alu-slot-label" x="543" y="341" textAnchor="middle">INPUT A</text>
+      <text className="cpu-alu-slot-value" x="543" y="357" textAnchor="middle">{alu.inputA ?? '—'}</text>
     </g>
     <g className={`cpu-alu-slot is-input-b ${inputBActive ? 'is-active' : ''}`}>
-      <rect x="579" y="324" width="58" height="38" rx="6"/>
-      <text className="cpu-alu-slot-label" x="608" y="338" textAnchor="middle">INPUT B</text>
-      <text className="cpu-alu-slot-value" x="608" y="354" textAnchor="middle">{alu.inputB ?? '—'}</text>
+      <rect x="579" y="328" width="58" height="36" rx="6"/>
+      <text className="cpu-alu-slot-label" x="608" y="341" textAnchor="middle">INPUT B</text>
+      <text className="cpu-alu-slot-value" x="608" y="357" textAnchor="middle">{alu.inputB ?? '—'}</text>
     </g>
     <g className={`cpu-alu-slot is-operation ${operationActive ? 'is-active' : ''}`}>
-      <rect x="644" y="324" width="72" height="38" rx="6"/>
-      <text className="cpu-alu-slot-label" x="680" y="338" textAnchor="middle">OPERATION</text>
-      <text className="cpu-alu-slot-value" x="680" y="354" textAnchor="middle">{alu.operation ?? '—'}</text>
+      <rect x="644" y="328" width="72" height="36" rx="6"/>
+      <text className="cpu-alu-slot-label" x="680" y="341" textAnchor="middle">OPERATION</text>
+      <text className="cpu-alu-slot-value" x="680" y="357" textAnchor="middle">{alu.operation ?? '—'}</text>
     </g>
-    <path className="cpu-alu-internal-path" d="M543 362 V370 H680 M608 362 V370 H680 M680 362 V374"/>
+    <path className="cpu-alu-internal-path" d="M543 364 V370 H680 M608 364 V370 H680 M680 364 V374"/>
     <g className={`cpu-alu-slot is-result ${resultActive ? 'is-active' : ''}`}>
       <rect x="514" y="374" width="202" height="38" rx="6"/>
       <text className="cpu-alu-slot-label" x="526" y="389">RESULT LATCH</text>
@@ -262,8 +262,8 @@ export const CpuDatapathRenderer = memo(function CpuDatapathRenderer({ frame, nu
       <g className="cpu-svg-layer cpu-component-layer" data-layer="components-and-text">
         <text className="cpu-svg-kicker cpu-title-kicker" x="355" y="47">TEACHING CPU · 16-BIT WORD</text>
         <RouteBadge x={254} y={92} width={76}>ADDR · 8b</RouteBadge>
-        <RouteBadge x={254} y={354} width={84}>DATA · 16b</RouteBadge>
-        <RouteBadge x={254} y={292} width={76} tone="is-control">READ / MFC</RouteBadge>
+        <RouteBadge x={254} y={363} width={84}>DATA · 16b</RouteBadge>
+        <RouteBadge x={254} y={157} width={76} tone="is-control">READ / MFC</RouteBadge>
 
         <MainMemorySvg frame={frame} animationMetadata={animationMetadata} numberFormat={numberFormat}/>
         <RegisterBox id="PC" x={350} y={72} register={registers.PC} animationMetadata={animationMetadata} numberFormat={numberFormat}/>
@@ -292,23 +292,23 @@ export const CpuDatapathRenderer = memo(function CpuDatapathRenderer({ frame, nu
         <AluSvg execution={execution} animationMetadata={animationMetadata}/>
 
         <g className={`cpu-component cpu-control-unit ${activeSignals.length ? 'is-active' : ''}`} data-component-id="CONTROL" data-component-state={activeSignals.length ? 'active' : 'idle'}>
-          <rect x="760" y="170" width="320" height="270" rx="11"/>
-          <text className="cpu-svg-label" x="782" y="199">CONTROL UNIT</text>
-          <text className="cpu-svg-signal-label" x="782" y="222">CONTROL SIGNALS</text>
+          <rect x="770" y="174" width="310" height="242" rx="11"/>
+          <text className="cpu-svg-label" x="792" y="201">CONTROL UNIT</text>
+          <text className="cpu-svg-signal-label" x="792" y="223">CONTROL SIGNALS</text>
+          {orderedSignals.length > 1 ? <text className="cpu-svg-sequence-note" x="1058" y="201" textAnchor="end">Teaching order · one operation</text> : null}
           {orderedSignals.length ? orderedSignals.map((signal, index) => {
             const cue = controlCueBySignal.get(signal.id);
             const cueDelay = durationUnit * (cue?.activationOffsetUnits || 0);
             return <m.g className={controlPulseSignals.has(signal.id) ? 'is-emitting' : ''} data-source-pulse={controlPulseSignals.has(signal.id) ? `CONTROL:${signal.id}` : undefined} data-cue-order={cue?.order} initial={motionMode === 'on' && cue ? { opacity: cue.order === 1 ? 1 : .34 } : false} animate={{ opacity: 1 }} transition={{ delay: cueDelay, duration: .08 }} style={{ '--cpu-cue-delay': `${cueDelay}s` }} key={signal.id}>
-              <rect className="cpu-signal-chip" x={782 + (index % 3) * 90} y={232 + Math.floor(index / 3) * 28} width="82" height="22" rx="5"/>
-              <text className="cpu-svg-signal" x={823 + (index % 3) * 90} y={247 + Math.floor(index / 3) * 28} textAnchor="middle">{cue ? `${cue.order} · ${signal.label}` : signal.label}</text>
+              <rect className="cpu-signal-chip" x={792 + (index % 3) * 88} y={233 + Math.floor(index / 3) * 28} width="80" height="22" rx="5"/>
+              <text className="cpu-svg-signal" x={832 + (index % 3) * 88} y={248 + Math.floor(index / 3) * 28} textAnchor="middle">{cue ? `${cue.order} · ${signal.label}` : signal.label}</text>
             </m.g>;
-          }) : <text className="cpu-svg-muted" x="782" y="248">No control signal is active</text>}
-          <path className="cpu-control-divider" d="M782 292 H1058"/>
-          <text className="cpu-svg-signal-label" x="782" y="314">WHAT IS HAPPENING</text>
-          <SvgTeachingNote className="cpu-svg-guidance" text={teachingText} x={782} y={335}/>
-          <text className="cpu-svg-signal-label cpu-svg-next-label" x="782" y="380">UP NEXT</text>
-          <SvgTeachingNote className="cpu-svg-guidance cpu-svg-next" text={nextText} x={782} y={401}/>
-          {orderedSignals.length > 1 ? <text className="cpu-svg-sequence-note" x="782" y="430">Teaching order · one semantic operation</text> : null}
+          }) : <text className="cpu-svg-muted" x="792" y="249">No control signal is active</text>}
+          <path className="cpu-control-divider" d="M792 288 H1058"/>
+          <text className="cpu-svg-signal-label" x="792" y="309">WHAT IS HAPPENING</text>
+          <SvgTeachingNote className="cpu-svg-guidance" text={teachingText} x={792} y={330}/>
+          <text className="cpu-svg-signal-label cpu-svg-next-label" x="792" y="369">UP NEXT</text>
+          <SvgTeachingNote className="cpu-svg-guidance cpu-svg-next" text={nextText} x={792} y={390}/>
         </g>
       </g>
 

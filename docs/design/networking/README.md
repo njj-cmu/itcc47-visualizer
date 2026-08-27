@@ -8,11 +8,14 @@ Module 1 uses five fixed, code-native network scenes rather than a single crowde
 overview: client-to-email/web/file services, local IPv4 peer sharing, component
 classification, campus copper/fiber/wireless media, and branch physical/logical
 topology. Every wired edge terminates at a named interface rendered by the scene;
-only used interfaces appear. The current movement card sits above Learning Evidence
-on desktop and at the top of the phone Steps view. All eight operations are paged as
-two sets of four readable cards. Interface names stay beside their physical
-attachments; service-protocol examples belong in the host-role evidence step so
-SMTP/IMAP, HTTP/HTTPS, and SMB remain readable instead of becoming tiny cable labels.
+only used interfaces appear. The current movement strip spans the top of the
+full-width operation canvas. All eight operations are paged as two sets of four
+readable cards. A Generic/Interfaces control changes the instructional detail
+without changing topology identity; interface names appear below devices and can be
+hidden independently. Device-attached callouts use neutral third-person statements
+such as “The client laptop has to request the selected network service.” They never
+role-play as the device. Classification outlines show the region considered an end
+device, intermediary network device, server role, or network connection.
 
 These accepted concepts are retained in the repository as fidelity and regression
 references for the port-accurate ARP vertical slice:
@@ -34,12 +37,15 @@ and cable tails without copying the unused ports visible in that image.
 
 For visual QA, compare the live lab at 1440 × 900 and 390 × 844 with the desktop and
 phone references, then inspect the RJ45 detail separately. Required fidelity points
-are the dark classroom tone, open topology, physical jack labels, packet inspector
-as a large draggable desktop side overlay, four readable operation cards at a time,
-the current movement card above right-hand Decision/table evidence, and bottom phone
-playback controls. The
-desktop inspector must remain clamped to the teaching stage, support arrow-key
-movement and position reset, and never become part of deterministic packet state.
+are the dark classroom tone, open topology, optional physical jack labels, packet
+inspector as a draggable and resizable desktop overlay, four readable operation
+cards at a time, the full-width current-movement strip above the canvas, and bottom
+phone playback controls. The former desktop Learning Evidence rail is intentionally
+removed; concepts now live in device callouts and classification outlines, while ARP
+tables live in the floating inspector. The desktop inspector must remain clamped to
+the teaching stage, enforce a 340 × 260 minimum, support mouse and keyboard movement
+and resizing, provide a reset action, and never become part of deterministic packet
+state.
 On phone layouts it remains a fixed Packet tab rather than a floating element.
 Also verify that every cable endpoint and plug tip falls inside its declared jack,
 Fa0/1 and Fa0/2 remain visibly distinct, the current physical-path statement matches

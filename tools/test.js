@@ -1184,9 +1184,23 @@ ok('foundation renderer resolves five fixed layouts from named interfaces rather
   && networkingFoundationsRendererSource.includes('data-to-interface-id={item.toInterfaceId}')
   && networkingFoundationsRendererSource.includes('data-path-definition={geometry.paths[item.id]}')
   && networkingFoundationsRendererSource.includes('activity.input.activityByPreset[event.target.value]'));
-ok('current movement is rendered above desktop networking evidence and repeated in phone Steps',
+ok('current movement is rendered once above the full-width network canvas on desktop and phone',
   networkingRendererSource.includes('export function NetworkCurrentMovement')
-  && networkingRendererSource.includes('<NetworkCurrentMovement frame={frame} compact/>'));
+  && !networkingRendererSource.includes('<NetworkCurrentMovement frame={frame} compact/>')
+  && visualizerSource.includes('<><NetworkCurrentMovement frame={networkFrame}/><div ref={networkWorkbenchRef}'));
+const networkingDiagramControlsSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'network-diagram-controls.jsx'), 'utf8');
+ok('network diagram exposes Generic and Interfaces modes with an optional interface-label toggle',
+  networkingDiagramControlsSource.includes("onModeChange('generic')")
+  && networkingDiagramControlsSource.includes("onModeChange('interfaces')")
+  && networkingDiagramControlsSource.includes('onShowLabelsChange(event.target.checked)')
+  && networkingFoundationsRendererSource.includes("displayMode === 'interfaces' && showInterfaceLabels")
+  && networkingFoundationsRendererSource.includes('data-interface-labels={showInterfaceLabels'));
+ok('device callouts use synchronized third-person teaching narration and preserve overlapping role classifications',
+  networkingFoundationsRendererSource.includes('data-callout-device-id={device.id}')
+  && networkingFoundationsRendererSource.includes('The email server handles SMTP and IMAP requests.')
+  && networkingFoundationsRendererSource.includes("return 'End device · Server role'")
+  && networkingRendererSource.includes('frame.phase.explanation')
+  && networkingRendererSource.includes('data-callout-device-id={deviceId}'));
 const networkingCarouselSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'network-operation-carousel.jsx'), 'utf8');
 ok('network operation carousel exposes four readable steps while retaining the eight-operation contract',
   networkingCarouselSource.includes('const PAGE_SIZE = 4')
@@ -1194,12 +1208,15 @@ ok('network operation carousel exposes four readable steps while retaining the e
   && networkingCarouselSource.includes('data-operation-total={timeline.length}')
   && networkingCarouselSource.includes('Show next four steps'));
 const networkingFloatingInspectorSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'network-floating-inspector.jsx'), 'utf8');
-ok('desktop packet inspector supports bounded pointer drag, keyboard movement, and position reset',
+ok('desktop packet inspector supports bounded drag, keyboard movement, resizing, evidence tabs, and window reset',
   networkingFloatingInspectorSource.includes("window.addEventListener('pointermove', movePanel)")
   && networkingFloatingInspectorSource.includes("'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home'")
   && networkingFloatingInspectorSource.includes('setPosition(clampPosition')
   && networkingFloatingInspectorSource.includes('data-position-mode={position ? \'custom\' : \'default\'}')
-  && networkingFloatingInspectorSource.includes('Reset position'));
+  && networkingFloatingInspectorSource.includes('data-min-width={MINIMUM_WIDTH}')
+  && networkingFloatingInspectorSource.includes('event.shiftKey')
+  && networkingFloatingInspectorSource.includes("tab === 'arp' ? <ArpTableView")
+  && networkingFloatingInspectorSource.includes('Reset window'));
 
 const oopEngine = load(['course-catalog.js', 'playback.js', 'itcc45-activities.js', 'itcc45-practice-data.js'], { setTimeout, clearTimeout });
 const Courses = oopEngine.get('BSITLearningLab');

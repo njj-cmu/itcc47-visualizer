@@ -1,9 +1,10 @@
 import React, { memo, useMemo } from 'react';
+import { NetworkDiagramControls } from './network-diagram-controls.jsx';
 import { NetworkOperationCarousel } from './network-operation-carousel.jsx';
 
 const SCENE_LAYOUTS = Object.freeze({
   'client-server-services': {
-    desktop: { viewBox: '0 0 1100 500', devices: {
+    desktop: { viewBox: '0 0 1300 500', devices: {
       'client-laptop': { x: 20, y: 190, w: 150, h: 120 }, 'home-router': { x: 215, y: 185, w: 150, h: 130 },
       'internet-cloud': { x: 430, y: 190, w: 160, h: 120 }, 'service-router': { x: 655, y: 165, w: 160, h: 170 },
       'email-server': { x: 920, y: 24, w: 155, h: 110 }, 'web-server': { x: 920, y: 195, w: 155, h: 110 }, 'file-server': { x: 920, y: 366, w: 155, h: 110 },
@@ -68,8 +69,77 @@ const DEVICE_MARKS = Object.freeze({
   'email-server': '@', 'web-server': 'WEB', 'file-server': 'FILE', 'library-server': 'LIB', 'hq-app-server': 'APP',
   'shared-printer': 'PRN', 'office-printer': 'PRN', 'student-tablet': 'TAB', 'faculty-pc': 'PC', 'branch-laptop': 'PC',
 });
+const NOOP = () => {};
 
 function center(box) { return { x: box.x + box.w / 2, y: box.y + box.h / 2 }; }
+
+function classificationFor(device) {
+  if (device.tags.includes('server-role')) return 'End device · Server role';
+  if (device.kind === 'end-device') return 'End device';
+  if (device.kind === 'intermediary') return 'Intermediary network device';
+  return 'Network connection';
+}
+
+function narrationFor(device, frame) {
+  const interfaceNames = device.interfaces.map((item) => item.label).join(' and ');
+  if (frame.detail.id === 'inspect-named-interfaces') return `${device.label} uses ${interfaceNames} on this path.`;
+  if (frame.detail.id === 'classify-end-devices') return `${device.label} is an end device where messages begin or end.`;
+  if (frame.detail.id === 'classify-intermediaries') return `${device.label} carries traffic between network endpoints.`;
+  if (frame.detail.id === 'separate-device-and-role' && device.tags.includes('server-role')) return `${device.label} is an end device performing a server role.`;
+  if (frame.detail.id === 'define-local-peer-network') return `${device.label} stays inside the local IP network.`;
+  if (frame.detail.id === 'recognize-both-roles' && device.tags.includes('peer')) return `${device.label} can request and provide a shared resource.`;
+  if (frame.detail.id === 'match-service-roles') {
+    if (device.tags.includes('service-email')) return 'The email server handles SMTP and IMAP requests.';
+    if (device.tags.includes('service-web')) return 'The web server handles HTTP and HTTPS requests.';
+    if (device.tags.includes('service-file')) return 'The file server provides shared files through SMB.';
+  }
+  if (device.tags.includes('client')) return `${device.label} has to request the selected network service.`;
+  if (device.tags.includes('service-email')) return 'The email server handles mail requests.';
+  if (device.tags.includes('service-web')) return 'The web server handles web requests.';
+  if (device.tags.includes('service-file')) return 'The file server provides shared files.';
+  if (device.tags.includes('switch')) return `${device.label} forwards frames inside the local network.`;
+  if (device.tags.includes('router') || device.tags.includes('gateway')) return `${device.label} checks which network should receive the traffic.`;
+  if (device.tags.includes('access-point')) return `${device.label} joins wireless devices to the local network.`;
+  if (device.kind === 'network-cloud') return `${device.label} represents the connection between distant networks.`;
+  return `${device.label} is relevant to this step: ${frame.detail.label.toLowerCase()}.`;
+}
+
+function wrapCallout(text, limit = 29) {
+  const lines = [];
+  let current = '';
+  for (const word of text.split(/\s+/)) {
+    if (!current || `${current} ${word}`.length <= limit) current = current ? `${current} ${word}` : word;
+    else { lines.push(current); current = word; }
+  }
+  if (current) lines.push(current);
+  return lines.slice(0, 4);
+}
+
+function FoundationCallout({ device, box, frame, viewBoxWidth }) {
+  const width = Math.min(196, Math.max(154, box.w + 18));
+  const narration = narrationFor(device, frame);
+  const lines = wrapCallout(narration);
+  const height = 22 + lines.length * 14;
+  let x = Math.max(8, Math.min(viewBoxWidth - width - 8, box.x + box.w / 2 - width / 2));
+  let y = box.y - height - 16;
+  let tail = `M${box.x + box.w / 2 - 8} ${y + height - 1}L${box.x + box.w / 2} ${box.y - 3}L${box.x + box.w / 2 + 8} ${y + height - 1}Z`;
+  if (box.x > viewBoxWidth * .65 && box.x + box.w + width + 22 <= viewBoxWidth) {
+    x = box.x + box.w + 14;
+    y = box.y + Math.max(0, (box.h - height) / 2);
+    tail = `M${x + 1} ${y + height / 2 - 7}L${box.x + box.w + 3} ${box.y + box.h / 2}L${x + 1} ${y + height / 2 + 7}Z`;
+  } else if (box.x > viewBoxWidth * .76) {
+    x = Math.max(8, box.x - width - 14);
+    y = box.y + Math.max(0, (box.h - height) / 2);
+    tail = `M${x + width - 1} ${y + height / 2 - 7}L${box.x - 3} ${box.y + box.h / 2}L${x + width - 1} ${y + height / 2 + 7}Z`;
+  } else if (y < 8) {
+    y = box.y + box.h + 15;
+    tail = `M${box.x + box.w / 2 - 8} ${y + 1}L${box.x + box.w / 2} ${box.y + box.h + 3}L${box.x + box.w / 2 + 8} ${y + 1}Z`;
+  }
+  return <g className="network-device-callout" data-callout-device-id={device.id} role="note" aria-label={narration}>
+    <path d={tail}/><rect x={x} y={y} width={width} height={height} rx="8"/>
+    <text x={x + 11} y={y + 18}>{lines.map((line, index) => <tspan x={x + 11} dy={index ? 14 : 0} key={`${device.id}:${line}`}>{line}</tspan>)}</text>
+  </g>;
+}
 
 function geometryFor(frame, compact) {
   const layout = SCENE_LAYOUTS[frame.presetId]?.[compact ? 'mobile' : 'desktop'] || SCENE_LAYOUTS['client-server-services'][compact ? 'mobile' : 'desktop'];
@@ -113,9 +183,13 @@ function geometryFor(frame, compact) {
   return { ...layout, id: compact ? 'mobile' : 'desktop', interfaces, paths };
 }
 
-function FoundationDevice({ device, box, interfaces, active, compact }) {
+function FoundationDevice({ device, box, interfaces, active, compact, displayMode, showInterfaceLabels }) {
   const mark = DEVICE_MARKS[device.id] || (device.kind === 'network-cloud' ? 'WAN' : device.tags.includes('router') ? 'R' : device.tags.includes('switch') ? 'SW' : device.tags.includes('access-point') ? 'AP' : device.tags.includes('server-role') ? 'SRV' : 'HOST');
   return <g className={`network-foundation-device kind-${device.kind} ${active ? 'is-focused' : ''}`} data-device-id={device.id}>
+    <g className="network-device-classification" data-classification={classificationFor(device)}>
+      <rect x={box.x - 7} y={box.y - 7} width={box.w + 14} height={box.h + 14} rx="15"/>
+      <text x={box.x + 10} y={box.y - 12}>{classificationFor(device)}</text>
+    </g>
     <rect className="network-foundation-device-shadow" x={box.x + 5} y={box.y + 7} width={box.w} height={box.h} rx="12"/>
     <rect className="network-foundation-device-shell" x={box.x} y={box.y} width={box.w} height={box.h} rx="12"/>
     <text className="network-foundation-device-icon" x={box.x + 18} y={box.y + 39}>{mark}</text>
@@ -124,29 +198,29 @@ function FoundationDevice({ device, box, interfaces, active, compact }) {
     <text className="network-foundation-device-role" x={box.x + 18} y={box.y + box.h - 14}>{device.role}</text>
     {device.interfaces.map((item) => {
       const point = interfaces[item.id];
-      const vertical = point.side === 'top' || point.side === 'bottom';
-      const labelX = point.x + (point.side === 'left' ? 10 : point.side === 'right' ? -10 : 0);
-      const labelY = compact && vertical ? point.y + (point.side === 'top' ? -11 : 19) : point.y + (point.side === 'top' ? 18 : point.side === 'bottom' ? -12 : -10);
-      const anchor = point.side === 'left' ? 'start' : point.side === 'right' ? 'end' : 'middle';
       return <g className={`network-foundation-interface media-${item.media}`} data-interface-id={item.id} data-interface-media={item.media} key={item.id}>
         <rect className="network-foundation-port" x={point.x - 10} y={point.y - 8} width="20" height="16" rx="3"/>
         <circle className="network-foundation-interface-core" cx={point.x} cy={point.y} r="3.5"/>
-        <text x={labelX} y={labelY} textAnchor={anchor}>{item.label}</text>
       </g>;
     })}
+    {displayMode === 'interfaces' && showInterfaceLabels ? <g className="network-interface-labels" aria-label={`${device.label} interfaces`}>
+      {device.interfaces.map((item, index) => <text x={box.x + box.w * ((index + 1) / (device.interfaces.length + 1))} y={box.y + box.h + (compact ? 18 : 17)} textAnchor="middle" key={`${device.id}:label:${item.id}`}>{item.label}</text>)}
+    </g> : null}
   </g>;
 }
 
-export const NetworkFoundationsRenderer = memo(function NetworkFoundationsRenderer({ frame, compact = false }) {
+export const NetworkFoundationsRenderer = memo(function NetworkFoundationsRenderer({ frame, compact = false, displayMode = 'interfaces', showInterfaceLabels = true, onDisplayModeChange = NOOP, onShowInterfaceLabelsChange = NOOP }) {
   const geometry = useMemo(() => frame ? geometryFor(frame, compact) : null, [compact, frame]);
   if (!frame || !geometry) return null;
   const focused = new Set(frame.focus.deviceIds);
   const focusedLinks = new Set(frame.focus.linkIds);
   const deviceIsFocused = (item) => focused.has(item.id) || item.interfaces.some((entry) => focused.has(entry.id));
   const zoneWidth = 100 / frame.topology.zones.length;
-  return <div className={`network-foundations-renderer representation-${frame.focus.representation}`} data-layout={geometry.id} data-scene-id={frame.scene.id} data-operation-id={frame.operation.id} data-detail-id={frame.detail.id}>
+  const calloutDevices = compact ? [] : frame.topology.devices.filter(deviceIsFocused).slice(0, 4);
+  const viewBoxWidth = Number(geometry.viewBox.split(' ')[2]);
+  return <div className={`network-foundations-renderer representation-${frame.focus.representation} display-${displayMode}`} data-layout={geometry.id} data-scene-id={frame.scene.id} data-operation-id={frame.operation.id} data-detail-id={frame.detail.id} data-display-mode={displayMode} data-interface-labels={showInterfaceLabels ? 'visible' : 'hidden'}>
     <NetworkOperationCarousel timeline={frame.operationTimeline} label="Eight-step Networking Today overview"/>
-    <div className="network-detail-label"><strong>Operation {frame.operation.index} of {frame.operation.total}</strong><span>Detail {frame.detail.index} of {frame.detail.total} · {frame.detail.label}</span></div>
+    <div className="network-diagram-toolbar"><div className="network-detail-label"><strong>Operation {frame.operation.index} of {frame.operation.total}</strong><span>Detail {frame.detail.index} of {frame.detail.total} · {frame.detail.label}</span></div><NetworkDiagramControls mode={displayMode} onModeChange={onDisplayModeChange} showLabels={showInterfaceLabels} onShowLabelsChange={onShowInterfaceLabelsChange}/></div>
     <svg className="network-foundations-svg" viewBox={geometry.viewBox} role="img" aria-labelledby="network-foundations-title network-foundations-description">
       <title id="network-foundations-title">{frame.scene.title}</title>
       <desc id="network-foundations-description">{frame.scene.description} {frame.phase.explanation}</desc>
@@ -156,7 +230,8 @@ export const NetworkFoundationsRenderer = memo(function NetworkFoundationsRender
           data-link-id={item.id} data-from-interface-id={item.fromInterfaceId} data-to-interface-id={item.toInterfaceId} data-path-definition={geometry.paths[item.id]}
           markerEnd={focusedLinks.has(item.id) ? `url(#foundation-arrow-${geometry.id})` : undefined} key={item.id}/>)}
       </g>
-      {frame.topology.devices.map((item) => <FoundationDevice device={item} box={geometry.devices[item.id]} interfaces={geometry.interfaces} active={deviceIsFocused(item)} compact={compact} key={item.id}/>)}
+      {frame.topology.devices.map((item) => <FoundationDevice device={item} box={geometry.devices[item.id]} interfaces={geometry.interfaces} active={deviceIsFocused(item)} compact={compact} displayMode={displayMode} showInterfaceLabels={showInterfaceLabels} key={item.id}/>)}
+      {calloutDevices.map((item) => <FoundationCallout device={item} box={geometry.devices[item.id]} frame={frame} viewBoxWidth={viewBoxWidth} key={`callout:${item.id}`}/>)}
       <g className="network-foundation-zone-labels" aria-hidden="true">{frame.topology.zones.map((zone, index) => <text x={`${zoneWidth * index + zoneWidth / 2}%`} y="98%" textAnchor="middle" key={zone.id}>{zone.label}</text>)}</g>
     </svg>
     <div className="network-foundation-caption"><span>{frame.scene.networkType}</span><strong>{frame.evidence.conclusion}</strong><em>{frame.focus.representation === 'split' ? 'Physical + logical' : `${frame.focus.representation} view`}</em></div>
@@ -176,7 +251,7 @@ export function NetworkFoundationConceptsView({ frame }) {
 export function NetworkFoundationEvidenceView({ frame }) {
   if (!frame) return null;
   return <section className="network-foundation-evidence" aria-label="Foundation evidence">
-    <span>Learning evidence</span><strong>{frame.evidence.conclusion}</strong>
+    <span>Step evidence</span><strong>{frame.evidence.conclusion}</strong>
     <dl><div><dt>Network example</dt><dd>{frame.scene.label}</dd></div><div><dt>Representation</dt><dd>{frame.focus.representation === 'split' ? 'Physical + logical' : frame.focus.representation}</dd></div><div><dt>Focus</dt><dd>{frame.evidence.category}</dd></div></dl>
   </section>;
 }

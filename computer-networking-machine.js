@@ -55,14 +55,14 @@ const ComputerNetworkingMachine = (() => {
         facts: ['192.168.10.10 AND 255.255.255.0', 'Source network: 192.168.10.0/24'], outcome: 'source-network-192.168.10.0',
       }),
       detail('compare-target-network', 'Classify Host B as local', 'The target produces the same 192.168.10.0/24 network, so Host A will deliver directly on this LAN.', {
-        deviceId: 'host-a', question: 'Is 192.168.10.20 on my local subnet?',
+        deviceId: 'host-a', question: 'Is 192.168.10.20 on Host A\'s local subnet?',
         facts: ['Source network: 192.168.10.0/24', 'Target network: 192.168.10.0/24'], outcome: 'local',
         console: 'Host A: destination 192.168.10.20 is local.',
       }),
     ]),
     operation('check-arp-cache', 'Look for a cached mapping', 'Host A checks its ARP table and finds no MAC address for Host B.', [
       detail('inspect-arp-cache', 'Inspect Host A ARP table', 'Host A searches its local ARP table for 192.168.10.20.', {
-        deviceId: 'host-a', question: 'Do I already know the target MAC address?',
+        deviceId: 'host-a', question: 'Does Host A already know the target MAC address?',
         facts: ['Lookup key: 192.168.10.20', 'Host A ARP table: empty'], outcome: 'lookup-in-progress',
       }),
       detail('confirm-cache-miss', 'Confirm the cache miss', 'No matching entry exists, so Host A must use ARP before it can build the Ethernet destination field.', {
@@ -123,7 +123,7 @@ const ComputerNetworkingMachine = (() => {
         packetFocusId: 'arp-request-1', transport: { packetId: 'arp-request-1', linkId: 'link-switch-host-b', fromInterfaceId: 'switch-1-p2', toInterfaceId: 'host-b-eth0', stage: 'destination', tone: 'broadcast' },
       }),
       detail('match-target-ip', 'Match the target IPv4 address', 'Host B compares the ARP target 192.168.10.20 with its eth0 address and finds an exact match.', {
-        deviceId: 'host-b', question: 'Does the requested IPv4 address belong to me?',
+        deviceId: 'host-b', question: 'Does the requested IPv4 address match Host B eth0?',
         facts: ['ARP target: 192.168.10.20', 'Host B eth0: 192.168.10.20/24'], outcome: 'target-is-host-b',
         packetFocusId: 'arp-request-1', transport: { packetId: 'arp-request-1', stage: 'destination', interfaceId: 'host-b-eth0', tone: 'broadcast' },
       }),

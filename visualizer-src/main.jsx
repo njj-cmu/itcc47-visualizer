@@ -6,8 +6,8 @@ import { ConceptDomainRenderer } from './domain-renderers.jsx';
 import { LinearADTRenderer } from './linear-adt-renderer.jsx';
 import { IndustryWorkbenchApp } from './industry-workbench.jsx';
 import { CpuDatapathRenderer, CpuInstructionDecodeRenderer, DecodeFieldsPane, MainMemoryPane } from './cpu-datapath.jsx';
-import { NetworkCurrentMovement, NetworkEvidencePanel, NetworkPacketInspector, NetworkStepsView, NetworkTablesView, NetworkTopologyRenderer } from './network-topology.jsx';
-import { NetworkFoundationConceptsView, NetworkFoundationEvidenceView, NetworkFoundationGuidePanel, NetworkFoundationsRenderer } from './network-foundations.jsx';
+import { NetworkCurrentMovement, NetworkPacketInspector, NetworkStepsView, NetworkTablesView, NetworkTopologyRenderer } from './network-topology.jsx';
+import { NetworkFoundationConceptsView, NetworkFoundationEvidenceView, NetworkFoundationsRenderer } from './network-foundations.jsx';
 import { NetworkFloatingPacketInspector } from './network-floating-inspector.jsx';
 
 const MAX_VISUAL_VALUES = 18;
@@ -910,6 +910,8 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const [viewOptions, setViewOptions] = useState({ numberFormat: 'hex' });
   const [cpuGranularity, setCpuGranularity] = useState(() => activity.defaultPlaybackGranularity === 'micro' ? 'micro' : 'operation');
   const [networkGranularity, setNetworkGranularity] = useState('micro');
+  const [networkDisplayMode, setNetworkDisplayMode] = useState('interfaces');
+  const [showNetworkInterfaceLabels, setShowNetworkInterfaceLabels] = useState(true);
   const pendingGranularityMap = useRef(null);
   const networkDetailedPositions = useRef(new Map());
   const networkWorkbenchRef = useRef(null);
@@ -1020,9 +1022,9 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
           <header className="cpu-canvas-heading"><strong>{isCpuDecode ? 'Instruction decoder' : 'CPU datapath'}</strong><span><b>Operation {cpuFrame?.operation?.index || 1} / {cpuFrame?.operation?.total || 1}</b><em>{cpuFrame?.microStep?.index || 1} / {cpuFrame?.microStep?.total || 1} · {cpuFrame?.microStep?.label || 'Find the source'}</em></span></header>
           <section className={`cpu-visual-canvas mobile-surface ${mobileTab === (isCpuDecode ? 'decode' : 'datapath') ? 'mobile-active' : ''}`} tabIndex="0" aria-label={isCpuDecode ? `${activity.title} focused decoder board` : `${activity.title} teaching CPU datapath`}><Renderer frame={cpuFrame} event={event} activity={activity} numberFormat={viewOptions.numberFormat} motionMode={motionPreference.mode} duration={visualDuration * (cpuFrame?.microStep?.durationWeight || 1)}/></section>
         </div>
-      </div> : isComputerNetworking ? <div ref={networkWorkbenchRef} className={`network-workbench ${isNetworkFoundations ? 'is-foundations' : 'is-arp'}`}>
+      </div> : isComputerNetworking ? <><NetworkCurrentMovement frame={networkFrame}/><div ref={networkWorkbenchRef} className={`network-workbench ${isNetworkFoundations ? 'is-foundations' : 'is-arp'}`}>
         <section className={`network-topology-surface mobile-surface ${(isNetworkFoundations ? mobileTab === 'diagram' : mobileTab === 'topology') ? 'mobile-active' : ''}`} tabIndex="0" aria-label={isNetworkFoundations ? `${activity.title} classroom diagram` : `${activity.title} physical-port topology`}>
-          <Renderer frame={networkFrame} event={event} activity={activity} motionMode={motionPreference.mode} duration={networkVisualDuration} navigationSource={playback.navigationSource} compact={usesCompactWorkspace}/>
+          <Renderer frame={networkFrame} event={event} activity={activity} motionMode={motionPreference.mode} duration={networkVisualDuration} navigationSource={playback.navigationSource} compact={usesCompactWorkspace} displayMode={networkDisplayMode} showInterfaceLabels={showNetworkInterfaceLabels} onDisplayModeChange={setNetworkDisplayMode} onShowInterfaceLabelsChange={setShowNetworkInterfaceLabels}/>
         </section>
         {isNetworkFoundations ? <>
           <div className={`network-packet-surface mobile-surface ${mobileTab === 'concepts' ? 'mobile-active' : ''}`}><NetworkFoundationConceptsView frame={networkFrame}/></div>
@@ -1038,7 +1040,7 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
           <div className={`network-tables-surface mobile-surface ${mobileTab === 'tables' ? 'mobile-active' : ''}`}><NetworkTablesView frame={networkFrame}/></div>
         </>}
         <div className={`network-steps-surface mobile-surface ${mobileTab === 'steps' ? 'mobile-active' : ''}`}><NetworkStepsView frame={networkFrame} controller={controller}/></div>
-      </div> : <div className="itcc47-workbench">
+      </div></> : <div className="itcc47-workbench">
         <div className={`desktop-source mobile-surface ${mobileTab === 'code' ? 'mobile-active' : ''}`}><SourcePanel activity={activity} event={event} source={source}/></div>
         <div className="itcc47-visual-shell">
           <section className={`visual-canvas mobile-surface ${mobileTab === 'visualize' ? 'mobile-active' : ''}`} tabIndex="0" aria-label={`${activity.title} visualization canvas`}><Renderer frame={event?.frame} event={event} activity={activity} motionMode={motionPreference.mode} duration={visualDuration} onEntityComplete={onEntityComplete}/></section>
@@ -1050,9 +1052,7 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
       </div> : null}
       {isComputerArchitecture || isComputerNetworking ? <CompletionActions activity={activity} visible={playback.atEnd && !playback.transitioning}/> : null}
     </main>
-    {!usesCompactWorkspace ? <div className={`desktop-evidence ${isComputerNetworking ? 'network-evidence-stack' : ''}`}>
-      {isComputerNetworking ? <NetworkCurrentMovement frame={networkFrame}/> : null}
-      {isComputerNetworking ? (isNetworkFoundations ? <NetworkFoundationGuidePanel frame={networkFrame} expanded={workspaceLayout.evidence === 'expanded'} onExpandedChange={(expanded) => updateWorkspaceLayout({ evidence: expanded ? 'expanded' : 'collapsed' })}/> : <NetworkEvidencePanel frame={networkFrame} expanded={workspaceLayout.evidence === 'expanded'} onExpandedChange={(expanded) => updateWorkspaceLayout({ evidence: expanded ? 'expanded' : 'collapsed' })}/>) : <CollapsibleEvidencePanel contentId={isITCC45 ? 'itcc45-learning-evidence' : isComputerArchitecture ? 'computer-architecture-learning-evidence' : 'itcc47-learning-evidence'} expanded={workspaceLayout.evidence === 'expanded'} onExpandedChange={(expanded) => updateWorkspaceLayout({ evidence: expanded ? 'expanded' : 'collapsed' })} showCurrentLabel={isITCC45 || isComputerArchitecture} tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/>}</div> : null}
+    {!usesCompactWorkspace && !isComputerNetworking ? <div className="desktop-evidence"><CollapsibleEvidencePanel contentId={isITCC45 ? 'itcc45-learning-evidence' : isComputerArchitecture ? 'computer-architecture-learning-evidence' : 'itcc47-learning-evidence'} expanded={workspaceLayout.evidence === 'expanded'} onExpandedChange={(expanded) => updateWorkspaceLayout({ evidence: expanded ? 'expanded' : 'collapsed' })} showCurrentLabel={isITCC45 || isComputerArchitecture} tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/></div> : null}
     {isComputerArchitecture ? <IntegratedPlayback state={playback} controller={controller} event={event} motionPreference={motionPreference} granularity={cpuGranularity} onGranularityChange={changeCpuGranularity}/> : null}
     {isComputerNetworking ? <IntegratedPlayback state={playback} controller={controller} event={event} motionPreference={motionPreference} granularity={networkGranularity} onGranularityChange={changeNetworkGranularity} granularityLabels={{ operation: 'Overview', micro: 'Detailed' }}/> : null}
     {isITCC45 ? <PlaybackDock state={playback} controller={controller} activity={activity} event={event} motionPreference={motionPreference}/> : null}

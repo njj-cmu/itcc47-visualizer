@@ -1,6 +1,24 @@
 # Computer networking implementation plan
 
-Status: ARP vertical slice implemented; Module 1 sequence and physical-port fidelity correction implemented on `codex/networking-module-1-sequence`.
+Status: ARP vertical slice and Module 1 sequence implemented; full-width dialogue workspace refinement in `codex/networking-dialogue-workspace`.
+
+## 2026-08-27 full-width instructional workspace
+
+The desktop networking workspace now gives the operation canvas the full available
+width. Current movement is a compact strip directly above it, and the former desktop
+Learning Evidence rail is removed. Module 1 concepts are attached to the relevant
+devices as concise, neutral third-person callouts. They describe the event—such as a
+client having to request a service—without anthropomorphizing the device. Dashed
+classification outlines identify the complete device region being discussed.
+
+Learners can switch between a Generic device-symbol view and the physical Interfaces
+view. Interface labels sit below their devices and have an independent visibility
+toggle. Both modes preserve the same device, interface, and link identities.
+
+On desktop ARP routes, the packet inspector can be dragged and resized anywhere
+inside the network workbench. It enforces a 340 px minimum width and 260 px minimum
+height, supports arrow-key movement and Shift+arrow resizing, and contains Packet,
+ARP table, and MAC table tabs. Phone routes keep the fixed Packet and Tables views.
 
 ## 2026-08-27 Module 1 network set
 
@@ -21,11 +39,10 @@ Module 1 now opens with five fixed activities backed by the same deterministic
 Each activity preserves the eight-operation Overview and 24-phase Detailed model.
 All links terminate at declared named interfaces, the preset selector opens the
 matching activity route, and omitted or unknown IDs resolve to the first host-role
-activity. The top-right current-movement card precedes Learning Evidence on desktop;
-phone Steps contains the same explanation. Operation cards remain a four-at-a-time
-carousel. Physical interface names remain attached to the diagram, while the host-role
-evidence names the classroom service protocols—SMTP/IMAP, HTTP/HTTPS, and SMB—at the
-step where learners match each service to its server instead of crowding the topology.
+activity. The current-movement strip precedes the full-width diagram. Operation cards
+remain a four-at-a-time carousel. Physical interface names sit below the devices and
+may be hidden, while device callouts name the classroom service protocols—SMTP/IMAP,
+HTTP/HTTPS, and SMB—at the step where learners match each service to its server.
 
 ## 2026-08-19 course-sequence correction
 
@@ -92,13 +109,15 @@ drift; and use the same activity on laptop, phone, `file://`, and offline.
   four readable operation cards at a time. The visible page follows the active
   operation while previous/next controls let learners inspect the other group.
 - On desktop ARP routes, the topology owns the full teaching stage. Packet details
-  begin as a large side overlay and can be dragged within that stage, moved with
-  arrow keys, or returned with Reset position. This position is transient view
-  state and never changes an immutable machine frame or saved course progress.
+  begin as a large side overlay and can be dragged or resized within that stage,
+  moved with arrow keys, resized with Shift+arrow keys, or returned with Reset
+  window. Its minimum size is 340 × 260. Position and size are transient view state
+  and never change an immutable machine frame or saved course progress.
 - On phone routes, Packet remains a dedicated fixed tab with vertically stacked
   Ethernet and ARP fields. No draggable overlay is introduced on small screens.
-- On desktop, Current movement is a separate card above Learning Evidence. On phone,
-  the same explanation appears first in Steps.
+- Current movement spans the top of the network workbench. The desktop evidence rail
+  is absent; device callouts, classification outlines, and inspector tabs carry the
+  corresponding instruction without reducing canvas width.
 
 ## Product and curriculum boundary
 

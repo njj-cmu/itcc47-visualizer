@@ -254,12 +254,32 @@ test('Network Lab starts with host roles, pages four steps at a time, and preser
   await expect(page.locator('.network-operation-carousel')).toHaveAttribute('data-operation-total', '8');
   await expect(page.locator('.network-carousel-range')).toHaveText('Steps 1–4 of 8');
   if (testInfo.project.name === 'laptop') {
-    const movement = page.locator('.desktop-evidence .network-current-movement');
-    const evidence = page.locator('.network-evidence-panel');
+    const movement = page.locator('.workspace-main > .network-current-movement');
+    const workbench = page.locator('.network-workbench');
     await expect(movement).toBeVisible();
+    await expect(page.locator('.network-evidence-panel')).toHaveCount(0);
     const movementBox = await movement.boundingBox();
-    const evidenceBox = await evidence.boundingBox();
-    expect(movementBox.y + movementBox.height).toBeLessThanOrEqual(evidenceBox.y);
+    const workbenchBox = await workbench.boundingBox();
+    expect(movementBox.y + movementBox.height).toBeLessThanOrEqual(workbenchBox.y);
+    await expect(page.locator('.network-foundations-renderer')).toHaveAttribute('data-display-mode', 'interfaces');
+    await page.getByRole('button', { name: 'Generic', exact: true }).click();
+    await expect(page.locator('.network-foundations-renderer')).toHaveAttribute('data-display-mode', 'generic');
+    await expect(page.getByRole('checkbox', { name: 'Labels' })).toBeDisabled();
+    await page.getByRole('button', { name: 'Interfaces', exact: true }).click();
+    await page.getByRole('checkbox', { name: 'Labels' }).uncheck();
+    await expect(page.locator('.network-foundations-renderer')).toHaveAttribute('data-interface-labels', 'hidden');
+    await expect(page.locator('.network-interface-labels')).toHaveCount(0);
+    await page.getByRole('checkbox', { name: 'Labels' }).check();
+    const calloutsAvoidOtherDevices = await page.locator('.network-foundations-svg').evaluate((svg) => {
+      const intersects = (a, b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
+      const devices = [...svg.querySelectorAll('.network-foundation-device')].map((item) => ({ id: item.dataset.deviceId, box: item.getBoundingClientRect() }));
+      return [...svg.querySelectorAll('.network-device-callout')].every((callout) => {
+        const targetId = callout.dataset.calloutDeviceId;
+        const calloutBox = callout.getBoundingClientRect();
+        return devices.filter((device) => device.id !== targetId).every((device) => !intersects(calloutBox, device.box));
+      });
+    });
+    expect(calloutsAvoidOtherDevices).toBe(true);
   }
   await page.getByRole('button', { name: 'Show next four steps' }).click();
   await expect(page.locator('.network-carousel-range')).toHaveText('Steps 5–8 of 8');
@@ -270,15 +290,11 @@ test('Network Lab starts with host roles, pages four steps at a time, and preser
   await expect(page.locator('[data-link-id="link-client-home"]')).toHaveAttribute('data-to-interface-id', 'home-router-g0-0');
   await (await visualizerTimeline(page)).fill('5');
   if (testInfo.project.name === 'laptop') {
-    await expect(page.locator('.network-foundation-guide')).toContainText('Email server: SMTP sends · IMAP retrieves');
-    await expect(page.locator('.network-foundation-guide')).toContainText('Web server: HTTP/HTTPS');
-    await expect(page.locator('.network-foundation-guide')).toContainText('File server: SMB shared folders');
-    const sections = await page.locator('.network-foundation-guide').evaluate((guide) => ['.network-foundation-concepts', '.network-foundation-evidence', '.network-foundation-legend'].map((selector) => {
-      const bounds = guide.querySelector(selector).getBoundingClientRect();
-      return { top: bounds.top, bottom: bounds.bottom };
-    }));
-    expect(sections[0].bottom).toBeLessThanOrEqual(sections[1].top + 1);
-    expect(sections[1].bottom).toBeLessThanOrEqual(sections[2].top + 1);
+    const callouts = page.locator('.network-device-callout');
+    await expect(callouts).toHaveCount(3);
+    const calloutText = await callouts.evaluateAll((items) => items.map((item) => item.getAttribute('aria-label')));
+    expect(calloutText).toEqual(['The email server handles SMTP and IMAP requests.', 'The web server handles HTTP and HTTPS requests.', 'The file server provides shared files through SMB.']);
+    expect(calloutText.join(' ')).not.toMatch(/\bI am\b|\bI have\b|\bmy\b/i);
   }
   await (await visualizerTimeline(page)).fill('16');
   await expect(page.locator('.network-detail-label')).toContainText('Detail 2 of 3 · Read the logical topology');
@@ -297,12 +313,11 @@ test('Network Lab starts with host roles, pages four steps at a time, and preser
     await page.getByRole('tab', { name: 'Steps', exact: true }).click();
     await expect(page.locator('.network-current-movement')).toContainText('HOME LAN → INTERNET → SERVICES LAN');
   } else {
-    const desktopMovement = page.locator('.desktop-evidence .network-current-movement');
+    const desktopMovement = page.locator('.workspace-main > .network-current-movement');
     await expect(desktopMovement).toContainText('HOME LAN → INTERNET → SERVICES LAN');
-    await expect(page.locator('.network-foundation-guide')).toContainText('Client to three services');
     const movementBox = await desktopMovement.boundingBox();
-    const evidenceBox = await page.locator('.network-foundation-guide').boundingBox();
-    expect(movementBox.y + movementBox.height).toBeLessThanOrEqual(evidenceBox.y);
+    const workbenchBox = await page.locator('.network-workbench').boundingBox();
+    expect(movementBox.y + movementBox.height).toBeLessThanOrEqual(workbenchBox.y);
   }
 });
 
@@ -353,11 +368,12 @@ test('Network Lab defaults to Detailed, preserves its phase through Overview, an
   await expect(page.locator('.network-operation-carousel')).toHaveAttribute('data-operation-total', '8');
   await expect(page.locator('.network-carousel-range')).toHaveText('Steps 1–4 of 8');
   if (testInfo.project.name === 'laptop') {
-    const movement = page.locator('.desktop-evidence .network-current-movement');
-    const evidence = page.locator('.network-evidence-panel');
+    const movement = page.locator('.workspace-main > .network-current-movement');
+    const workbench = page.locator('.network-workbench');
     const movementBox = await movement.boundingBox();
-    const evidenceBox = await evidence.boundingBox();
-    expect(movementBox.y + movementBox.height).toBeLessThanOrEqual(evidenceBox.y);
+    const workbenchBox = await workbench.boundingBox();
+    expect(movementBox.y + movementBox.height).toBeLessThanOrEqual(workbenchBox.y);
+    await expect(page.locator('.network-evidence-panel')).toHaveCount(0);
   }
   await timeline.fill('11');
   await expect(page.locator('.network-detail-label')).toContainText('Detail 4 of 4 · Flood Fa0/2 → Host B eth0');
@@ -373,7 +389,8 @@ test('Network Lab defaults to Detailed, preserves its phase through Overview, an
   await expect(page.locator('.network-detail-label')).toContainText('Flood Fa0/2 → Host B eth0');
   await (await visualizerTimeline(page)).fill('22');
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Tables', exact: true }).click();
-  const arpTable = page.locator(testInfo.project.name === 'phone' ? '.network-tables-surface .network-arp-table' : '.network-evidence-panel .network-arp-table');
+  if (testInfo.project.name === 'laptop') await page.getByRole('tab', { name: 'ARP table', exact: true }).click();
+  const arpTable = page.locator(testInfo.project.name === 'phone' ? '.network-tables-surface .network-arp-table' : '[data-floating-packet-inspector] .network-arp-table');
   await expect(arpTable.locator('[data-row-id="host-a-arp-host-b"]')).toContainText('192.168.10.20');
   await expect(arpTable.locator('[data-row-id="host-a-arp-host-b"]')).toContainText('02:00:00:00:10:14');
   await (await visualizerTimeline(page)).fill('21');
@@ -391,6 +408,18 @@ test('ARP packet inspector floats within the desktop stage and remains keyboard 
   await expect(floating.locator('.network-packet-inspector')).toContainText('Address Resolution Protocol');
   await expect(floating.locator('.network-packet-inspector')).toContainText('FF:FF:FF:FF:FF:FF');
 
+  const handle = page.getByRole('group', { name: 'Move or resize packet inspector. Arrow keys move, Shift plus arrow keys resize, and Home resets.' });
+  await handle.focus();
+  const beforeResizeBox = await floating.boundingBox();
+  await handle.press('Shift+ArrowRight');
+  await handle.press('Shift+ArrowDown');
+  const resizedBox = await floating.boundingBox();
+  expect(resizedBox.width).toBeGreaterThanOrEqual(340);
+  expect(resizedBox.height).toBeGreaterThanOrEqual(260);
+  expect(resizedBox.width).toBeGreaterThan(beforeResizeBox.width);
+  expect(resizedBox.height).toBeGreaterThan(beforeResizeBox.height);
+  await page.getByRole('button', { name: 'Reset window' }).click();
+
   const workbenchBox = await page.locator('.network-workbench').boundingBox();
   const initialBox = await floating.boundingBox();
   await page.mouse.move(initialBox.x + 180, initialBox.y + 24);
@@ -405,12 +434,15 @@ test('ARP packet inspector floats within the desktop stage and remains keyboard 
   expect(draggedBox.x + draggedBox.width).toBeLessThanOrEqual(workbenchBox.x + workbenchBox.width);
   expect(draggedBox.y + draggedBox.height).toBeLessThanOrEqual(workbenchBox.y + workbenchBox.height);
 
-  const handle = page.getByRole('group', { name: 'Move packet inspector. Use arrow keys to move or Home to reset.' });
   await handle.focus();
   await handle.press('ArrowRight');
   const keyboardBox = await floating.boundingBox();
   expect(keyboardBox.x).toBeGreaterThan(draggedBox.x);
-  await page.getByRole('button', { name: 'Reset position' }).click();
+  await page.getByRole('tab', { name: 'ARP table', exact: true }).click();
+  await expect(floating.locator('.network-arp-table')).toBeVisible();
+  await page.getByRole('tab', { name: 'MAC table', exact: true }).click();
+  await expect(floating.locator('.network-mac-table')).toBeVisible();
+  await page.getByRole('button', { name: 'Reset window' }).click();
   await expect(floating).toHaveAttribute('data-position-mode', 'default');
 });
 

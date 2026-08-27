@@ -13,7 +13,15 @@
     });
   }
 
+  let currentGroup = '';
   ComputerNetworkingPractice.QUESTIONS.forEach((question, questionIndex) => {
+    if (question.group !== currentGroup) {
+      currentGroup = question.group;
+      const heading = document.createElement('header');
+      heading.className = 'net-practice-group-heading';
+      heading.innerHTML = `<span>${question.module === 1 ? 'Current sequence' : 'Available preview'}</span><h2>${question.group}</h2>`;
+      root.appendChild(heading);
+    }
     const article = document.createElement('article');
     article.className = 'net-practice-card';
     article.dataset.questionId = question.id;

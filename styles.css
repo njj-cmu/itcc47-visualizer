@@ -353,6 +353,8 @@ body[data-course="computer-architecture"] .topbar-title { color: #67e8f9; }
 .net-module-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
 .net-module-card { display: grid; grid-template-columns: 72px 1fr; gap: 24px; padding: 25px 27px; border: 1px solid #2e413b; border-radius: 10px; background: #11191e; }
 .net-module-card.is-current { border-color: #317c66; background: #11231d; box-shadow: inset 4px 0 #35d6a5; }
+.net-module-card.is-preview { border-color: #6c5429; background: #211b12; box-shadow: inset 4px 0 #f4b740; }
+.net-module-card.is-preview small { color: #f4c86e; }
 .net-module-card.is-planned { opacity: .72; }
 .net-module-card.is-extension { border-style: dashed; opacity: .64; }
 .net-module-number { color: #35d6a5; font: 800 1.8rem ui-monospace,monospace; }
@@ -368,6 +370,12 @@ body[data-course="computer-architecture"] .topbar-title { color: #67e8f9; }
 .net-practice-progress strong { color: #79e4c2; font: 750 .85rem ui-monospace,monospace; }
 .net-practice-progress button { display: inline-flex; gap: 7px; align-items: center; padding: 0; border: 0; color: #94a59f; background: none; cursor: pointer; text-decoration: underline; }
 .net-practice-questions { display: grid; gap: 15px; }
+.net-practice-group-heading { margin-top: 22px; padding: 18px 4px 3px; border-top: 1px solid #2e413b; }
+.net-practice-group-heading:first-child { margin-top: 0; border-top: 0; }
+.net-practice-group-heading span { color: #35d6a5; font: 800 .62rem ui-monospace,monospace; text-transform: uppercase; letter-spacing: .09em; }
+.net-practice-group-heading h2 { margin: 5px 0 0; color: #ecf7f3; font-size: 1.22rem; }
+.net-practice-return-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.net-return-lab.is-secondary { color: #f4c86e; border-color: #6c5429; }
 .net-practice-card { border: 1px solid #2e413b; border-radius: 10px; background: #11191e; overflow: hidden; }
 .net-practice-card.is-solved { border-color: #317c66; box-shadow: inset 3px 0 #35d6a5; }
 .net-practice-card form { padding: 25px; }

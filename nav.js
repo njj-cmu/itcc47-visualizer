@@ -67,7 +67,7 @@
         : `<span class="topbar-code">${course.code}</span> ${course.shortTitle || course.brandLabel || course.title}`;
       if (courseId === 'itcc45') document.title = 'ITCC45 Python Object Lab';
       else if (courseId === 'computer-architecture') document.title = 'Computer Architecture CPU Lab';
-      else if (courseId === 'computer-networking') document.title = 'Introduction to Networking · ARP Lab';
+      else if (courseId === 'computer-networking') document.title = 'Introduction to Networking · Network Lab';
     }
     nav.querySelectorAll('[data-icon]').forEach((element) => element.insertAdjacentHTML('afterbegin', svg(element.dataset.icon)));
   }

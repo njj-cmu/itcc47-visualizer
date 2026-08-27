@@ -1,6 +1,50 @@
 # Computer networking implementation plan
 
-Status: port-accurate vertical slice implemented on `codex/computer-networking-slice-a`.
+Status: ARP vertical slice implemented; Module 1 sequence and physical-port fidelity correction implemented on `codex/networking-module-1-sequence`.
+
+## 2026-08-27 Module 1 network set
+
+Module 1 now opens with five fixed activities backed by the same deterministic
+`ComputerNetworkingFoundationsMachine` contract:
+
+1. `networking-read-classroom-network` — one client reaches distinct email, web,
+   and file server roles through a home router, the Internet, and a service router.
+2. `networking-local-peer-sharing` — two laptops both request and provide resources
+   inside the local `192.168.20.0/24` network; no router or Internet appears.
+3. `networking-classify-components` — learners distinguish end devices,
+   intermediary devices, and a server role performed by an ordinary laptop.
+4. `networking-compare-media` — copper serves room links, fiber spans buildings and
+   long distances, and wireless serves a mobile endpoint.
+5. `networking-read-network-topologies` — a branch LAN, provider WAN, and HQ LAN
+   contrast physical attachment with logical organization.
+
+Each activity preserves the eight-operation Overview and 24-phase Detailed model.
+All links terminate at declared named interfaces, the preset selector opens the
+matching activity route, and omitted or unknown IDs resolve to the first host-role
+activity. The top-right current-movement card precedes Learning Evidence on desktop;
+phone Steps contains the same explanation. Operation cards remain a four-at-a-time
+carousel. Physical interface names remain attached to the diagram, while the host-role
+evidence names the classroom service protocols—SMTP/IMAP, HTTP/HTTPS, and SMB—at the
+step where learners match each service to its server instead of crowding the topology.
+
+## 2026-08-19 course-sequence correction
+
+The subject opens with **Module 1 — Networking Today**, following the supplied course
+syllabus before exposing the existing ARP activity. The default activity remains
+`networking-read-classroom-network`; it begins the five-network sequence and covers
+network purpose, host roles, intermediaries, interfaces and media, physical/logical
+representations, LAN/WAN scope, reliable-network qualities, and professional practice.
+
+The deterministic ARP activity remains available as a clearly labeled **Topic 6
+preview** grounded in ITN Modules 8 and 9. It is not a progression lock and it is no
+longer described as Module 1. Topics 2–5 remain visible in their required order as
+planned course modules.
+
+The ARP renderer retains the fixed two-port switch and exact interface/link/packet
+identities. Its physical treatment now uses large RJ45 openings, visible plug heads,
+latches, molded boots, cable tails, insertion anchors, and a synchronized physical-
+path statement. The four-port switch in the visual reference is not copied; only
+the two interfaces used by the teaching model are rendered.
 
 ## Supplied curriculum reconciliation
 
@@ -10,7 +54,7 @@ Fundamentals of Networking** (three units; two lecture hours and three laborator
 hours weekly). The learner-facing title remains **Introduction to Networking** and
 the compact shell code remains `NET`.
 
-The current ARP slice is grounded in ITN Module 8 (same-network versus remote-network
+The five Module 1 activities are grounded in ITN Module 1. The ARP slice is grounded in ITN Module 8 (same-network versus remote-network
 forwarding decisions) and Module 9 (ARP purpose, lookup, request broadcast, reply,
 and learned mapping). Physical NIC, interface, UTP, and RJ45 language is grounded in
 Modules 2 and 4. Switch source-MAC learning and flooding appear only as evidence
@@ -30,8 +74,11 @@ authoritative where a full-screen concept is visually ambiguous.
 ## Outcome
 
 Add **Introduction to Networking** as an independent BSIT Learning Lab subject.
-The first release will teach how a host discovers a same-subnet peer with ARP,
-using a deterministic, curated topology and a packet inspector. It will not be
+The first course activity teaches learners how a client uses separate server roles,
+and the following four activities make peers, device categories, media, and topology
+explicit. The
+available Topic 6 preview teaches how a host discovers a same-subnet peer with ARP,
+using a deterministic, curated topology and a packet inspector. Neither activity is
 a general network simulator or a Packet Tracer replacement.
 
 The vertical slice is complete when a learner can step from an empty ARP cache
@@ -39,14 +86,31 @@ through request broadcast, switch flooding, reply unicast, and cache update;
 inspect the Ethernet and ARP fields at each step; scrub backward without state
 drift; and use the same activity on laptop, phone, `file://`, and offline.
 
+### Workspace presentation contract
+
+- Every networking activity retains eight operations, presented as a carousel of
+  four readable operation cards at a time. The visible page follows the active
+  operation while previous/next controls let learners inspect the other group.
+- On desktop ARP routes, the topology owns the full teaching stage. Packet details
+  begin as a large side overlay and can be dragged within that stage, moved with
+  arrow keys, or returned with Reset position. This position is transient view
+  state and never changes an immutable machine frame or saved course progress.
+- On phone routes, Packet remains a dedicated fixed tab with vertically stacked
+  Ethernet and ARP fields. No draggable overlay is introduced on small screens.
+- On desktop, Current movement is a separate card above Learning Evidence. On phone,
+  the same explanation appears first in Steps.
+
 ## Product and curriculum boundary
 
 - Public title: **Introduction to Networking**.
 - Internal course ID: `computer-networking`.
 - Compact shell code: `NET`; the supplied institutional course code is `IT 53`.
 - Short title: **Network Lab**.
-- Initial module: **Local Network Delivery**.
-- First activity: **Discover a neighbor with ARP**.
+- Initial module: **Networking Today**.
+- First activity: **Follow a client to three servers**.
+- Module 1 activity set: host roles, local peer sharing, component classification,
+  campus media, and physical/logical topology.
+- Available preview: **Topic 6 — Discover a neighbor with ARP**.
 - Curated topology: Host A, one Layer 2 switch, and Host B on one `/24` subnet.
 - No editable topology, arbitrary packet construction, vendor CLI emulation,
   STP, dynamic routing, wireless behavior, or real socket/network access.
@@ -132,7 +196,7 @@ Do not infer table changes from animation position in the renderer.
 Create `computer-networking-activities.js` and register it through
 `BSITLearningLab.registerActivities('computer-networking', ...)`.
 
-The first activity uses:
+The Topic 6 ARP preview uses:
 
 - ID `networking-arp-neighbor-discovery`;
 - engine `guided-network-model`;
@@ -202,8 +266,13 @@ Add the same minimal route family used by Computer Architecture:
 - `computer-networking.html` — subject home and learning path;
 - `computer-networking-modules.html` — current and planned modules;
 - `computer-networking-practice.html` plus local data/controller files — three
-  checks covering local-subnet choice, Ethernet broadcast destination, and ARP
-  cache outcome;
+  Module 1 checks followed by three Topic 6 checks covering local-subnet choice,
+  Ethernet broadcast destination, and ARP cache outcome;
+- `visualizer.html?course=computer-networking&activity=networking-read-classroom-network`;
+- `visualizer.html?course=computer-networking&activity=networking-local-peer-sharing`;
+- `visualizer.html?course=computer-networking&activity=networking-classify-components`;
+- `visualizer.html?course=computer-networking&activity=networking-compare-media`;
+- `visualizer.html?course=computer-networking&activity=networking-read-network-topologies`;
 - `visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery`.
 
 Register the course in `course-catalog.js`, add it to the subject chooser and

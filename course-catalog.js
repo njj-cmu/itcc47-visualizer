@@ -80,7 +80,7 @@ const BSITLearningLab = (() => {
     home: 'computer-networking.html', accent: 'green',
     nav: [
       { href: 'computer-networking.html', label: 'Home', icon: 'start' },
-      { href: 'visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery', label: 'Network Lab', icon: 'network' },
+      { href: 'visualizer.html?course=computer-networking&activity=networking-read-classroom-network', label: 'Network Lab', icon: 'network' },
       { href: 'computer-networking-modules.html', label: 'Modules', icon: 'modules' },
       { href: 'computer-networking-practice.html', label: 'Practice', icon: 'problems' },
       { href: 'index.html', label: 'All Subjects', icon: 'grid' },

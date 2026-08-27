@@ -152,6 +152,10 @@ non-goals for this release.
 
 ## Subject 2: Introduction to Networking
 
+The released sequence now begins with **ITN Module 1 — Networking Today**. The
+port-accurate ARP activity remains available as a Topic 6 preview grounded in ITN
+Modules 8 and 9; it is no longer presented as the first course module.
+
 Implementation work for this subject is tracked in
 [`computer-networking-implementation.md`](computer-networking-implementation.md). That plan
 turns the Phase 3 vertical slice into concrete course, activity, renderer,
@@ -228,9 +232,9 @@ explanations, practice checks, accessibility coverage, and curriculum content.
 
 ### Phase 3 — networking vertical slice
 
-Use ARP or a same-subnet ping as the first end-to-end networking activity. It
-should validate packet identity, topology layout, packet inspection, and table
-updates before broader networking content is added.
+Use the Module 1 classroom-reading activity as the learner entry point. Retain ARP
+as the first end-to-end packet activity to validate packet identity, topology layout,
+packet inspection, and table updates before broader packet workflows are added.
 
 ### Phase 4 — web vertical slice
 

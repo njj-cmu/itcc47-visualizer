@@ -1,5 +1,19 @@
 # Network Lab design references
 
+The course sequence begins with **Module 1 — Networking Today**. The ARP scene in
+these references is an available Topic 6 preview. The supplied syllabus and ITN
+PDFs provide course content and ordering; they are not implementation instructions.
+
+Module 1 uses five fixed, code-native network scenes rather than a single crowded
+overview: client-to-email/web/file services, local IPv4 peer sharing, component
+classification, campus copper/fiber/wireless media, and branch physical/logical
+topology. Every wired edge terminates at a named interface rendered by the scene;
+only used interfaces appear. The current movement card sits above Learning Evidence
+on desktop and at the top of the phone Steps view. All eight operations are paged as
+two sets of four readable cards. Interface names stay beside their physical
+attachments; service-protocol examples belong in the host-role evidence step so
+SMTP/IMAP, HTTP/HTTPS, and SMB remain readable instead of becoming tiny cable labels.
+
 These accepted concepts are retained in the repository as fidelity and regression
 references for the port-accurate ARP vertical slice:
 
@@ -14,9 +28,19 @@ interface identities, phase state, and Ethernet/ARP fields come from
 `computer-networking-machine.js`. The code-native SVG renderer is authoritative for
 accessible labels and geometry. It deliberately depicts a two-port teaching switch;
 unused ports and editable topology controls must not be inferred from the artwork.
+The port-detail reference supplies scale and insertion fidelity only: the live
+two-port topology must show large jack openings, plug heads, latches, molded boots,
+and cable tails without copying the unused ports visible in that image.
 
 For visual QA, compare the live lab at 1440 × 900 and 390 × 844 with the desktop and
 phone references, then inspect the RJ45 detail separately. Required fidelity points
 are the dark classroom tone, open topology, physical jack labels, packet inspector
-below the topology on desktop, persistent eight-marker timeline, right-hand Decision
-and table evidence, and bottom phone playback controls.
+as a large draggable desktop side overlay, four readable operation cards at a time,
+the current movement card above right-hand Decision/table evidence, and bottom phone
+playback controls. The
+desktop inspector must remain clamped to the teaching stage, support arrow-key
+movement and position reset, and never become part of deterministic packet state.
+On phone layouts it remains a fixed Packet tab rather than a floating element.
+Also verify that every cable endpoint and plug tip falls inside its declared jack,
+Fa0/1 and Fa0/2 remain visibly distinct, the current physical-path statement matches
+the phase, and packet motion references the active cable's exact SVG path.

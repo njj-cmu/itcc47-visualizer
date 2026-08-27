@@ -953,10 +953,11 @@ ok('practice bank preserves three fetch IDs and adds four unsolved decode and ex
 
 section('computer networking teaching machine');
 const computerNetworkingEngine = load([
-  'course-catalog.js', 'playback.js', 'computer-networking-machine.js',
+  'course-catalog.js', 'playback.js', 'computer-networking-machine.js', 'computer-networking-foundations-machine.js',
   'computer-networking-activities.js', 'computer-networking-practice-data.js',
 ], { setTimeout, clearTimeout });
 const ComputerNetworking = computerNetworkingEngine.get('ComputerNetworkingMachine');
+const ComputerNetworkingFoundations = computerNetworkingEngine.get('ComputerNetworkingFoundationsMachine');
 const ComputerNetworkingCatalog = computerNetworkingEngine.get('ComputerNetworkingActivities');
 const ComputerNetworkingCourses = computerNetworkingEngine.get('BSITLearningLab');
 const ComputerNetworkingPractice = computerNetworkingEngine.get('ComputerNetworkingPractice');
@@ -968,18 +969,80 @@ const networkingEvents = networkingFirst.events;
 const networkingFrames = networkingEvents.map((event) => event.frame);
 const networkingDetailedFrames = networkingMicro.events.map((event) => event.frame);
 const networkingFinal = networkingFrames.at(-1);
+const foundationsPreset = ComputerNetworkingFoundations.PRESETS[0];
+const foundationsFirst = ComputerNetworkingFoundations.run(foundationsPreset.id);
+const foundationsSecond = ComputerNetworkingFoundations.run(foundationsPreset.id);
+const foundationsMicro = ComputerNetworkingFoundations.run(foundationsPreset.id, { granularity: 'micro' });
 
-ok('networking course and ARP activity expose the planned public contracts', (() => {
+ok('networking course exposes Module 1 first and ARP as a Topic 6 preview', (() => {
   const course = ComputerNetworkingCourses.getCourse('computer-networking');
+  const foundations = ComputerNetworkingCatalog.get('networking-read-classroom-network');
   const activity = ComputerNetworkingCatalog.get('networking-arp-neighbor-discovery');
   const registered = ComputerNetworkingCourses.getActivity('computer-networking', activity.id);
+  const activityIds = [
+    'networking-read-classroom-network',
+    'networking-local-peer-sharing',
+    'networking-classify-components',
+    'networking-compare-media',
+    'networking-read-network-topologies',
+    'networking-arp-neighbor-discovery',
+  ];
   return course.code === 'NET' && course.title === 'Introduction to Networking'
     && course.shortTitle === 'Network Lab' && course.home === 'computer-networking.html'
-    && ComputerNetworkingCourses.listActivities('computer-networking').length === 1 && registered === activity
-    && activity.contentVersion === 1 && activity.engine === 'guided-network-model'
+    && course.nav[1].href.includes('networking-read-classroom-network')
+    && ComputerNetworkingCourses.listActivities('computer-networking').map((item) => item.id).join(',') === activityIds.join(',')
+    && ComputerNetworkingCatalog.get('unknown') === foundations && registered === activity
+    && foundations.module === 1 && foundations.topic === 'Networking Today' && foundations.renderer === 'network-foundations'
+    && activity.module === 6 && activity.topic === 'Network Layer & Address Resolution'
+    && activity.contentVersion === 3 && activity.engine === 'guided-network-model'
     && activity.renderer === 'network-topology' && activity.workspaceKind === 'network-lab'
     && activity.input.kind === 'network-preset' && !activity.input.editable
     && activity.evidenceViews.join(',') === 'packet-inspector,network-decisions,arp-table,mac-table';
+})());
+ok('Networking Today emits eight deterministic immutable Overview frames and 24 Detailed phases',
+  foundationsFirst.events.length === 8 && foundationsMicro.events.length === 24
+  && ComputerNetworkingFoundations.OPERATIONS.length === 8 && ComputerNetworkingFoundations.DETAILS.length === 24
+  && JSON.stringify(foundationsFirst) === JSON.stringify(foundationsSecond)
+  && [...foundationsFirst.events, ...foundationsMicro.events].every((event) => Object.isFrozen(event) && Object.isFrozen(event.frame) && Object.isFrozen(event.frame.topology.devices)));
+ok('Networking Today keeps stable interface-owned links and equal final state in both granularities', (() => {
+  const frames = [...foundationsFirst.events, ...foundationsMicro.events].map((event) => event.frame);
+  const declaredInterfaces = new Set(ComputerNetworkingFoundations.ENTITY_IDS.interfaces);
+  return frames.every((frame) => frame.topology.devices.map((item) => item.id).join(',') === ComputerNetworkingFoundations.ENTITY_IDS.devices.join(',')
+    && frame.topology.links.map((item) => item.id).join(',') === ComputerNetworkingFoundations.ENTITY_IDS.links.join(',')
+    && frame.topology.links.every((link) => declaredInterfaces.has(link.fromInterfaceId) && declaredInterfaces.has(link.toInterfaceId)))
+    && JSON.stringify(foundationsFirst.result.finalState) === JSON.stringify(foundationsMicro.result.finalState);
+})());
+ok('Networking Today exposes five deterministic interface-owned network examples', (() => {
+  const presetIds = ['client-server-services', 'local-peer-sharing', 'small-office-components', 'campus-media', 'branch-topology'];
+  return ComputerNetworkingFoundations.PRESETS.map((preset) => preset.id).join(',') === presetIds.join(',')
+    && ComputerNetworkingFoundations.PRESETS.every((preset) => {
+      const operationRun = ComputerNetworkingFoundations.run(preset.id);
+      const detailedRun = ComputerNetworkingFoundations.run(preset.id, { granularity: 'micro' });
+      const ids = ComputerNetworkingFoundations.ENTITY_IDS_BY_PRESET[preset.id];
+      const declaredInterfaces = new Set(ids.interfaces);
+      return ComputerNetworkingFoundations.validatePreset(preset)
+        && operationRun.events.length === 8 && detailedRun.events.length === 24
+        && JSON.stringify(operationRun.result.finalState) === JSON.stringify(detailedRun.result.finalState)
+        && preset.devices.map((device) => device.id).join(',') === ids.devices.join(',')
+        && preset.links.map((link) => link.id).join(',') === ids.links.join(',')
+        && preset.links.every((link) => declaredInterfaces.has(link.fromInterfaceId) && declaredInterfaces.has(link.toInterfaceId));
+    });
+})());
+ok('Module 1 examples teach distinct host roles, local peers, device classes, and media', (() => {
+  const services = ComputerNetworkingFoundations.getPreset('client-server-services');
+  const serviceRoleFrame = ComputerNetworkingFoundations.run(services.id, { granularity: 'micro' }).events[5].frame;
+  const peers = ComputerNetworkingFoundations.getPreset('local-peer-sharing');
+  const components = ComputerNetworkingFoundations.getPreset('small-office-components');
+  const campus = ComputerNetworkingFoundations.getPreset('campus-media');
+  return ['service-email', 'service-web', 'service-file'].every((tag) => services.devices.some((device) => device.tags.includes(tag)))
+    && services.links.some((link) => link.tags.includes('long-distance') && link.media === 'fiber')
+    && serviceRoleFrame.evidence.facts.join(' ').includes('SMTP') && serviceRoleFrame.evidence.facts.join(' ').includes('HTTP/HTTPS') && serviceRoleFrame.evidence.facts.join(' ').includes('SMB')
+    && peers.devices.filter((device) => device.tags.includes('peer')).every((device) => device.tags.includes('client') && device.tags.includes('server-role'))
+    && !peers.devices.some((device) => device.tags.includes('router') || device.tags.includes('internet'))
+    && peers.devices.flatMap((device) => device.interfaces).filter((item) => item.id.includes('laptop')).every((item) => item.label.includes('192.168.20.'))
+    && components.devices.some((device) => device.kind === 'end-device' && device.tags.includes('server-role'))
+    && ['copper', 'fiber', 'wireless'].every((medium) => campus.links.some((link) => link.media === medium))
+    && campus.links.some((link) => link.media === 'fiber' && link.tags.includes('building-backbone'));
 })());
 ok('canonical ARP preset is valid, curated, and stays on one /24 LAN',
   ComputerNetworking.PRESETS.length === 1 && ComputerNetworking.validatePreset(networkingPreset)
@@ -1073,14 +1136,20 @@ ok('backward timeline inspection restores the earlier empty cache without mutati
 ok('networking activity delegates to the canonical deterministic model', (() => {
   const activity = ComputerNetworkingCatalog.get('networking-arp-neighbor-discovery');
   const run = activity.run();
-  return ComputerNetworkingCatalog.list().length === 1
+  const foundationActivities = ComputerNetworkingCatalog.list().slice(0, 5);
+  return ComputerNetworkingCatalog.list().length === 6
+    && foundationActivities.every((item, index) => item.input.defaultPreset === ComputerNetworkingFoundations.PRESETS[index].id
+      && item.input.activityByPreset[item.input.defaultPreset] === item.id
+      && item.run().events.length === 8)
     && activity.input.defaultPreset === 'arp-same-lan'
     && activity.source.length === 8
     && run.result.finalFrame.phase.id === 'ready-for-ipv4';
 })());
 const normalizedNetworkingPractice = ComputerNetworkingPractice.normalize({ contentVersion: 1, solvedIds: ['classify-local-peer', 'classify-local-peer', 'unknown', 12] });
 ok('networking practice is versioned, identity-free, and keeps only unique known checks',
-  ComputerNetworkingPractice.QUESTIONS.length === 3
+  ComputerNetworkingPractice.QUESTIONS.length === 6
+  && ComputerNetworkingPractice.QUESTIONS.slice(0, 3).every((question) => question.module === 1)
+  && ComputerNetworkingPractice.QUESTIONS.slice(3).every((question) => question.module === 6)
   && JSON.stringify(normalizedNetworkingPractice) === JSON.stringify({ contentVersion: 1, solvedIds: ['classify-local-peer'] })
   && ComputerNetworkingPractice.normalize({ contentVersion: 0, solvedIds: ['classify-local-peer'] }).solvedIds.length === 0);
 const ComputerNetworkingLayout = workspaceLayoutEngine.get('ComputerNetworkingWorkspaceLayout');
@@ -1095,7 +1164,10 @@ ok('network renderer declares interface-owned jack bounds and link-owned cable e
   && networkingRendererSource.includes('data-jack-x={x}')
   && networkingRendererSource.includes('data-link-id={link.id}')
   && networkingRendererSource.includes('data-from-interface-id={link.fromInterfaceId}')
-  && networkingRendererSource.includes('data-to-interface-id={link.toInterfaceId}'));
+  && networkingRendererSource.includes('data-to-interface-id={link.toInterfaceId}')
+  && networkingRendererSource.includes('data-jack-opening-x={opening.x}')
+  && networkingRendererSource.includes('data-plug-interface-id={interfaceId}')
+  && networkingRendererSource.includes('data-plug-tip-x={geometry.cx}'));
 ok('packet movement reuses the active cable path and preserves the 0.8s hold plus 0.9s travel contract',
   networkingRendererSource.includes('<mpath href={`#${linkPathId}`}/>')
   && networkingRendererSource.includes('dur="0.9s" begin="0.8s"')
@@ -1104,6 +1176,30 @@ ok('network renderer keeps independent fixed desktop and mobile geometry maps',
   networkingRendererSource.includes('const DESKTOP_GEOMETRY')
   && networkingRendererSource.includes('const MOBILE_GEOMETRY')
   && ['host-a-eth0', 'switch-1-p1', 'switch-1-p2', 'host-b-eth0'].every((id) => networkingRendererSource.match(new RegExp(`'${id}'`, 'g')).length >= 2));
+const networkingFoundationsRendererSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'network-foundations.jsx'), 'utf8');
+ok('foundation renderer resolves five fixed layouts from named interfaces rather than device centers',
+  ['client-server-services', 'local-peer-sharing', 'small-office-components', 'campus-media', 'branch-topology'].every((id) => networkingFoundationsRendererSource.includes(`'${id}'`))
+  && networkingFoundationsRendererSource.includes('data-interface-id={item.id}')
+  && networkingFoundationsRendererSource.includes('data-from-interface-id={item.fromInterfaceId}')
+  && networkingFoundationsRendererSource.includes('data-to-interface-id={item.toInterfaceId}')
+  && networkingFoundationsRendererSource.includes('data-path-definition={geometry.paths[item.id]}')
+  && networkingFoundationsRendererSource.includes('activity.input.activityByPreset[event.target.value]'));
+ok('current movement is rendered above desktop networking evidence and repeated in phone Steps',
+  networkingRendererSource.includes('export function NetworkCurrentMovement')
+  && networkingRendererSource.includes('<NetworkCurrentMovement frame={frame} compact/>'));
+const networkingCarouselSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'network-operation-carousel.jsx'), 'utf8');
+ok('network operation carousel exposes four readable steps while retaining the eight-operation contract',
+  networkingCarouselSource.includes('const PAGE_SIZE = 4')
+  && networkingCarouselSource.includes('timeline.slice(start, start + PAGE_SIZE)')
+  && networkingCarouselSource.includes('data-operation-total={timeline.length}')
+  && networkingCarouselSource.includes('Show next four steps'));
+const networkingFloatingInspectorSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'network-floating-inspector.jsx'), 'utf8');
+ok('desktop packet inspector supports bounded pointer drag, keyboard movement, and position reset',
+  networkingFloatingInspectorSource.includes("window.addEventListener('pointermove', movePanel)")
+  && networkingFloatingInspectorSource.includes("'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home'")
+  && networkingFloatingInspectorSource.includes('setPosition(clampPosition')
+  && networkingFloatingInspectorSource.includes('data-position-mode={position ? \'custom\' : \'default\'}')
+  && networkingFloatingInspectorSource.includes('Reset position'));
 
 const oopEngine = load(['course-catalog.js', 'playback.js', 'itcc45-activities.js', 'itcc45-practice-data.js'], { setTimeout, clearTimeout });
 const Courses = oopEngine.get('BSITLearningLab');

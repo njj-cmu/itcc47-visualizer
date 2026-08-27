@@ -5,7 +5,51 @@ const ComputerNetworkingPractice = (() => {
   const STORAGE_KEY = 'computer-networking.practice:v1';
   const QUESTIONS = Object.freeze([
     Object.freeze({
+      id: 'identify-network-roles',
+      module: 1,
+      group: 'Module 1 · Networking Today',
+      title: 'Identify device roles',
+      prompt: 'In the classroom diagram, which statement correctly separates end devices from intermediary devices?',
+      choices: Object.freeze([
+        'The laptop and learning server are end devices; the access point, switch, and edge router are intermediaries.',
+        'Every device with a network interface is an intermediary device.',
+        'Only the edge router is a network device; laptops and servers are outside the network.',
+      ]),
+      answer: 0,
+      explanation: 'Communication begins or ends on hosts such as laptops and servers. Access points, switches, and routers move or protect traffic between those hosts.',
+    }),
+    Object.freeze({
+      id: 'compare-topology-views',
+      module: 1,
+      group: 'Module 1 · Networking Today',
+      title: 'Choose a topology view',
+      prompt: 'Which view is most useful when checking which named interfaces a copper cable joins?',
+      choices: Object.freeze([
+        'The physical topology, because it shows placement, media, ports, and interface attachments.',
+        'The logical topology, because it replaces every interface with an application name.',
+        'Neither view, because a network diagram must never show interfaces.',
+      ]),
+      answer: 0,
+      explanation: 'A physical topology answers where devices and media are placed and which ports are connected. A logical topology emphasizes how communication is organized.',
+    }),
+    Object.freeze({
+      id: 'evaluate-reliable-network',
+      module: 1,
+      group: 'Module 1 · Networking Today',
+      title: 'Evaluate a reliable network',
+      prompt: 'Which set contains the four qualities used in the lesson to evaluate a dependable network?',
+      choices: Object.freeze([
+        'Fault tolerance, scalability, quality of service, and security.',
+        'One cable, one user, one application, and one password.',
+        'Broadcasting, subnetting, DNS, and vendor-specific commands.',
+      ]),
+      answer: 0,
+      explanation: 'Reliable networks limit failures, grow with demand, prioritize important traffic, and protect confidentiality, integrity, and availability.',
+    }),
+    Object.freeze({
       id: 'classify-local-peer',
+      module: 6,
+      group: 'Topic 6 preview · Network Layer & ARP',
       title: 'Classify the destination',
       prompt: 'Host A is 192.168.10.10/24 and Host B is 192.168.10.20/24. Where must Host A send the frame?',
       choices: Object.freeze([
@@ -18,6 +62,8 @@ const ComputerNetworkingPractice = (() => {
     }),
     Object.freeze({
       id: 'arp-request-fields',
+      module: 6,
+      group: 'Topic 6 preview · Network Layer & ARP',
       title: 'Inspect the ARP request',
       prompt: 'Which Ethernet and ARP destination values are correct while Host A asks for Host B?',
       choices: Object.freeze([
@@ -30,6 +76,8 @@ const ComputerNetworkingPractice = (() => {
     }),
     Object.freeze({
       id: 'predict-learned-state',
+      module: 6,
+      group: 'Topic 6 preview · Network Layer & ARP',
       title: 'Predict the learned state',
       prompt: 'After Host B replies, which entries should this two-host lab contain?',
       choices: Object.freeze([

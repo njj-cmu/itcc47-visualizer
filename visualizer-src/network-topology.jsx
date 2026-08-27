@@ -1,4 +1,5 @@
 import React, { memo, useState } from 'react';
+import { NetworkOperationCarousel } from './network-operation-carousel.jsx';
 
 const DESKTOP_GEOMETRY = Object.freeze({
   id: 'desktop', viewBox: '0 0 1100 420',
@@ -8,33 +9,33 @@ const DESKTOP_GEOMETRY = Object.freeze({
     'host-b': { x: 814, y: 82, width: 248, height: 226 },
   },
   ports: {
-    'host-a-eth0': { x: 254, y: 193, width: 28, height: 40, cx: 270, cy: 213, labelX: 250, labelY: 183, labelAnchor: 'end' },
-    'switch-1-p1': { x: 421, y: 190, width: 42, height: 46, cx: 444, cy: 213, labelX: 442, labelY: 179, labelAnchor: 'middle' },
-    'switch-1-p2': { x: 637, y: 190, width: 42, height: 46, cx: 660, cy: 213, labelX: 658, labelY: 179, labelAnchor: 'middle' },
-    'host-b-eth0': { x: 818, y: 193, width: 28, height: 40, cx: 834, cy: 213, labelX: 850, labelY: 183, labelAnchor: 'start' },
+    'host-a-eth0': { x: 232, y: 177, width: 58, height: 72, cx: 278, cy: 213, labelX: 228, labelY: 166, labelAnchor: 'end', plugAngle: 0 },
+    'switch-1-p1': { x: 410, y: 177, width: 72, height: 72, cx: 426, cy: 213, labelX: 446, labelY: 171, labelAnchor: 'middle', plugAngle: 180 },
+    'switch-1-p2': { x: 618, y: 177, width: 72, height: 72, cx: 674, cy: 213, labelX: 654, labelY: 171, labelAnchor: 'middle', plugAngle: 0 },
+    'host-b-eth0': { x: 810, y: 177, width: 58, height: 72, cx: 822, cy: 213, labelX: 872, labelY: 166, labelAnchor: 'start', plugAngle: 180 },
   },
   paths: {
-    'link-host-a-switch': 'M270 213 C330 213 380 213 444 213',
-    'link-switch-host-b': 'M660 213 C720 213 774 213 834 213',
+    'link-host-a-switch': 'M278 213 C326 257 380 257 426 213',
+    'link-switch-host-b': 'M674 213 C718 257 778 257 822 213',
   },
 });
 
 const MOBILE_GEOMETRY = Object.freeze({
-  id: 'mobile', viewBox: '0 0 390 570',
+  id: 'mobile', viewBox: '0 0 390 580',
   devices: {
-    'host-a': { x: 48, y: 24, width: 294, height: 142 },
-    'switch-1': { x: 48, y: 220, width: 294, height: 126 },
-    'host-b': { x: 48, y: 404, width: 294, height: 142 },
+    'host-a': { x: 48, y: 20, width: 294, height: 150 },
+    'switch-1': { x: 48, y: 215, width: 294, height: 150 },
+    'host-b': { x: 48, y: 410, width: 294, height: 150 },
   },
   ports: {
-    'host-a-eth0': { x: 179, y: 143, width: 32, height: 28, cx: 195, cy: 157, labelX: 195, labelY: 137, labelAnchor: 'middle' },
-    'switch-1-p1': { x: 119, y: 213, width: 42, height: 30, cx: 140, cy: 228, labelX: 140, labelY: 207, labelAnchor: 'middle' },
-    'switch-1-p2': { x: 229, y: 323, width: 42, height: 30, cx: 250, cy: 338, labelX: 250, labelY: 369, labelAnchor: 'middle' },
-    'host-b-eth0': { x: 179, y: 395, width: 32, height: 28, cx: 195, cy: 409, labelX: 195, labelY: 438, labelAnchor: 'middle' },
+    'host-a-eth0': { x: 252, y: 92, width: 72, height: 60, cx: 290, cy: 140, labelX: 288, labelY: 85, labelAnchor: 'middle', plugAngle: 90 },
+    'switch-1-p1': { x: 58, y: 211, width: 72, height: 60, cx: 95, cy: 230, labelX: 95, labelY: 204, labelAnchor: 'middle', plugAngle: -25 },
+    'switch-1-p2': { x: 260, y: 309, width: 72, height: 60, cx: 295, cy: 346, labelX: 250, labelY: 344, labelAnchor: 'end', plugAngle: 155 },
+    'host-b-eth0': { x: 60, y: 408, width: 72, height: 60, cx: 95, cy: 430, labelX: 140, labelY: 454, labelAnchor: 'start', plugAngle: -25 },
   },
   paths: {
-    'link-host-a-switch': 'M195 157 C195 188 140 188 140 228',
-    'link-switch-host-b': 'M250 338 C250 372 195 372 195 409',
+    'link-host-a-switch': 'M290 140 C284 184 160 183 95 230',
+    'link-switch-host-b': 'M295 346 C238 389 155 385 95 430',
   },
 });
 
@@ -42,37 +43,86 @@ function pathId(layoutId, linkId) { return `network-path-${layoutId}-${linkId}`;
 
 function Rj45Port({ id, label, geometry, state }) {
   const { x, y, width, height, labelX, labelY, labelAnchor } = geometry;
+  const opening = { x: x + 7, y: y + 9, width: width - 14, height: height - 18 };
   return <g className={`network-rj45-port is-${state || 'idle'}`} data-interface-id={id} data-interface-state={state || 'idle'}
-    data-jack-x={x} data-jack-y={y} data-jack-width={width} data-jack-height={height}>
-    <rect className="network-jack-bezel" x={x} y={y} width={width} height={height} rx="3"/>
-    <rect className="network-jack-interior" x={x + 4} y={y + 5} width={width - 8} height={height - 10} rx="1"/>
-    <path className="network-jack-contacts" d={`M${x + 7} ${y + 8}h${width - 14} M${x + 8} ${y + 12}v5 M${x + 12} ${y + 12}v5 M${x + 16} ${y + 12}v5 M${x + 20} ${y + 12}v5`}/>
+    data-jack-x={x} data-jack-y={y} data-jack-width={width} data-jack-height={height}
+    data-jack-opening-x={opening.x} data-jack-opening-y={opening.y} data-jack-opening-width={opening.width} data-jack-opening-height={opening.height}
+    data-anchor-x={geometry.cx} data-anchor-y={geometry.cy}>
+    <rect className="network-jack-bezel-shadow" x={x - 3} y={y - 3} width={width + 6} height={height + 6} rx="7"/>
+    <rect className="network-jack-bezel" x={x} y={y} width={width} height={height} rx="5"/>
+    <path className="network-jack-interior" d={`M${opening.x} ${opening.y + 8}h8v-8h${opening.width - 16}v8h8v${opening.height - 8}h-${opening.width}Z`}/>
+    <g className="network-jack-contacts">{Array.from({ length: 8 }, (_, index) => <path d={`M${opening.x + 7 + index * ((opening.width - 14) / 7)} ${opening.y + opening.height - 5}v-10`} key={index}/>)}</g>
+    <circle className="network-jack-led is-link" cx={x + 8} cy={y + 8} r="3"/><circle className="network-jack-led is-activity" cx={x + width - 8} cy={y + 8} r="3"/>
     <text className="network-port-label" x={labelX} y={labelY} textAnchor={labelAnchor}>{label}</text>
   </g>;
 }
 
+function CablePlug({ interfaceId, linkId, geometry, tone, active }) {
+  return <g className={`network-cable-plug is-${active ? tone : 'inactive'}`} data-plug-interface-id={interfaceId} data-plug-link-id={linkId}
+    data-plug-tip-x={geometry.cx} data-plug-tip-y={geometry.cy} transform={`translate(${geometry.cx} ${geometry.cy}) rotate(${geometry.plugAngle})`}>
+    <path className="network-plug-shadow" d="M-11 -14H15L23 -17H36V17H23L15 14H-11Z"/>
+    <path className="network-plug-head" d="M-10 -12H14V12H-10Z"/>
+    <path className="network-plug-latch" d="M-4 -12V-20H13L19 -13"/>
+    <path className="network-plug-contacts" d="M-7 -8H10 M-7 -5H10 M-7 -2H10 M-7 1H10 M-7 4H10 M-7 7H10"/>
+    <path className="network-plug-boot" d="M14 -14H24L35 -10V10L24 14H14Z"/>
+    <path className="network-plug-ribs" d="M21 -11V11 M26 -11V11 M31 -9V9"/>
+  </g>;
+}
+
 function HostDevice({ id, label, device, geometry, port, portLabel, mobile }) {
+  const portOnLeft = mobile && id === 'host-b';
+  const screenX = mobile ? geometry.x + (portOnLeft ? 140 : 18) : geometry.x + 24;
+  const screenWidth = mobile ? 136 : 145;
+  const textX = mobile ? geometry.x + (portOnLeft ? 160 : 18) : geometry.x + (id === 'host-b' ? 94 : 24);
   return <g className={`network-device network-host is-${device?.state || 'idle'}`} data-device-id={id}>
     <rect className="network-device-shadow" x={geometry.x + 5} y={geometry.y + 7} width={geometry.width} height={geometry.height} rx="12"/>
     <rect className="network-device-shell" x={geometry.x} y={geometry.y} width={geometry.width} height={geometry.height} rx="12"/>
-    <rect className="network-host-screen" x={geometry.x + 24} y={geometry.y + 25} width={mobile ? geometry.width - 48 : 145} height={mobile ? 54 : 102} rx="7"/>
+    <rect className="network-host-screen" x={screenX} y={geometry.y + (mobile ? 18 : 25)} width={screenWidth} height={mobile ? 64 : 102} rx="7"/>
     <path className="network-host-screen-line" d={mobile
-      ? `M${geometry.x + 44} ${geometry.y + 54}h${geometry.width - 88}`
+      ? `M${screenX + 18} ${geometry.y + 44}h${screenWidth - 36} M${screenX + 18} ${geometry.y + 60}h${screenWidth - 54}`
       : `M${geometry.x + 46} ${geometry.y + 60}h98 M${geometry.x + 46} ${geometry.y + 78}h72 M${geometry.x + 46} ${geometry.y + 96}h86`}/>
-    <text className="network-device-title" x={geometry.x + 24} y={geometry.y + geometry.height - 50}>{label}</text>
-    <text className="network-device-address" x={geometry.x + 24} y={geometry.y + geometry.height - 26}>{device?.interfaces?.[0]?.ip}/24</text>
-    <rect className="network-nic-plate" x={port.x - 8} y={port.y - 11} width={port.width + 16} height={port.height + 22} rx="5"/>
+    <text className="network-device-title" x={textX} y={geometry.y + geometry.height - (mobile ? 36 : 50)}>{label}</text>
+    <text className="network-device-address" x={textX} y={geometry.y + geometry.height - (mobile ? 16 : 26)}>{device?.interfaces?.[0]?.ip}/24</text>
+    <rect className="network-nic-plate" x={port.x - 9} y={port.y - 13} width={port.width + 18} height={port.height + 26} rx="7"/>
     <Rj45Port id={id === 'host-a' ? 'host-a-eth0' : 'host-b-eth0'} label={portLabel} geometry={port} state={device?.state}/>
   </g>;
+}
+
+function physicalPathAnnotation(frame) {
+  const annotations = {
+    'transmit-request-fa0-1': 'Host A eth0 → cable → switch Fa0/1',
+    'receive-request-fa0-1': 'Ingress Fa0/1 → inspect the Ethernet frame',
+    'learn-host-a-source': 'Ingress Fa0/1 → learn Host A source MAC',
+    'classify-broadcast': 'Ingress Fa0/1 → exclude ingress → choose Fa0/2',
+    'flood-request-fa0-2': 'Broadcast egress Fa0/2 → Host B eth0',
+    'receive-request-eth0': 'Switch Fa0/2 → cable → Host B eth0',
+    'transmit-reply-fa0-2': 'Host B eth0 → cable → switch Fa0/2',
+    'receive-and-learn-host-b': 'Ingress Fa0/2 → learn Host B source MAC',
+    'lookup-host-a-destination': 'Host A destination MAC → learned Fa0/1',
+    'forward-reply-fa0-1': 'Unicast egress Fa0/1 → Host A eth0',
+    'receive-reply-eth0': 'Switch Fa0/1 → cable → Host A eth0',
+  };
+  return annotations[frame.detail.id] || frame.operation.summary;
+}
+
+export function NetworkCurrentMovement({ frame, compact = false }) {
+  if (!frame) return null;
+  const path = frame.kind === 'network-foundations' ? frame.movement?.path : physicalPathAnnotation(frame);
+  return <section className={`network-current-movement ${compact ? 'is-compact' : ''}`} aria-label="Current movement explanation">
+    <span>Current movement</span>
+    <strong>{frame.detail?.label || frame.operation?.label}</strong>
+    <p>{frame.phase?.explanation}</p>
+    <code>{path || frame.operation?.summary}</code>
+  </section>;
 }
 
 function SwitchDevice({ device, geometry, ports, mobile }) {
   return <g className={`network-device network-switch is-${device?.state || 'idle'}`} data-device-id="switch-1">
     <rect className="network-device-shadow" x={geometry.x + 5} y={geometry.y + 7} width={geometry.width} height={geometry.height} rx="10"/>
     <rect className="network-device-shell network-switch-shell" x={geometry.x} y={geometry.y} width={geometry.width} height={geometry.height} rx="10"/>
-    <text className="network-switch-kicker" x={geometry.x + 22} y={geometry.y + 31}>TEACHING SWITCH · 2 PORTS</text>
-    <text className="network-device-title" x={geometry.x + 22} y={geometry.y + 58}>Switch 1</text>
-    <path className="network-switch-rule" d={mobile ? `M${geometry.x + 20} ${geometry.y + 70}h${geometry.width - 40}` : `M${geometry.x + 20} ${geometry.y + 76}h${geometry.width - 40}`}/>
+    <text className="network-switch-kicker" x={mobile ? geometry.x + geometry.width / 2 : geometry.x + 22} y={geometry.y + (mobile ? 48 : 19)} textAnchor={mobile ? 'middle' : 'start'}>TEACHING SWITCH · 2 PORTS</text>
+    <text className="network-device-title" x={mobile ? geometry.x + geometry.width / 2 : geometry.x + 22} y={geometry.y + (mobile ? 75 : 39)} textAnchor={mobile ? 'middle' : 'start'}>Switch 1</text>
+    <path className="network-switch-rule" d={mobile ? `M${geometry.x + 112} ${geometry.y + 90}h70` : `M${geometry.x + 20} ${geometry.y + 49}h${geometry.width - 40}`}/>
     <Rj45Port id="switch-1-p1" label="Fa0/1 · Port 1" geometry={ports['switch-1-p1']} state={device?.state}/>
     <Rj45Port id="switch-1-p2" label="Fa0/2 · Port 2" geometry={ports['switch-1-p2']} state={device?.state}/>
   </g>;
@@ -111,12 +161,13 @@ export const NetworkTopologyRenderer = memo(function NetworkTopologyRenderer({ f
   const reducedTravel = motionMode === 'reduced' && transport?.stage === 'travel';
   const activeSource = transport?.fromInterfaceId || (transport?.stage === 'source' ? transport.interfaceId : null);
   const activeDestination = transport?.toInterfaceId || (transport?.stage === 'destination' ? transport.interfaceId : null);
+  const plugs = frame.topology.links.flatMap((link) => [link.fromInterfaceId, link.toInterfaceId].map((interfaceId) => ({
+    interfaceId, linkId: link.id, active: transport?.linkId === link.id || transport?.interfaceId === interfaceId, tone: transport?.tone || 'inactive',
+  })));
 
   return <div className="network-topology-renderer" data-layout={geometry.id} data-motion-mode={motionMode}
     data-operation-id={frame.operation.id} data-detail-id={frame.detail.id}>
-    <div className="network-operation-timeline" aria-label="Eight-step ARP overview">
-      {frame.operationTimeline.map((item) => <span className={`is-${item.status}`} aria-current={item.status === 'active' ? 'step' : undefined} key={item.id}><b>{item.index}</b><i>{item.label}</i></span>)}
-    </div>
+    <NetworkOperationCarousel timeline={frame.operationTimeline} label="Eight-step ARP overview"/>
     <div className="network-detail-label"><strong>Operation {frame.operation.index} of {frame.operation.total}</strong><span>Detail {frame.detail.index} of {frame.detail.total} · {frame.detail.label}</span></div>
     <svg className="network-topology-svg" viewBox={geometry.viewBox} role="img" aria-labelledby="network-topology-title network-topology-description">
       <title id="network-topology-title">Port-accurate ARP teaching topology</title>
@@ -124,6 +175,7 @@ export const NetworkTopologyRenderer = memo(function NetworkTopologyRenderer({ f
       <defs>
         <marker id={`network-arrow-${geometry.id}`} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0 0 8 4 0 8Z"/></marker>
         <filter id={`network-glow-${geometry.id}`} x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <linearGradient id="network-jack-metal" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#a9b5ba"/><stop offset=".28" stopColor="#4c6069"/><stop offset=".65" stopColor="#24343c"/><stop offset="1" stopColor="#81939b"/></linearGradient>
       </defs>
       <g className="network-cables" data-layer="cables">
         {frame.topology.links.map((link) => {
@@ -140,6 +192,7 @@ export const NetworkTopologyRenderer = memo(function NetworkTopologyRenderer({ f
       <HostDevice id="host-a" label="Host A" device={devices['host-a']} geometry={geometry.devices['host-a']} port={geometry.ports['host-a-eth0']} portLabel="eth0" mobile={compact}/>
       <SwitchDevice device={devices['switch-1']} geometry={geometry.devices['switch-1']} ports={geometry.ports} mobile={compact}/>
       <HostDevice id="host-b" label="Host B" device={devices['host-b']} geometry={geometry.devices['host-b']} port={geometry.ports['host-b-eth0']} portLabel="eth0" mobile={compact}/>
+      <g className="network-plugs" data-layer="plugs">{plugs.map((plug) => <CablePlug {...plug} geometry={geometry.ports[plug.interfaceId]} key={`${plug.linkId}:${plug.interfaceId}`}/>)}</g>
       {reducedTravel ? <g className="network-reduced-cues" aria-hidden="true">
         <circle className="network-reduced-source" cx={geometry.ports[activeSource]?.cx} cy={geometry.ports[activeSource]?.cy} r="24"/>
         <circle className="network-reduced-destination" cx={geometry.ports[activeDestination]?.cx} cy={geometry.ports[activeDestination]?.cy} r="24"/>
@@ -195,10 +248,10 @@ export function NetworkTablesView({ frame }) {
 
 export function NetworkStepsView({ frame, controller }) {
   if (!frame) return null;
-  return <ol className="network-steps-view" data-granularity={frame.playbackGranularity}>{frame.operationTimeline.map((operation) => <li className={`is-${operation.status}`} key={operation.id}>
+  return <><NetworkCurrentMovement frame={frame} compact/><ol className="network-steps-view" data-granularity={frame.playbackGranularity}>{frame.operationTimeline.map((operation) => <li className={`is-${operation.status}`} key={operation.id}>
     <button type="button" onClick={() => controller.seek(operation.activeEvent - 1)}><span>{operation.index}</span><strong>{operation.label}</strong><em>{operation.status}</em></button>
     {operation.status === 'active' ? <ol>{operation.details.map((item) => <li className={`is-${item.status}`} key={item.id}><button type="button" disabled={!item.activeEvent} onClick={() => item.activeEvent && controller.seek(item.activeEvent - 1)}><span>{operation.index}.{item.index}</span><strong>{item.label}</strong><em>{item.status}</em></button></li>)}</ol> : null}
-  </li>)}</ol>;
+  </li>)}</ol></>;
 }
 
 export const NetworkEvidencePanel = memo(function NetworkEvidencePanel({ frame, expanded, onExpandedChange }) {

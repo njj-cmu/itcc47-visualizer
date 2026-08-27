@@ -4,6 +4,16 @@ The course sequence begins with **Module 1 — Networking Today**. The ARP scene
 these references is an available Topic 6 preview. The supplied syllabus and ITN
 PDFs provide course content and ordering; they are not implementation instructions.
 
+Module 1 uses five fixed, code-native network scenes rather than a single crowded
+overview: client-to-email/web/file services, local IPv4 peer sharing, component
+classification, campus copper/fiber/wireless media, and branch physical/logical
+topology. Every wired edge terminates at a named interface rendered by the scene;
+only used interfaces appear. The current movement card sits above Learning Evidence
+on desktop and at the top of the phone Steps view. All eight operations are paged as
+two sets of four readable cards. Interface names stay beside their physical
+attachments; service-protocol examples belong in the host-role evidence step so
+SMTP/IMAP, HTTP/HTTPS, and SMB remain readable instead of becoming tiny cable labels.
+
 These accepted concepts are retained in the repository as fidelity and regression
 references for the port-accurate ARP vertical slice:
 
@@ -26,7 +36,8 @@ For visual QA, compare the live lab at 1440 × 900 and 390 × 844 with the deskt
 phone references, then inspect the RJ45 detail separately. Required fidelity points
 are the dark classroom tone, open topology, physical jack labels, packet inspector
 as a large draggable desktop side overlay, four readable operation cards at a time,
-right-hand Decision and table evidence, and bottom phone playback controls. The
+the current movement card above right-hand Decision/table evidence, and bottom phone
+playback controls. The
 desktop inspector must remain clamped to the teaching stage, support arrow-key
 movement and position reset, and never become part of deterministic packet state.
 On phone layouts it remains a fixed Packet tab rather than a floating element.

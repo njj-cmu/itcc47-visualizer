@@ -879,16 +879,19 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .course-computer-networking .activity-heading p a { display: inline-flex; align-items: center; gap: 5px; color: var(--net-emerald-soft); }
 .course-computer-networking .activity-heading h1 { color: #f6fbfa; font-size: clamp(1.42rem,2vw,1.9rem); }
 .course-computer-networking .activity-heading > div:first-child > span { max-width: 720px; color: #9babb4; font-size: .79rem; }
-.network-preset-control { min-width: 310px; display: grid; gap: 3px; padding: 9px 12px; border: 1px solid var(--net-line); border-radius: 8px; background: rgba(17,26,33,.92); }
+.network-preset-control { min-width: 310px; display: grid; grid-template-columns: auto minmax(170px,1fr); gap: 4px 10px; align-items: center; padding: 9px 12px; border: 1px solid var(--net-line); border-radius: 8px; background: rgba(17,26,33,.92); }
 .network-preset-control span { margin: 0; color: #718793; font-size: .55rem; font-weight: 750; text-transform: uppercase; letter-spacing: .07em; }
-.network-preset-control strong { color: #e8fff8; font-size: .72rem; }
-.network-preset-control em { color: #8eb6a9; font: normal .58rem ui-monospace,monospace; }
+.network-preset-control select { min-width: 0; min-height: 32px; padding: 0 30px 0 9px; border: 1px solid #3c5661; border-radius: 6px; color: #e8fff8; background: #0d171d; font-size: .69rem; font-weight: 700; cursor: pointer; }
+.network-preset-control select:focus-visible { border-color: var(--net-emerald); outline: 2px solid rgba(53,214,165,.24); outline-offset: 1px; }
+.network-preset-control em { grid-column: 1 / 3; color: #8eb6a9; font: normal .58rem ui-monospace,monospace; }
 .network-workbench { position: relative; min-height: 0; display: grid; grid-template-rows: minmax(330px,1fr) 206px; gap: 10px; flex: 1; }
 .network-workbench.is-arp { grid-template-rows: minmax(0,1fr); }
+.network-workbench.is-foundations { grid-template-rows: minmax(0,1fr); }
+.network-workbench.is-foundations > .network-packet-surface { display: none; }
 .network-topology-surface, .network-packet-surface { min-width: 0; min-height: 0; border: 1px solid var(--net-line); border-radius: 10px; background: linear-gradient(145deg,rgba(20,31,39,.97),rgba(10,16,21,.98)); overflow: hidden; }
 .network-tables-surface, .network-steps-surface { display: none; }
 .network-topology-surface { position: relative; }
-.network-topology-renderer { height: 100%; display: grid; grid-template-rows: 76px 32px minmax(0,1fr) 42px; }
+.network-topology-renderer { height: 100%; display: grid; grid-template-rows: 76px 32px minmax(0,1fr); }
 .network-operation-carousel { position: relative; min-width: 0; display: grid; grid-template-columns: 32px minmax(0,1fr) 32px; gap: 8px; align-items: center; padding: 8px 10px 19px; }
 .network-operation-timeline { min-width: 0; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 7px; }
 .network-operation-item { min-width: 0; min-height: 43px; display: grid; grid-template-columns: 26px minmax(0,1fr); gap: 7px; align-items: center; padding: 5px 8px; border: 1px solid #2f434e; border-radius: 7px; color: #82949d; background: #10181e; }
@@ -908,20 +911,19 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .network-topology-svg { width: 100%; height: 100%; display: block; }
 .network-foundations-renderer { height: 100%; display: grid; grid-template-rows: 76px 32px minmax(0,1fr) 42px; }
 .network-foundations-svg { width: 100%; height: 100%; display: block; }
-.network-foundation-scopes rect { fill: rgba(13,25,32,.36); stroke: #2a4852; stroke-width: 1.4; stroke-dasharray: 8 6; }
-.network-foundation-scopes .network-foundation-wan { fill: rgba(34,28,17,.3); stroke: #72582b; }
-.network-foundation-scopes text { fill: #6f8790; font: 750 10px ui-monospace,monospace; letter-spacing: .09em; }
 .network-foundation-device-shadow { fill: rgba(0,0,0,.32); }
 .network-foundation-device-shell { fill: #16232c; stroke: #3b505c; stroke-width: 1.5; transition: stroke 150ms ease,fill 150ms ease,filter 150ms ease; }
+.network-foundation-device.kind-network-cloud .network-foundation-device-shell { fill: #111c27; stroke: #47758a; stroke-dasharray: 6 4; }
 .network-foundation-device.is-focused .network-foundation-device-shell { fill: #17352d; stroke: var(--net-emerald); stroke-width: 2.5; filter: drop-shadow(0 0 7px rgba(53,214,165,.32)); }
-.network-foundation-device-kind { fill: #738992; font: 750 8px ui-monospace,monospace; letter-spacing: .08em; }
+.network-foundation-device-kind { fill: #738992; font: 750 8.5px ui-monospace,monospace; letter-spacing: .08em; }
 .network-foundation-device-title { fill: #eefaf7; font: 800 14px ui-monospace,monospace; }
-.network-foundation-device-role { fill: #91a9a3; font: 650 10px ui-monospace,monospace; }
-.network-foundation-device-icon { fill: var(--net-cyan); font: 800 29px ui-monospace,monospace; }
-.network-foundation-interface circle { fill: #091015; stroke: #718892; stroke-width: 1.5; }
+.network-foundation-device-role { fill: #91a9a3; font: 650 10.5px ui-monospace,monospace; }
+.network-foundation-device-icon { fill: var(--net-cyan); font: 850 22px ui-monospace,monospace; }
+.network-foundation-port { fill: #071016; stroke: #7b929c; stroke-width: 1.5; }
 .network-foundation-interface .network-foundation-interface-core { fill: var(--net-emerald); stroke: none; }
 .network-foundation-interface.media-wireless .network-foundation-interface-core { fill: var(--net-cyan); }
-.network-foundation-interface text { fill: #cce0da; font: 750 8px ui-monospace,monospace; }
+.network-foundation-interface.media-fiber .network-foundation-interface-core { fill: var(--net-amber); }
+.network-foundation-interface text { fill: #d8eae5; font: 750 11.5px ui-monospace,monospace; paint-order: stroke; stroke: #0b1217; stroke-width: 3px; stroke-linejoin: round; }
 .network-foundation-link { fill: none; stroke: #49715f; stroke-width: 4; stroke-linecap: round; opacity: .58; transition: stroke 150ms ease,stroke-width 150ms ease,opacity 150ms ease; }
 .network-foundation-link.media-wireless { stroke: #4e8fa0; stroke-width: 3; stroke-dasharray: 8 7; }
 .network-foundation-link.media-fiber { stroke: #b68d3d; }
@@ -929,7 +931,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .network-foundation-link.media-wireless.is-focused { stroke: var(--net-cyan); stroke-width: 5; }
 .network-foundation-link.media-fiber.is-focused { stroke: var(--net-amber); }
 .representation-logical .network-foundation-device-shell { stroke-dasharray: 5 3; }
-.representation-logical .network-foundation-scopes rect, .representation-split .network-foundation-scopes rect { stroke-width: 2.2; }
+.network-foundation-zone-labels text { fill: #77909a; font: 750 10px ui-monospace,monospace; letter-spacing: .08em; }
 .network-foundation-caption { min-width: 0; display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 0 14px; border-top: 1px solid var(--net-line); color: #b5c7c2; background: #0e171d; }
 .network-foundation-caption span { color: var(--net-emerald); font-size: .55rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
 .network-foundation-caption strong { min-width: 0; overflow: hidden; font-size: .67rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -956,7 +958,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .network-foundation-legend span { display: flex; align-items: center; gap: 7px; }
 .network-foundation-legend i { width: 14px; height: 8px; border: 2px solid var(--net-cyan); border-radius: 3px; }
 .network-foundation-legend i.is-intermediary { border-color: var(--net-emerald); }
-.network-foundation-legend i.is-wired { height: 2px; border: 0; border-radius: 0; background: var(--net-emerald); }
+.network-foundation-legend i.is-wired { height: 2px; border: 0; border-radius: 0; background: #49715f; }
+.network-foundation-legend i.is-fiber { height: 2px; border: 0; border-radius: 0; background: var(--net-amber); }
 .network-foundation-legend i.is-wireless { height: 2px; border: 0; border-radius: 0; background: repeating-linear-gradient(90deg,var(--net-cyan) 0 4px,transparent 4px 7px); }
 .network-device-shadow { fill: rgba(0,0,0,.3); }
 .network-device-shell { fill: #16232c; stroke: #3b505c; stroke-width: 1.5; }
@@ -1005,9 +1008,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .network-packet.is-broadcast { filter: drop-shadow(0 0 8px rgba(244,183,64,.68)); }
 .network-packet.is-broadcast rect { fill: #4a3512; stroke: #ffcf72; }
 .network-packet.is-broadcast path { stroke: #ffe4ad; }
-.network-physical-path { min-width: 0; display: grid; grid-template-columns: auto minmax(0,1fr); gap: 12px; align-items: center; padding: 0 14px; border-top: 1px solid var(--net-line); background: #0e171d; }
-.network-physical-path span { color: var(--net-amber); font-size: .55rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-.network-physical-path strong { min-width: 0; color: #dceae6; font: 720 .64rem ui-monospace,monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @keyframes network-cue-source { 0%,30% { opacity: 1; transform: scale(.7); } 45%,100% { opacity: .15; transform: scale(1); } }
 @keyframes network-cue-destination { 0%,60% { opacity: .12; transform: scale(.7); } 78%,100% { opacity: 1; transform: scale(1); } }
 .network-reduced-cues circle { fill: none; stroke: var(--net-emerald-soft); stroke-width: 4; transform-box: fill-box; transform-origin: center; }
@@ -1049,8 +1049,16 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .network-floating-packet .network-packet-layers dt { font-size: .61rem; }
 .network-floating-packet .network-packet-layers dd { font-size: .64rem; }
 .course-computer-networking .desktop-evidence { min-height: 0; padding: 14px 14px 12px 0; }
+.course-computer-networking .network-evidence-stack { display: grid; grid-template-rows: auto minmax(0,1fr); gap: 10px; }
 .course-computer-networking.evidence-collapsed .desktop-evidence { padding-right: 8px; }
+.network-current-movement { display: grid; gap: 7px; padding: 13px 14px; border: 1px solid #7d5f28; border-radius: 10px; color: #d9e8e4; background: linear-gradient(145deg,rgba(53,39,14,.84),rgba(16,24,29,.98)); box-shadow: inset 3px 0 0 var(--net-amber); }
+.network-current-movement > span { color: var(--net-amber); font-size: .56rem; font-weight: 850; text-transform: uppercase; letter-spacing: .09em; }
+.network-current-movement > strong { color: #fff5d8; font-size: .78rem; line-height: 1.35; }
+.network-current-movement p { margin: 0; color: #b9c7c2; font-size: .63rem; line-height: 1.45; }
+.network-current-movement code { padding-top: 7px; border-top: 1px solid rgba(244,183,64,.25); color: #f5d78e; font: 700 .57rem/1.45 ui-monospace,monospace; overflow-wrap: anywhere; }
+.network-current-movement.is-compact { margin: 10px; }
 .network-evidence-panel { height: 100%; display: grid; grid-template-rows: 58px auto 44px minmax(0,1fr); border: 1px solid var(--net-line); border-radius: 10px; background: var(--net-surface); overflow: hidden; }
+.network-evidence-panel.network-foundation-guide { grid-template-rows: 58px auto auto minmax(68px,1fr); overflow-y: auto; }
 .network-evidence-panel > header { display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-bottom: 1px solid var(--net-line); background: #152129; }
 .network-evidence-panel > header div { display: grid; gap: 3px; }
 .network-evidence-panel > header span { color: #a3b5bd; font-size: .53rem; text-transform: uppercase; letter-spacing: .06em; }
@@ -1120,9 +1128,11 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .network-workbench { display: contents; }
   .network-topology-surface, .network-packet-surface, .network-tables-surface, .network-steps-surface { display: none; }
   .network-topology-surface.mobile-active, .network-packet-surface.mobile-active, .network-tables-surface.mobile-active, .network-steps-surface.mobile-active { display: block; }
+  .network-workbench.is-foundations > .network-packet-surface.mobile-active { display: block; }
   .network-topology-surface { min-height: 514px; border-radius: 9px; }
-  .network-topology-renderer { min-height: 514px; grid-template-rows: 92px 43px minmax(0,1fr) 48px; }
+  .network-topology-renderer { min-height: 514px; grid-template-rows: 92px 43px minmax(0,1fr); }
   .network-foundations-renderer { min-height: 514px; grid-template-rows: 92px 43px minmax(0,1fr) 54px; }
+  .network-workbench.is-foundations .network-topology-surface, .network-workbench.is-foundations .network-foundations-renderer { min-height: 680px; }
   .network-operation-carousel { grid-template-columns: 28px minmax(0,1fr) 28px; gap: 4px; padding: 7px 6px 18px; }
   .network-operation-timeline { gap: 4px; }
   .network-operation-item { min-height: 65px; grid-template-columns: 1fr; grid-template-rows: 23px minmax(0,1fr); gap: 4px; justify-items: center; align-content: center; padding: 5px 3px; text-align: center; }
@@ -1170,9 +1180,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .course-computer-networking .activity-heading p, .course-computer-networking .activity-heading > div:first-child > span { display: none; }
   .course-computer-networking .activity-heading h1 { font-size: 1.08rem; line-height: 1.15; }
   .course-computer-networking .activity-heading .activity-action-stack, .course-computer-networking .activity-heading .activity-actions { width: auto; margin: 0; }
-  .network-preset-control { min-height: 48px; padding: 7px 9px; }
+  .network-preset-control { min-height: 48px; display: block; padding: 7px 9px; }
   .network-preset-control span, .network-preset-control em { display: none; }
-  .network-preset-control strong { font-size: .61rem; line-height: 1.3; }
+  .network-preset-control select { width: 100%; min-height: 34px; font-size: .61rem; line-height: 1.3; }
   .course-computer-networking .mobile-surface-tabs { margin-top: 4px; }
   .course-computer-networking .mobile-surface-tabs button { min-height: 48px; padding-block: 4px; }
   .network-topology-surface { height: 540px; min-height: 540px; }

@@ -59,20 +59,21 @@ work without an account or network.
 
 ### IT 53 — Introduction to Networking
 
-The Network Lab begins with Module 1, **Networking Today**, in a deterministic
-classroom scene that teaches components, roles, interfaces, media, representations,
-scope, reliability, trends, and professional practice. A Topic 6 preview then follows
+The Network Lab begins with Module 1, **Networking Today**, through five deterministic
+networks. Learners first follow one client through two routers and the Internet to
+separate email, web, and file servers, then compare local peer sharing, device
+categories, campus media, and physical/logical topology. A Topic 6 preview follows
 one same-LAN IPv4 forwarding decision through ARP. Its two-host, two-port topology
 uses visible plugs seated in named physical RJ45 jacks: Host A `eth0` ↔ `Fa0/1`, then
-`Fa0/2` ↔ Host B `eth0`. Both activities provide eight Overview operations and 24
-immutable Detailed phases. They are guided classroom labs, not editable topologies
+`Fa0/2` ↔ Host B `eth0`. Every Module 1 network and the ARP preview provides eight
+Overview operations and 24 immutable Detailed phases. They are guided labs, not editable topologies
 or Packet Tracer replacements.
 
 | Page | Purpose |
 |---|---|
 | [`computer-networking.html`](computer-networking.html) | IT 53 subject home and learning path |
 | [`computer-networking-modules.html`](computer-networking-modules.html) | Curriculum-reconciled module roadmap |
-| [`visualizer.html?course=computer-networking&activity=networking-read-classroom-network`](visualizer.html?course=computer-networking&activity=networking-read-classroom-network) | Module 1 classroom Network Lab |
+| [`visualizer.html?course=computer-networking&activity=networking-read-classroom-network`](visualizer.html?course=computer-networking&activity=networking-read-classroom-network) | Module 1 host-role path and five-network selector |
 | [`visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery`](visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery) | Topic 6 port-accurate ARP preview |
 | [`computer-networking-practice.html`](computer-networking-practice.html) | Six identity-free Module 1 and Topic 6 checks |
 
@@ -154,7 +155,8 @@ Detailed timeline. Separate fixed desktop and phone SVG coordinate maps resolve 
 endpoints and plug tips from interface IDs; ARP packet motion references those exact
 cable paths. Networking operations appear four at a time in a readable carousel;
 desktop ARP packet fields use a bounded draggable inspector while phones retain a
-fixed Packet tab.
+fixed Packet tab. The current movement explanation occupies its own card above the
+desktop Learning Evidence panel and is repeated in the phone Steps view.
 
 This repository is public practice, not an academic record. It stores no
 identity, grades, timestamps, authentication, or authoritative submissions.

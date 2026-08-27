@@ -2,14 +2,38 @@
 
 Status: ARP vertical slice implemented; Module 1 sequence and physical-port fidelity correction implemented on `codex/networking-module-1-sequence`.
 
+## 2026-08-27 Module 1 network set
+
+Module 1 now opens with five fixed activities backed by the same deterministic
+`ComputerNetworkingFoundationsMachine` contract:
+
+1. `networking-read-classroom-network` — one client reaches distinct email, web,
+   and file server roles through a home router, the Internet, and a service router.
+2. `networking-local-peer-sharing` — two laptops both request and provide resources
+   inside the local `192.168.20.0/24` network; no router or Internet appears.
+3. `networking-classify-components` — learners distinguish end devices,
+   intermediary devices, and a server role performed by an ordinary laptop.
+4. `networking-compare-media` — copper serves room links, fiber spans buildings and
+   long distances, and wireless serves a mobile endpoint.
+5. `networking-read-network-topologies` — a branch LAN, provider WAN, and HQ LAN
+   contrast physical attachment with logical organization.
+
+Each activity preserves the eight-operation Overview and 24-phase Detailed model.
+All links terminate at declared named interfaces, the preset selector opens the
+matching activity route, and omitted or unknown IDs resolve to the first host-role
+activity. The top-right current-movement card precedes Learning Evidence on desktop;
+phone Steps contains the same explanation. Operation cards remain a four-at-a-time
+carousel. Physical interface names remain attached to the diagram, while the host-role
+evidence names the classroom service protocols—SMTP/IMAP, HTTP/HTTPS, and SMB—at the
+step where learners match each service to its server instead of crowding the topology.
+
 ## 2026-08-19 course-sequence correction
 
-The subject now opens with **Module 1 — Networking Today**, following the supplied
-course syllabus before exposing the existing ARP activity. The default activity is
-`networking-read-classroom-network`, a fixed classroom scenario with eight Overview
-operations and 24 Detailed phases covering network purpose, end-device roles,
-intermediaries, interfaces and media, physical/logical representations, LAN/WAN
-scope, reliable-network qualities, trends, and professional practice.
+The subject opens with **Module 1 — Networking Today**, following the supplied course
+syllabus before exposing the existing ARP activity. The default activity remains
+`networking-read-classroom-network`; it begins the five-network sequence and covers
+network purpose, host roles, intermediaries, interfaces and media, physical/logical
+representations, LAN/WAN scope, reliable-network qualities, and professional practice.
 
 The deterministic ARP activity remains available as a clearly labeled **Topic 6
 preview** grounded in ITN Modules 8 and 9. It is not a progression lock and it is no
@@ -30,7 +54,7 @@ Fundamentals of Networking** (three units; two lecture hours and three laborator
 hours weekly). The learner-facing title remains **Introduction to Networking** and
 the compact shell code remains `NET`.
 
-The Module 1 classroom activity is grounded in ITN Module 1. The ARP slice is grounded in ITN Module 8 (same-network versus remote-network
+The five Module 1 activities are grounded in ITN Module 1. The ARP slice is grounded in ITN Module 8 (same-network versus remote-network
 forwarding decisions) and Module 9 (ARP purpose, lookup, request broadcast, reply,
 and learned mapping). Physical NIC, interface, UTP, and RJ45 language is grounded in
 Modules 2 and 4. Switch source-MAC learning and flooding appear only as evidence
@@ -50,7 +74,9 @@ authoritative where a full-screen concept is visually ambiguous.
 ## Outcome
 
 Add **Introduction to Networking** as an independent BSIT Learning Lab subject.
-The first course activity teaches learners how to read a classroom network. The
+The first course activity teaches learners how a client uses separate server roles,
+and the following four activities make peers, device categories, media, and topology
+explicit. The
 available Topic 6 preview teaches how a host discovers a same-subnet peer with ARP,
 using a deterministic, curated topology and a packet inspector. Neither activity is
 a general network simulator or a Packet Tracer replacement.
@@ -62,7 +88,7 @@ drift; and use the same activity on laptop, phone, `file://`, and offline.
 
 ### Workspace presentation contract
 
-- Both networking activities retain eight operations, presented as a carousel of
+- Every networking activity retains eight operations, presented as a carousel of
   four readable operation cards at a time. The visible page follows the active
   operation while previous/next controls let learners inspect the other group.
 - On desktop ARP routes, the topology owns the full teaching stage. Packet details
@@ -71,6 +97,8 @@ drift; and use the same activity on laptop, phone, `file://`, and offline.
   state and never changes an immutable machine frame or saved course progress.
 - On phone routes, Packet remains a dedicated fixed tab with vertically stacked
   Ethernet and ARP fields. No draggable overlay is introduced on small screens.
+- On desktop, Current movement is a separate card above Learning Evidence. On phone,
+  the same explanation appears first in Steps.
 
 ## Product and curriculum boundary
 
@@ -79,7 +107,9 @@ drift; and use the same activity on laptop, phone, `file://`, and offline.
 - Compact shell code: `NET`; the supplied institutional course code is `IT 53`.
 - Short title: **Network Lab**.
 - Initial module: **Networking Today**.
-- First activity: **Read a classroom network**.
+- First activity: **Follow a client to three servers**.
+- Module 1 activity set: host roles, local peer sharing, component classification,
+  campus media, and physical/logical topology.
 - Available preview: **Topic 6 — Discover a neighbor with ARP**.
 - Curated topology: Host A, one Layer 2 switch, and Host B on one `/24` subnet.
 - No editable topology, arbitrary packet construction, vendor CLI emulation,
@@ -239,6 +269,10 @@ Add the same minimal route family used by Computer Architecture:
   Module 1 checks followed by three Topic 6 checks covering local-subnet choice,
   Ethernet broadcast destination, and ARP cache outcome;
 - `visualizer.html?course=computer-networking&activity=networking-read-classroom-network`;
+- `visualizer.html?course=computer-networking&activity=networking-local-peer-sharing`;
+- `visualizer.html?course=computer-networking&activity=networking-classify-components`;
+- `visualizer.html?course=computer-networking&activity=networking-compare-media`;
+- `visualizer.html?course=computer-networking&activity=networking-read-network-topologies`;
 - `visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery`.
 
 Register the course in `course-catalog.js`, add it to the subject chooser and

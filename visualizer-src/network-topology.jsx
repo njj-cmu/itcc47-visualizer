@@ -105,6 +105,17 @@ function physicalPathAnnotation(frame) {
   return annotations[frame.detail.id] || frame.operation.summary;
 }
 
+export function NetworkCurrentMovement({ frame, compact = false }) {
+  if (!frame) return null;
+  const path = frame.kind === 'network-foundations' ? frame.movement?.path : physicalPathAnnotation(frame);
+  return <section className={`network-current-movement ${compact ? 'is-compact' : ''}`} aria-label="Current movement explanation">
+    <span>Current movement</span>
+    <strong>{frame.detail?.label || frame.operation?.label}</strong>
+    <p>{frame.phase?.explanation}</p>
+    <code>{path || frame.operation?.summary}</code>
+  </section>;
+}
+
 function SwitchDevice({ device, geometry, ports, mobile }) {
   return <g className={`network-device network-switch is-${device?.state || 'idle'}`} data-device-id="switch-1">
     <rect className="network-device-shadow" x={geometry.x + 5} y={geometry.y + 7} width={geometry.width} height={geometry.height} rx="10"/>
@@ -188,7 +199,6 @@ export const NetworkTopologyRenderer = memo(function NetworkTopologyRenderer({ f
       </g> : null}
       <PacketGlyph packet={packet} transport={transport} geometry={geometry} motionMode={motionMode} animateTravel={animateTravel} layoutId={geometry.id}/>
     </svg>
-    <div className="network-physical-path" aria-label="Current physical path"><span>Physical path</span><strong>{physicalPathAnnotation(frame)}</strong></div>
     <p className="sr-only" role="status">Operation {frame.operation.index} of 8. Detail {frame.detail.index} of {frame.detail.total}: {frame.detail.label}. {frame.phase.explanation}</p>
   </div>;
 });
@@ -238,10 +248,10 @@ export function NetworkTablesView({ frame }) {
 
 export function NetworkStepsView({ frame, controller }) {
   if (!frame) return null;
-  return <ol className="network-steps-view" data-granularity={frame.playbackGranularity}>{frame.operationTimeline.map((operation) => <li className={`is-${operation.status}`} key={operation.id}>
+  return <><NetworkCurrentMovement frame={frame} compact/><ol className="network-steps-view" data-granularity={frame.playbackGranularity}>{frame.operationTimeline.map((operation) => <li className={`is-${operation.status}`} key={operation.id}>
     <button type="button" onClick={() => controller.seek(operation.activeEvent - 1)}><span>{operation.index}</span><strong>{operation.label}</strong><em>{operation.status}</em></button>
     {operation.status === 'active' ? <ol>{operation.details.map((item) => <li className={`is-${item.status}`} key={item.id}><button type="button" disabled={!item.activeEvent} onClick={() => item.activeEvent && controller.seek(item.activeEvent - 1)}><span>{operation.index}.{item.index}</span><strong>{item.label}</strong><em>{item.status}</em></button></li>)}</ol> : null}
-  </li>)}</ol>;
+  </li>)}</ol></>;
 }
 
 export const NetworkEvidencePanel = memo(function NetworkEvidencePanel({ frame, expanded, onExpandedChange }) {

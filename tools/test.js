@@ -979,14 +979,22 @@ ok('networking course exposes Module 1 first and ARP as a Topic 6 preview', (() 
   const foundations = ComputerNetworkingCatalog.get('networking-read-classroom-network');
   const activity = ComputerNetworkingCatalog.get('networking-arp-neighbor-discovery');
   const registered = ComputerNetworkingCourses.getActivity('computer-networking', activity.id);
+  const activityIds = [
+    'networking-read-classroom-network',
+    'networking-local-peer-sharing',
+    'networking-classify-components',
+    'networking-compare-media',
+    'networking-read-network-topologies',
+    'networking-arp-neighbor-discovery',
+  ];
   return course.code === 'NET' && course.title === 'Introduction to Networking'
     && course.shortTitle === 'Network Lab' && course.home === 'computer-networking.html'
     && course.nav[1].href.includes('networking-read-classroom-network')
-    && ComputerNetworkingCourses.listActivities('computer-networking').map((item) => item.id).join(',') === 'networking-read-classroom-network,networking-arp-neighbor-discovery'
+    && ComputerNetworkingCourses.listActivities('computer-networking').map((item) => item.id).join(',') === activityIds.join(',')
     && ComputerNetworkingCatalog.get('unknown') === foundations && registered === activity
     && foundations.module === 1 && foundations.topic === 'Networking Today' && foundations.renderer === 'network-foundations'
     && activity.module === 6 && activity.topic === 'Network Layer & Address Resolution'
-    && activity.contentVersion === 2 && activity.engine === 'guided-network-model'
+    && activity.contentVersion === 3 && activity.engine === 'guided-network-model'
     && activity.renderer === 'network-topology' && activity.workspaceKind === 'network-lab'
     && activity.input.kind === 'network-preset' && !activity.input.editable
     && activity.evidenceViews.join(',') === 'packet-inspector,network-decisions,arp-table,mac-table';
@@ -1003,6 +1011,38 @@ ok('Networking Today keeps stable interface-owned links and equal final state in
     && frame.topology.links.map((item) => item.id).join(',') === ComputerNetworkingFoundations.ENTITY_IDS.links.join(',')
     && frame.topology.links.every((link) => declaredInterfaces.has(link.fromInterfaceId) && declaredInterfaces.has(link.toInterfaceId)))
     && JSON.stringify(foundationsFirst.result.finalState) === JSON.stringify(foundationsMicro.result.finalState);
+})());
+ok('Networking Today exposes five deterministic interface-owned network examples', (() => {
+  const presetIds = ['client-server-services', 'local-peer-sharing', 'small-office-components', 'campus-media', 'branch-topology'];
+  return ComputerNetworkingFoundations.PRESETS.map((preset) => preset.id).join(',') === presetIds.join(',')
+    && ComputerNetworkingFoundations.PRESETS.every((preset) => {
+      const operationRun = ComputerNetworkingFoundations.run(preset.id);
+      const detailedRun = ComputerNetworkingFoundations.run(preset.id, { granularity: 'micro' });
+      const ids = ComputerNetworkingFoundations.ENTITY_IDS_BY_PRESET[preset.id];
+      const declaredInterfaces = new Set(ids.interfaces);
+      return ComputerNetworkingFoundations.validatePreset(preset)
+        && operationRun.events.length === 8 && detailedRun.events.length === 24
+        && JSON.stringify(operationRun.result.finalState) === JSON.stringify(detailedRun.result.finalState)
+        && preset.devices.map((device) => device.id).join(',') === ids.devices.join(',')
+        && preset.links.map((link) => link.id).join(',') === ids.links.join(',')
+        && preset.links.every((link) => declaredInterfaces.has(link.fromInterfaceId) && declaredInterfaces.has(link.toInterfaceId));
+    });
+})());
+ok('Module 1 examples teach distinct host roles, local peers, device classes, and media', (() => {
+  const services = ComputerNetworkingFoundations.getPreset('client-server-services');
+  const serviceRoleFrame = ComputerNetworkingFoundations.run(services.id, { granularity: 'micro' }).events[5].frame;
+  const peers = ComputerNetworkingFoundations.getPreset('local-peer-sharing');
+  const components = ComputerNetworkingFoundations.getPreset('small-office-components');
+  const campus = ComputerNetworkingFoundations.getPreset('campus-media');
+  return ['service-email', 'service-web', 'service-file'].every((tag) => services.devices.some((device) => device.tags.includes(tag)))
+    && services.links.some((link) => link.tags.includes('long-distance') && link.media === 'fiber')
+    && serviceRoleFrame.evidence.facts.join(' ').includes('SMTP') && serviceRoleFrame.evidence.facts.join(' ').includes('HTTP/HTTPS') && serviceRoleFrame.evidence.facts.join(' ').includes('SMB')
+    && peers.devices.filter((device) => device.tags.includes('peer')).every((device) => device.tags.includes('client') && device.tags.includes('server-role'))
+    && !peers.devices.some((device) => device.tags.includes('router') || device.tags.includes('internet'))
+    && peers.devices.flatMap((device) => device.interfaces).filter((item) => item.id.includes('laptop')).every((item) => item.label.includes('192.168.20.'))
+    && components.devices.some((device) => device.kind === 'end-device' && device.tags.includes('server-role'))
+    && ['copper', 'fiber', 'wireless'].every((medium) => campus.links.some((link) => link.media === medium))
+    && campus.links.some((link) => link.media === 'fiber' && link.tags.includes('building-backbone'));
 })());
 ok('canonical ARP preset is valid, curated, and stays on one /24 LAN',
   ComputerNetworking.PRESETS.length === 1 && ComputerNetworking.validatePreset(networkingPreset)
@@ -1096,7 +1136,11 @@ ok('backward timeline inspection restores the earlier empty cache without mutati
 ok('networking activity delegates to the canonical deterministic model', (() => {
   const activity = ComputerNetworkingCatalog.get('networking-arp-neighbor-discovery');
   const run = activity.run();
-  return ComputerNetworkingCatalog.list().length === 2
+  const foundationActivities = ComputerNetworkingCatalog.list().slice(0, 5);
+  return ComputerNetworkingCatalog.list().length === 6
+    && foundationActivities.every((item, index) => item.input.defaultPreset === ComputerNetworkingFoundations.PRESETS[index].id
+      && item.input.activityByPreset[item.input.defaultPreset] === item.id
+      && item.run().events.length === 8)
     && activity.input.defaultPreset === 'arp-same-lan'
     && activity.source.length === 8
     && run.result.finalFrame.phase.id === 'ready-for-ipv4';
@@ -1132,6 +1176,17 @@ ok('network renderer keeps independent fixed desktop and mobile geometry maps',
   networkingRendererSource.includes('const DESKTOP_GEOMETRY')
   && networkingRendererSource.includes('const MOBILE_GEOMETRY')
   && ['host-a-eth0', 'switch-1-p1', 'switch-1-p2', 'host-b-eth0'].every((id) => networkingRendererSource.match(new RegExp(`'${id}'`, 'g')).length >= 2));
+const networkingFoundationsRendererSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'network-foundations.jsx'), 'utf8');
+ok('foundation renderer resolves five fixed layouts from named interfaces rather than device centers',
+  ['client-server-services', 'local-peer-sharing', 'small-office-components', 'campus-media', 'branch-topology'].every((id) => networkingFoundationsRendererSource.includes(`'${id}'`))
+  && networkingFoundationsRendererSource.includes('data-interface-id={item.id}')
+  && networkingFoundationsRendererSource.includes('data-from-interface-id={item.fromInterfaceId}')
+  && networkingFoundationsRendererSource.includes('data-to-interface-id={item.toInterfaceId}')
+  && networkingFoundationsRendererSource.includes('data-path-definition={geometry.paths[item.id]}')
+  && networkingFoundationsRendererSource.includes('activity.input.activityByPreset[event.target.value]'));
+ok('current movement is rendered above desktop networking evidence and repeated in phone Steps',
+  networkingRendererSource.includes('export function NetworkCurrentMovement')
+  && networkingRendererSource.includes('<NetworkCurrentMovement frame={frame} compact/>'));
 const networkingCarouselSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'network-operation-carousel.jsx'), 'utf8');
 ok('network operation carousel exposes four readable steps while retaining the eight-operation contract',
   networkingCarouselSource.includes('const PAGE_SIZE = 4')

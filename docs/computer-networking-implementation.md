@@ -60,6 +60,18 @@ through request broadcast, switch flooding, reply unicast, and cache update;
 inspect the Ethernet and ARP fields at each step; scrub backward without state
 drift; and use the same activity on laptop, phone, `file://`, and offline.
 
+### Workspace presentation contract
+
+- Both networking activities retain eight operations, presented as a carousel of
+  four readable operation cards at a time. The visible page follows the active
+  operation while previous/next controls let learners inspect the other group.
+- On desktop ARP routes, the topology owns the full teaching stage. Packet details
+  begin as a large side overlay and can be dragged within that stage, moved with
+  arrow keys, or returned with Reset position. This position is transient view
+  state and never changes an immutable machine frame or saved course progress.
+- On phone routes, Packet remains a dedicated fixed tab with vertically stacked
+  Ethernet and ARP fields. No draggable overlay is introduced on small screens.
+
 ## Product and curriculum boundary
 
 - Public title: **Introduction to Networking**.

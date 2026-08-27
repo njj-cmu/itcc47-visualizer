@@ -1,4 +1,5 @@
 import React, { memo, useState } from 'react';
+import { NetworkOperationCarousel } from './network-operation-carousel.jsx';
 
 const DESKTOP_GEOMETRY = Object.freeze({
   id: 'desktop', viewBox: '0 0 1100 420',
@@ -155,9 +156,7 @@ export const NetworkTopologyRenderer = memo(function NetworkTopologyRenderer({ f
 
   return <div className="network-topology-renderer" data-layout={geometry.id} data-motion-mode={motionMode}
     data-operation-id={frame.operation.id} data-detail-id={frame.detail.id}>
-    <div className="network-operation-timeline" aria-label="Eight-step ARP overview">
-      {frame.operationTimeline.map((item) => <span className={`is-${item.status}`} aria-current={item.status === 'active' ? 'step' : undefined} key={item.id}><b>{item.index}</b><i>{item.label}</i></span>)}
-    </div>
+    <NetworkOperationCarousel timeline={frame.operationTimeline} label="Eight-step ARP overview"/>
     <div className="network-detail-label"><strong>Operation {frame.operation.index} of {frame.operation.total}</strong><span>Detail {frame.detail.index} of {frame.detail.total} · {frame.detail.label}</span></div>
     <svg className="network-topology-svg" viewBox={geometry.viewBox} role="img" aria-labelledby="network-topology-title network-topology-description">
       <title id="network-topology-title">Port-accurate ARP teaching topology</title>

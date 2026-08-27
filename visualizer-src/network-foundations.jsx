@@ -1,4 +1,5 @@
 import React, { memo } from 'react';
+import { NetworkOperationCarousel } from './network-operation-carousel.jsx';
 
 const DESKTOP = Object.freeze({
   id: 'desktop', viewBox: '0 0 1100 470',
@@ -88,9 +89,7 @@ export const NetworkFoundationsRenderer = memo(function NetworkFoundationsRender
   const deviceByInterface = new Map(frame.topology.devices.flatMap((device) => device.interfaces.map((item) => [item.id, device])));
   const deviceIsFocused = (device) => focused.has(device.id) || device.interfaces.some((item) => focused.has(item.id));
   return <div className={`network-foundations-renderer representation-${frame.focus.representation}`} data-layout={geometry.id} data-operation-id={frame.operation.id} data-detail-id={frame.detail.id}>
-    <div className="network-operation-timeline" aria-label="Eight-step Networking Today overview">
-      {frame.operationTimeline.map((item) => <span className={`is-${item.status}`} aria-current={item.status === 'active' ? 'step' : undefined} key={item.id}><b>{item.index}</b><i>{item.label}</i></span>)}
-    </div>
+    <NetworkOperationCarousel timeline={frame.operationTimeline} label="Eight-step Networking Today overview"/>
     <div className="network-detail-label"><strong>Operation {frame.operation.index} of {frame.operation.total}</strong><span>Detail {frame.detail.index} of {frame.detail.total} · {frame.detail.label}</span></div>
     <svg className="network-foundations-svg" viewBox={geometry.viewBox} role="img" aria-labelledby="network-foundations-title network-foundations-description">
       <title id="network-foundations-title">Connected classroom network</title>

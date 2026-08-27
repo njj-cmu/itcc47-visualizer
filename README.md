@@ -152,7 +152,9 @@ stable device, interface, and link identities; ARP also preserves packet and tab
 identities. Each eight-operation Overview reaches the same final state as its 24-phase
 Detailed timeline. Separate fixed desktop and phone SVG coordinate maps resolve cable
 endpoints and plug tips from interface IDs; ARP packet motion references those exact
-cable paths.
+cable paths. Networking operations appear four at a time in a readable carousel;
+desktop ARP packet fields use a bounded draggable inspector while phones retain a
+fixed Packet tab.
 
 This repository is public practice, not an academic record. It stores no
 identity, grades, timestamps, authentication, or authoritative submissions.

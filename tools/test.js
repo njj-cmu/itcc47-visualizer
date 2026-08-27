@@ -1132,6 +1132,19 @@ ok('network renderer keeps independent fixed desktop and mobile geometry maps',
   networkingRendererSource.includes('const DESKTOP_GEOMETRY')
   && networkingRendererSource.includes('const MOBILE_GEOMETRY')
   && ['host-a-eth0', 'switch-1-p1', 'switch-1-p2', 'host-b-eth0'].every((id) => networkingRendererSource.match(new RegExp(`'${id}'`, 'g')).length >= 2));
+const networkingCarouselSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'network-operation-carousel.jsx'), 'utf8');
+ok('network operation carousel exposes four readable steps while retaining the eight-operation contract',
+  networkingCarouselSource.includes('const PAGE_SIZE = 4')
+  && networkingCarouselSource.includes('timeline.slice(start, start + PAGE_SIZE)')
+  && networkingCarouselSource.includes('data-operation-total={timeline.length}')
+  && networkingCarouselSource.includes('Show next four steps'));
+const networkingFloatingInspectorSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'network-floating-inspector.jsx'), 'utf8');
+ok('desktop packet inspector supports bounded pointer drag, keyboard movement, and position reset',
+  networkingFloatingInspectorSource.includes("window.addEventListener('pointermove', movePanel)")
+  && networkingFloatingInspectorSource.includes("'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home'")
+  && networkingFloatingInspectorSource.includes('setPosition(clampPosition')
+  && networkingFloatingInspectorSource.includes('data-position-mode={position ? \'custom\' : \'default\'}')
+  && networkingFloatingInspectorSource.includes('Reset position'));
 
 const oopEngine = load(['course-catalog.js', 'playback.js', 'itcc45-activities.js', 'itcc45-practice-data.js'], { setTimeout, clearTimeout });
 const Courses = oopEngine.get('BSITLearningLab');

@@ -1,0 +1,87 @@
+import React, { memo, useEffect, useRef, useState } from 'react';
+import { NetworkPacketInspector } from './network-topology.jsx';
+
+const EDGE_INSET = 10;
+const KEYBOARD_STEP = 18;
+
+function clamp(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+export const NetworkFloatingPacketInspector = memo(function NetworkFloatingPacketInspector({ boundaryRef, frame }) {
+  const panelRef = useRef(null);
+  const dragRef = useRef(null);
+  const [position, setPosition] = useState(null);
+
+  useEffect(() => {
+    function movePanel(event) {
+      const drag = dragRef.current;
+      const boundary = boundaryRef.current;
+      const panel = panelRef.current;
+      if (!drag || drag.pointerId !== event.pointerId || !boundary || !panel) return;
+      const boundaryBox = boundary.getBoundingClientRect();
+      const maximumX = Math.max(EDGE_INSET, boundary.clientWidth - panel.offsetWidth - EDGE_INSET);
+      const maximumY = Math.max(EDGE_INSET, boundary.clientHeight - panel.offsetHeight - EDGE_INSET);
+      setPosition({
+        x: clamp(event.clientX - boundaryBox.left - drag.offsetX, EDGE_INSET, maximumX),
+        y: clamp(event.clientY - boundaryBox.top - drag.offsetY, EDGE_INSET, maximumY),
+      });
+    }
+    function stopMoving(event) {
+      if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
+    }
+    window.addEventListener('pointermove', movePanel);
+    window.addEventListener('pointerup', stopMoving);
+    window.addEventListener('pointercancel', stopMoving);
+    return () => {
+      window.removeEventListener('pointermove', movePanel);
+      window.removeEventListener('pointerup', stopMoving);
+      window.removeEventListener('pointercancel', stopMoving);
+    };
+  }, [boundaryRef]);
+
+  function clampPosition(x, y) {
+    const boundary = boundaryRef.current;
+    const panel = panelRef.current;
+    if (!boundary || !panel) return { x, y };
+    const maximumX = Math.max(EDGE_INSET, boundary.clientWidth - panel.offsetWidth - EDGE_INSET);
+    const maximumY = Math.max(EDGE_INSET, boundary.clientHeight - panel.offsetHeight - EDGE_INSET);
+    return { x: clamp(x, EDGE_INSET, maximumX), y: clamp(y, EDGE_INSET, maximumY) };
+  }
+
+  function beginDrag(event) {
+    if (event.button !== 0 || event.target.closest('button')) return;
+    const panel = panelRef.current;
+    const boundary = boundaryRef.current;
+    if (!panel || !boundary) return;
+    const panelBox = panel.getBoundingClientRect();
+    dragRef.current = { pointerId: event.pointerId, offsetX: event.clientX - panelBox.left, offsetY: event.clientY - panelBox.top };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setPosition({ x: panel.offsetLeft, y: panel.offsetTop });
+  }
+
+  function endDrag(event) {
+    if (dragRef.current?.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+  }
+
+  function moveWithKeyboard(event) {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home'].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === 'Home') { setPosition(null); return; }
+    const panel = panelRef.current;
+    const current = position || { x: panel?.offsetLeft || EDGE_INSET, y: panel?.offsetTop || EDGE_INSET };
+    const deltaX = event.key === 'ArrowLeft' ? -KEYBOARD_STEP : event.key === 'ArrowRight' ? KEYBOARD_STEP : 0;
+    const deltaY = event.key === 'ArrowUp' ? -KEYBOARD_STEP : event.key === 'ArrowDown' ? KEYBOARD_STEP : 0;
+    setPosition(clampPosition(current.x + deltaX, current.y + deltaY));
+  }
+
+  return <aside ref={panelRef} className="network-floating-packet" data-floating-packet-inspector="true" data-position-mode={position ? 'custom' : 'default'} style={position ? { left: `${position.x}px`, top: `${position.y}px`, right: 'auto', bottom: 'auto' } : undefined}>
+    <div className="network-floating-packet-handle" tabIndex="0" role="group" aria-label="Move packet inspector. Use arrow keys to move or Home to reset." onPointerDown={beginDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onKeyDown={moveWithKeyboard}>
+      <span aria-hidden="true">⠿</span><strong>Packet inspector</strong><small>Drag to reposition</small>
+      <button type="button" onClick={() => setPosition(null)}>Reset position</button>
+    </div>
+    <div className="network-floating-packet-body"><NetworkPacketInspector frame={frame}/></div>
+  </aside>;
+});

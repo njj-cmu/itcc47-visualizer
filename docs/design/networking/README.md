@@ -25,8 +25,11 @@ and cable tails without copying the unused ports visible in that image.
 For visual QA, compare the live lab at 1440 × 900 and 390 × 844 with the desktop and
 phone references, then inspect the RJ45 detail separately. Required fidelity points
 are the dark classroom tone, open topology, physical jack labels, packet inspector
-below the topology on desktop, persistent eight-marker timeline, right-hand Decision
-and table evidence, and bottom phone playback controls.
+as a large draggable desktop side overlay, four readable operation cards at a time,
+right-hand Decision and table evidence, and bottom phone playback controls. The
+desktop inspector must remain clamped to the teaching stage, support arrow-key
+movement and position reset, and never become part of deterministic packet state.
+On phone layouts it remains a fixed Packet tab rather than a floating element.
 Also verify that every cable endpoint and plug tip falls inside its declared jack,
 Fa0/1 and Fa0/2 remain visibly distinct, the current physical-path statement matches
 the phase, and packet motion references the active cable's exact SVG path.

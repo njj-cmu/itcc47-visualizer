@@ -8,6 +8,7 @@ import { IndustryWorkbenchApp } from './industry-workbench.jsx';
 import { CpuDatapathRenderer, CpuInstructionDecodeRenderer, DecodeFieldsPane, MainMemoryPane } from './cpu-datapath.jsx';
 import { NetworkEvidencePanel, NetworkPacketInspector, NetworkStepsView, NetworkTablesView, NetworkTopologyRenderer } from './network-topology.jsx';
 import { NetworkFoundationConceptsView, NetworkFoundationEvidenceView, NetworkFoundationGuidePanel, NetworkFoundationsRenderer } from './network-foundations.jsx';
+import { NetworkFloatingPacketInspector } from './network-floating-inspector.jsx';
 
 const MAX_VISUAL_VALUES = 18;
 const DEFAULT_SPEED = 6;
@@ -911,6 +912,7 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const [networkGranularity, setNetworkGranularity] = useState('micro');
   const pendingGranularityMap = useRef(null);
   const networkDetailedPositions = useRef(new Map());
+  const networkWorkbenchRef = useRef(null);
   const primaryEvidence = activity.evidenceViews?.[0] || 'trace';
   const [evidenceTab, setEvidenceTab] = useState(primaryEvidence);
   const [mobileTab, setMobileTab] = useState(() => activity.mobileViews?.[0]?.id || 'visualize');
@@ -1018,7 +1020,7 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
           <header className="cpu-canvas-heading"><strong>{isCpuDecode ? 'Instruction decoder' : 'CPU datapath'}</strong><span><b>Operation {cpuFrame?.operation?.index || 1} / {cpuFrame?.operation?.total || 1}</b><em>{cpuFrame?.microStep?.index || 1} / {cpuFrame?.microStep?.total || 1} · {cpuFrame?.microStep?.label || 'Find the source'}</em></span></header>
           <section className={`cpu-visual-canvas mobile-surface ${mobileTab === (isCpuDecode ? 'decode' : 'datapath') ? 'mobile-active' : ''}`} tabIndex="0" aria-label={isCpuDecode ? `${activity.title} focused decoder board` : `${activity.title} teaching CPU datapath`}><Renderer frame={cpuFrame} event={event} activity={activity} numberFormat={viewOptions.numberFormat} motionMode={motionPreference.mode} duration={visualDuration * (cpuFrame?.microStep?.durationWeight || 1)}/></section>
         </div>
-      </div> : isComputerNetworking ? <div className={`network-workbench ${isNetworkFoundations ? 'is-foundations' : 'is-arp'}`}>
+      </div> : isComputerNetworking ? <div ref={networkWorkbenchRef} className={`network-workbench ${isNetworkFoundations ? 'is-foundations' : 'is-arp'}`}>
         <section className={`network-topology-surface mobile-surface ${(isNetworkFoundations ? mobileTab === 'diagram' : mobileTab === 'topology') ? 'mobile-active' : ''}`} tabIndex="0" aria-label={isNetworkFoundations ? `${activity.title} classroom diagram` : `${activity.title} physical-port topology`}>
           <Renderer frame={networkFrame} event={event} activity={activity} motionMode={motionPreference.mode} duration={networkVisualDuration} navigationSource={playback.navigationSource} compact={usesCompactWorkspace}/>
         </section>
@@ -1026,7 +1028,13 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
           <div className={`network-packet-surface mobile-surface ${mobileTab === 'concepts' ? 'mobile-active' : ''}`}><NetworkFoundationConceptsView frame={networkFrame}/></div>
           <div className={`network-tables-surface mobile-surface ${mobileTab === 'evidence' ? 'mobile-active' : ''}`}><NetworkFoundationEvidenceView frame={networkFrame}/></div>
         </> : <>
-          <div className={`network-packet-surface mobile-surface ${mobileTab === 'packet' ? 'mobile-active' : ''}`}><NetworkPacketInspector frame={networkFrame}/></div>
+          {usesCompactWorkspace ? (
+            <div className={`network-packet-surface mobile-surface ${mobileTab === 'packet' ? 'mobile-active' : ''}`}>
+              <NetworkPacketInspector frame={networkFrame}/>
+            </div>
+          ) : (
+            <NetworkFloatingPacketInspector boundaryRef={networkWorkbenchRef} frame={networkFrame}/>
+          )}
           <div className={`network-tables-surface mobile-surface ${mobileTab === 'tables' ? 'mobile-active' : ''}`}><NetworkTablesView frame={networkFrame}/></div>
         </>}
         <div className={`network-steps-surface mobile-surface ${mobileTab === 'steps' ? 'mobile-active' : ''}`}><NetworkStepsView frame={networkFrame} controller={controller}/></div>

@@ -250,12 +250,20 @@ test('Network Lab defaults to the Module 1 classroom sequence and preserves Deta
   if (testInfo.project.name === 'phone') await openMobilePlaybackDetails(page);
   await expect(page.getByRole('button', { name: 'Detailed', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.integrated-step strong')).toHaveText('1 / 24');
-  await expect(page.locator('.network-operation-timeline > span')).toHaveCount(8);
+  await expect(page.locator('.network-operation-item')).toHaveCount(4);
+  await expect(page.locator('.network-operation-carousel')).toHaveAttribute('data-operation-total', '8');
+  await expect(page.locator('.network-carousel-range')).toHaveText('Steps 1–4 of 8');
+  await page.getByRole('button', { name: 'Show next four steps' }).click();
+  await expect(page.locator('.network-carousel-range')).toHaveText('Steps 5–8 of 8');
+  await expect(page.locator('.network-operation-item').first()).toContainText('5');
+  await page.getByRole('button', { name: 'Show previous four steps' }).click();
+  await expect(page.locator('.network-carousel-range')).toHaveText('Steps 1–4 of 8');
   await expect(page.locator('[data-link-id="link-instructor-switch"]')).toHaveAttribute('data-from-interface-id', 'instructor-pc-eth0');
   await expect(page.locator('[data-link-id="link-instructor-switch"]')).toHaveAttribute('data-to-interface-id', 'classroom-switch-fa0-1');
   await (await visualizerTimeline(page)).fill('13');
   await expect(page.locator('.network-detail-label')).toContainText('Detail 2 of 3 · Read the logical topology');
   await expect(page.locator('.network-foundations-renderer')).toHaveClass(/representation-logical/);
+  await expect(page.locator('.network-carousel-range')).toHaveText('Steps 5–8 of 8');
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
   await expect(page.locator('.integrated-step strong')).toHaveText('5 / 8');
   await page.getByRole('button', { name: 'Detailed', exact: true }).click();
@@ -279,7 +287,9 @@ test('Network Lab defaults to Detailed, preserves its phase through Overview, an
   if (testInfo.project.name === 'phone') await openMobilePlaybackDetails(page);
   await expect(page.getByRole('button', { name: 'Detailed', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.integrated-step strong')).toHaveText('1 / 24');
-  await expect(page.locator('.network-operation-timeline > span')).toHaveCount(8);
+  await expect(page.locator('.network-operation-item')).toHaveCount(4);
+  await expect(page.locator('.network-operation-carousel')).toHaveAttribute('data-operation-total', '8');
+  await expect(page.locator('.network-carousel-range')).toHaveText('Steps 1–4 of 8');
   await timeline.fill('11');
   await expect(page.locator('.network-detail-label')).toContainText('Detail 4 of 4 · Flood Fa0/2 → Host B eth0');
   await expect(page.locator('path[data-link-id="link-switch-host-b"]')).toHaveClass(/is-broadcast/);
@@ -288,7 +298,7 @@ test('Network Lab defaults to Detailed, preserves its phase through Overview, an
   await expect(page.locator('.network-packet-inspector')).toContainText('FF:FF:FF:FF:FF:FF');
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
   await expect(page.locator('.integrated-step strong')).toHaveText('4 / 8');
-  await expect(page.locator('.network-operation-timeline > span')).toHaveCount(8);
+  await expect(page.locator('.network-operation-item')).toHaveCount(4);
   await page.getByRole('button', { name: 'Detailed', exact: true }).click();
   await expect(page.locator('.integrated-step strong')).toHaveText('12 / 24');
   await expect(page.locator('.network-detail-label')).toContainText('Flood Fa0/2 → Host B eth0');
@@ -299,6 +309,40 @@ test('Network Lab defaults to Detailed, preserves its phase through Overview, an
   await expect(arpTable.locator('[data-row-id="host-a-arp-host-b"]')).toContainText('02:00:00:00:10:14');
   await (await visualizerTimeline(page)).fill('21');
   await expect(arpTable.locator('[data-row-id="host-a-arp-host-b"]')).toHaveCount(0);
+});
+
+test('ARP packet inspector floats within the desktop stage and remains keyboard movable', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
+  await page.goto('/visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery');
+  const floating = page.locator('[data-floating-packet-inspector]');
+  await expect(floating).toBeVisible();
+  await expect(page.locator('.network-packet-surface')).toHaveCount(0);
+  await (await visualizerTimeline(page)).fill('7');
+  await expect(floating.locator('.network-packet-inspector')).toContainText('Address Resolution Protocol');
+  await expect(floating.locator('.network-packet-inspector')).toContainText('FF:FF:FF:FF:FF:FF');
+
+  const workbenchBox = await page.locator('.network-workbench').boundingBox();
+  const initialBox = await floating.boundingBox();
+  await page.mouse.move(initialBox.x + 180, initialBox.y + 24);
+  await page.mouse.down();
+  await page.mouse.move(workbenchBox.x + 210, workbenchBox.y + 190, { steps: 5 });
+  await page.mouse.up();
+  await expect(floating).toHaveAttribute('data-position-mode', 'custom');
+  const draggedBox = await floating.boundingBox();
+  expect(Math.abs(draggedBox.x - initialBox.x)).toBeGreaterThan(40);
+  expect(draggedBox.x).toBeGreaterThanOrEqual(workbenchBox.x);
+  expect(draggedBox.y).toBeGreaterThanOrEqual(workbenchBox.y);
+  expect(draggedBox.x + draggedBox.width).toBeLessThanOrEqual(workbenchBox.x + workbenchBox.width);
+  expect(draggedBox.y + draggedBox.height).toBeLessThanOrEqual(workbenchBox.y + workbenchBox.height);
+
+  const handle = page.getByRole('group', { name: 'Move packet inspector. Use arrow keys to move or Home to reset.' });
+  await handle.focus();
+  await handle.press('ArrowRight');
+  const keyboardBox = await floating.boundingBox();
+  expect(keyboardBox.x).toBeGreaterThan(draggedBox.x);
+  await page.getByRole('button', { name: 'Reset position' }).click();
+  await expect(floating).toHaveAttribute('data-position-mode', 'default');
 });
 
 test('Network Lab cable endpoints stay inside declared RJ45 jacks at laptop and phone geometry', async ({ page }, testInfo) => {
@@ -355,6 +399,7 @@ test('Network Lab phone views, motion alternatives, keyboard controls, and conso
   await page.getByRole('button', { name: 'Previous', exact: true }).focus();
   await expect(page.getByRole('button', { name: 'Previous', exact: true })).toBeFocused();
   if (testInfo.project.name === 'phone') {
+    await expect(page.locator('[data-floating-packet-inspector]')).toHaveCount(0);
     for (const name of ['Topology', 'Packet', 'Tables', 'Steps']) await expect(page.getByRole('tab', { name, exact: true })).toBeVisible();
     await page.getByRole('tab', { name: 'Packet', exact: true }).click();
     await expect(page.locator('.network-packet-surface')).toBeVisible();

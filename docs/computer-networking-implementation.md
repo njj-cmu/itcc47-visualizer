@@ -1,6 +1,36 @@
 # Computer networking implementation plan
 
-Status: ARP vertical slice and Module 1 sequence implemented; full-width dialogue workspace refinement in `codex/networking-dialogue-workspace`.
+Status: ARP vertical slice and Module 1 sequence implemented; situation-driven Generic foundations refinement in `codex/networking-generic-situations`.
+
+## 2026-08-27 Generic situation journeys
+
+Module 1 foundations now use one code-native **Generic** representation. It replaces
+the earlier interface-hidden device cards with recognizable laptop, desktop,
+router, cloud, switch, access-point, printer, tablet, and server silhouettes. Large
+dashed regions explain which shapes are currently being considered end devices,
+intermediary network devices, and servers. Named interface ownership remains in the
+deterministic topology and link geometry for testing, but physical port controls are
+reserved for the Topic 6 ARP preview where they are instructionally relevant.
+
+Topology and situation are separate choices. **Change Network Topology** opens the
+five fixed Module 1 networks. The adjacent Situation control changes the user task
+without recreating any devices, interfaces, or links. The first topology provides
+five situations on the same client–router–Internet–router–three-server scene:
+
+1. Send an email through the email server with SMTP.
+2. Open a website through the web server with HTTPS.
+3. Upload a file through the file server with SFTP.
+4. Delete a file through the file server with authenticated SFTP.
+5. Send a chat message through the web application using HTTPS/WebSocket.
+
+Every Module 1 situation follows the same eight-operation, 24-detail journey: state
+the client task, choose the correct service endpoint, prepare the request, leave the
+source network, cross the transit path, reach the destination network, let the
+server act, and return the result. Focus and neutral third-person callouts advance
+through the client, target server, source intermediary, transit network,
+destination-side intermediary, server action, and response. The implementation uses
+only repository-native SVG and CSS, so it introduces no downloaded runtime asset,
+new dependency, tracking request, or stale icon file.
 
 ## 2026-08-27 full-width instructional workspace
 
@@ -11,9 +41,9 @@ devices as concise, neutral third-person callouts. They describe the event—suc
 client having to request a service—without anthropomorphizing the device. Dashed
 classification outlines identify the complete device region being discussed.
 
-Learners can switch between a Generic device-symbol view and the physical Interfaces
-view. Interface labels sit below their devices and have an independent visibility
-toggle. Both modes preserve the same device, interface, and link identities.
+The Topic 6 ARP preview retains its Generic/Interfaces control, physical interface
+labels, and exact RJ45 geometry. Module 1 foundations are Generic-only so physical
+port detail does not compete with the client/server lesson.
 
 On desktop ARP routes, the packet inspector can be dragged and resized anywhere
 inside the network workbench. It enforces a 340 px minimum width and 260 px minimum
@@ -37,12 +67,12 @@ Module 1 now opens with five fixed activities backed by the same deterministic
    contrast physical attachment with logical organization.
 
 Each activity preserves the eight-operation Overview and 24-phase Detailed model.
-All links terminate at declared named interfaces, the preset selector opens the
+All links terminate at declared named interfaces, the topology chooser opens the
 matching activity route, and omitted or unknown IDs resolve to the first host-role
 activity. The current-movement strip precedes the full-width diagram. Operation cards
-remain a four-at-a-time carousel. Physical interface names sit below the devices and
-may be hidden, while device callouts name the classroom service protocols—SMTP/IMAP,
-HTTP/HTTPS, and SMB—at the step where learners match each service to its server.
+remain a four-at-a-time carousel. The foundations scene keeps those interfaces in its
+testable model while presenting recognizable Generic device symbols; physical labels
+and jacks remain available in the ARP preview.
 
 ## 2026-08-19 course-sequence correction
 

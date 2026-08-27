@@ -2,9 +2,10 @@
 const ComputerNetworkingActivities = (() => {
   'use strict';
 
-  const CONTENT_VERSION = 3;
+  const CONTENT_VERSION = 4;
   const foundationPresets = ComputerNetworkingFoundationsMachine.PRESETS;
   const activityByPreset = Object.freeze(Object.fromEntries(foundationPresets.map((preset) => [preset.id, preset.activityId])));
+  const situationsByPreset = Object.freeze(Object.fromEntries(foundationPresets.map((preset) => [preset.id, ComputerNetworkingFoundationsMachine.listSituations(preset.id)])));
   const mobileViews = Object.freeze([
     Object.freeze({ id: 'diagram', label: 'Diagram', icon: 'network' }),
     Object.freeze({ id: 'concepts', label: 'Concepts', icon: 'inspect' }),
@@ -37,18 +38,22 @@ const ComputerNetworkingActivities = (() => {
       inputControlIds: Object.freeze(['network-foundation-preset']),
       input: Object.freeze({
         kind: 'network-foundation-preset',
-        label: 'Network example',
+        label: 'Network topology and situation',
         editable: false,
         defaultPreset: preset.id,
+        defaultSituation: situationsByPreset[preset.id][0].id,
         presets: foundationPresets,
         activityByPreset,
+        situationsByPreset,
       }),
       metrics: Object.freeze([]),
       source: Object.freeze(ComputerNetworkingFoundationsMachine.PHASES.map((phase) => phase.label)),
       sourceFor() { return this.source; },
       completionActions: Object.freeze(completionActions),
       run(options = {}, playbackOptions = {}) {
-        return ComputerNetworkingFoundationsMachine.run(options.preset || this.input.defaultPreset, playbackOptions);
+        const selectedPreset = options.preset || this.input.defaultPreset;
+        const selectedSituation = options.situation || this.input.situationsByPreset[selectedPreset]?.[0]?.id || this.input.defaultSituation;
+        return ComputerNetworkingFoundationsMachine.run(selectedPreset, { ...playbackOptions, situationId: selectedSituation });
       },
     });
   }

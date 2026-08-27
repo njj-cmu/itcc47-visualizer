@@ -898,7 +898,8 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const isNetworkFoundations = isComputerNetworking && activity.workspaceComposition === 'network-foundations';
   const initialInputs = useCallback((nextActivity) => {
     if (nextActivity.input.defaults) return { ...nextActivity.input.defaults };
-    if (nextActivity.input.kind === 'cpu-preset' || nextActivity.input.kind === 'network-preset' || nextActivity.input.kind === 'network-foundation-preset') return { preset: nextActivity.input.defaultPreset };
+    if (nextActivity.input.kind === 'network-foundation-preset') return { preset: nextActivity.input.defaultPreset, situation: nextActivity.input.defaultSituation };
+    if (nextActivity.input.kind === 'cpu-preset' || nextActivity.input.kind === 'network-preset') return { preset: nextActivity.input.defaultPreset };
     return {
       values: [...(nextActivity.input.defaultValues || [])],
       target: nextActivity.input.needsTarget ? nextActivity.input.defaultValues[Math.floor(nextActivity.input.defaultValues.length / 2)] : null,
@@ -910,7 +911,7 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const [viewOptions, setViewOptions] = useState({ numberFormat: 'hex' });
   const [cpuGranularity, setCpuGranularity] = useState(() => activity.defaultPlaybackGranularity === 'micro' ? 'micro' : 'operation');
   const [networkGranularity, setNetworkGranularity] = useState('micro');
-  const [networkDisplayMode, setNetworkDisplayMode] = useState('interfaces');
+  const [networkDisplayMode, setNetworkDisplayMode] = useState(() => isNetworkFoundations ? 'generic' : 'interfaces');
   const [showNetworkInterfaceLabels, setShowNetworkInterfaceLabels] = useState(true);
   const pendingGranularityMap = useRef(null);
   const networkDetailedPositions = useRef(new Map());

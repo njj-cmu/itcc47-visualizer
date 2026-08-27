@@ -994,7 +994,7 @@ ok('networking course exposes Module 1 first and ARP as a Topic 6 preview', (() 
     && ComputerNetworkingCatalog.get('unknown') === foundations && registered === activity
     && foundations.module === 1 && foundations.topic === 'Networking Today' && foundations.renderer === 'network-foundations'
     && activity.module === 6 && activity.topic === 'Network Layer & Address Resolution'
-    && activity.contentVersion === 3 && activity.engine === 'guided-network-model'
+    && activity.contentVersion === 4 && activity.engine === 'guided-network-model'
     && activity.renderer === 'network-topology' && activity.workspaceKind === 'network-lab'
     && activity.input.kind === 'network-preset' && !activity.input.editable
     && activity.evidenceViews.join(',') === 'packet-inspector,network-decisions,arp-table,mac-table';
@@ -1028,15 +1028,38 @@ ok('Networking Today exposes five deterministic interface-owned network examples
         && preset.links.every((link) => declaredInterfaces.has(link.fromInterfaceId) && declaredInterfaces.has(link.toInterfaceId));
     });
 })());
+ok('client-to-services keeps five situations on one stable topology', (() => {
+  const situations = ComputerNetworkingFoundations.listSituations('client-server-services');
+  const ids = situations.map((item) => item.id);
+  const topologySignatures = situations.map((item) => {
+    const run = ComputerNetworkingFoundations.run('client-server-services', { granularity: 'micro', situationId: item.id });
+    return `${run.result.finalFrame.topology.devices.map((device) => device.id).join(',')}|${run.result.finalFrame.topology.links.map((link) => link.id).join(',')}`;
+  });
+  return ids.join(',') === 'send-email,open-website,upload-file,delete-file,send-chat-message'
+    && new Set(topologySignatures).size === 1
+    && situations.every((item) => item.pathDeviceIds[0] === item.sourceDeviceId && item.pathDeviceIds.at(-1) === item.targetDeviceId)
+    && situations.every((item) => ComputerNetworkingFoundations.run('client-server-services', { situationId: item.id }).events.length === 8
+      && ComputerNetworkingFoundations.run('client-server-services', { granularity: 'micro', situationId: item.id }).events.length === 24);
+})());
+ok('foundation situations focus the endpoint, source gateway, transit network, destination edge, and server in sequence', (() => {
+  const frames = ComputerNetworkingFoundations.run('client-server-services', { granularity: 'micro', situationId: 'open-website' }).events.map((event) => event.frame);
+  return frames[0].focus.deviceIds.join(',') === 'client-laptop'
+    && frames[4].focus.deviceIds.join(',') === 'web-server'
+    && frames[10].focus.deviceIds.join(',') === 'home-router'
+    && frames[12].focus.deviceIds.join(',') === 'internet-cloud'
+    && frames[15].focus.deviceIds.join(',') === 'service-router'
+    && frames[17].focus.deviceIds.join(',') === 'web-server'
+    && frames[4].callouts['web-server'].includes('web service');
+})());
 ok('Module 1 examples teach distinct host roles, local peers, device classes, and media', (() => {
   const services = ComputerNetworkingFoundations.getPreset('client-server-services');
-  const serviceRoleFrame = ComputerNetworkingFoundations.run(services.id, { granularity: 'micro' }).events[5].frame;
+  const serviceRoleFrame = ComputerNetworkingFoundations.run(services.id, { granularity: 'micro' }).events[3].frame;
   const peers = ComputerNetworkingFoundations.getPreset('local-peer-sharing');
   const components = ComputerNetworkingFoundations.getPreset('small-office-components');
   const campus = ComputerNetworkingFoundations.getPreset('campus-media');
   return ['service-email', 'service-web', 'service-file'].every((tag) => services.devices.some((device) => device.tags.includes(tag)))
     && services.links.some((link) => link.tags.includes('long-distance') && link.media === 'fiber')
-    && serviceRoleFrame.evidence.facts.join(' ').includes('SMTP') && serviceRoleFrame.evidence.facts.join(' ').includes('HTTP/HTTPS') && serviceRoleFrame.evidence.facts.join(' ').includes('SMB')
+    && serviceRoleFrame.evidence.facts.join(' ').includes('Email server') && serviceRoleFrame.evidence.facts.join(' ').includes('Web server') && serviceRoleFrame.evidence.facts.join(' ').includes('File server')
     && peers.devices.filter((device) => device.tags.includes('peer')).every((device) => device.tags.includes('client') && device.tags.includes('server-role'))
     && !peers.devices.some((device) => device.tags.includes('router') || device.tags.includes('internet'))
     && peers.devices.flatMap((device) => device.interfaces).filter((item) => item.id.includes('laptop')).every((item) => item.label.includes('192.168.20.'))
@@ -1140,6 +1163,7 @@ ok('networking activity delegates to the canonical deterministic model', (() => 
   return ComputerNetworkingCatalog.list().length === 6
     && foundationActivities.every((item, index) => item.input.defaultPreset === ComputerNetworkingFoundations.PRESETS[index].id
       && item.input.activityByPreset[item.input.defaultPreset] === item.id
+      && item.input.defaultSituation === ComputerNetworkingFoundations.listSituations(item.input.defaultPreset)[0].id
       && item.run().events.length === 8)
     && activity.input.defaultPreset === 'arp-same-lan'
     && activity.source.length === 8
@@ -1183,21 +1207,23 @@ ok('foundation renderer resolves five fixed layouts from named interfaces rather
   && networkingFoundationsRendererSource.includes('data-from-interface-id={item.fromInterfaceId}')
   && networkingFoundationsRendererSource.includes('data-to-interface-id={item.toInterfaceId}')
   && networkingFoundationsRendererSource.includes('data-path-definition={geometry.paths[item.id]}')
-  && networkingFoundationsRendererSource.includes('activity.input.activityByPreset[event.target.value]'));
+  && networkingFoundationsRendererSource.includes('activity.input.activityByPreset[presetId]'));
 ok('current movement is rendered once above the full-width network canvas on desktop and phone',
   networkingRendererSource.includes('export function NetworkCurrentMovement')
   && !networkingRendererSource.includes('<NetworkCurrentMovement frame={frame} compact/>')
   && visualizerSource.includes('<><NetworkCurrentMovement frame={networkFrame}/><div ref={networkWorkbenchRef}'));
 const networkingDiagramControlsSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'network-diagram-controls.jsx'), 'utf8');
-ok('network diagram exposes Generic and Interfaces modes with an optional interface-label toggle',
+ok('Module 1 stays generic while the ARP preview preserves Generic, Interfaces, and its label toggle',
   networkingDiagramControlsSource.includes("onModeChange('generic')")
   && networkingDiagramControlsSource.includes("onModeChange('interfaces')")
   && networkingDiagramControlsSource.includes('onShowLabelsChange(event.target.checked)')
-  && networkingFoundationsRendererSource.includes("displayMode === 'interfaces' && showInterfaceLabels")
-  && networkingFoundationsRendererSource.includes('data-interface-labels={showInterfaceLabels'));
+  && networkingFoundationsRendererSource.includes('data-display-mode="generic"')
+  && networkingFoundationsRendererSource.includes('data-interface-labels="hidden"')
+  && !networkingFoundationsRendererSource.includes('<NetworkDiagramControls'));
 ok('device callouts use synchronized third-person teaching narration and preserve overlapping role classifications',
   networkingFoundationsRendererSource.includes('data-callout-device-id={device.id}')
-  && networkingFoundationsRendererSource.includes('The email server handles SMTP and IMAP requests.')
+  && networkingFoundationsRendererSource.includes('frame.callouts?.[device.id]')
+  && networkingFoundationsRendererSource.includes('Client laptop wants to') === false
   && networkingFoundationsRendererSource.includes("return 'End device · Server role'")
   && networkingRendererSource.includes('frame.phase.explanation')
   && networkingRendererSource.includes('data-callout-device-id={deviceId}'));

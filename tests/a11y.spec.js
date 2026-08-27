@@ -35,6 +35,16 @@ test('ITCC45 scenario and expanded-model dialogs have no serious or critical Axe
   }
 });
 
+test('network topology chooser has no serious or critical Axe violations', async ({ page }) => {
+  await page.goto('/visualizer.html?course=computer-networking&activity=networking-read-classroom-network');
+  await page.getByRole('button', { name: /Change Network Topology/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Change Network Topology' })).toBeVisible();
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+  const important = results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact));
+  const summary = important.map((violation) => ({ id: violation.id, targets: violation.nodes.map((node) => node.target.join(' ')) }));
+  expect(summary, important.map((violation) => `${violation.id}: ${violation.help}`).join('\n')).toEqual([]);
+});
+
 test('reviewed visualization progress remains accessible', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('itcc47.visualizer-progress:v1', JSON.stringify({

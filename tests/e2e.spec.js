@@ -241,7 +241,7 @@ test('networking practice stores only version and solved IDs and can reset', asy
   expect(await page.evaluate(() => localStorage.getItem('computer-networking.practice:v1'))).toBeNull();
 });
 
-test('Network Lab starts with host roles, pages four steps at a time, and preserves Detailed position', async ({ page }, testInfo) => {
+test('Network Lab follows five client-server situations step by step and preserves Detailed position', async ({ page }, testInfo) => {
   await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
   await page.goto('/visualizer.html?course=computer-networking');
   await expect(page).toHaveURL(/activity=networking-read-classroom-network/);
@@ -253,6 +253,12 @@ test('Network Lab starts with host roles, pages four steps at a time, and preser
   await expect(page.locator('.network-operation-item')).toHaveCount(4);
   await expect(page.locator('.network-operation-carousel')).toHaveAttribute('data-operation-total', '8');
   await expect(page.locator('.network-carousel-range')).toHaveText('Steps 1–4 of 8');
+  await expect(page.getByRole('button', { name: /Change Network Topology/ })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Situation' }).locator('option')).toHaveCount(5);
+  await expect(page.locator('.network-foundations-renderer')).toHaveAttribute('data-display-mode', 'generic');
+  await expect(page.getByRole('button', { name: 'Interfaces', exact: true })).toHaveCount(0);
+  await expect(page.locator('[data-device-id="client-laptop"]')).toHaveClass(/is-focused/);
+  await expect(page.locator('[data-callout-device-id="client-laptop"]')).toHaveAttribute('aria-label', 'Client laptop wants to send an email.');
   if (testInfo.project.name === 'laptop') {
     const movement = page.locator('.workspace-main > .network-current-movement');
     const workbench = page.locator('.network-workbench');
@@ -261,15 +267,6 @@ test('Network Lab starts with host roles, pages four steps at a time, and preser
     const movementBox = await movement.boundingBox();
     const workbenchBox = await workbench.boundingBox();
     expect(movementBox.y + movementBox.height).toBeLessThanOrEqual(workbenchBox.y);
-    await expect(page.locator('.network-foundations-renderer')).toHaveAttribute('data-display-mode', 'interfaces');
-    await page.getByRole('button', { name: 'Generic', exact: true }).click();
-    await expect(page.locator('.network-foundations-renderer')).toHaveAttribute('data-display-mode', 'generic');
-    await expect(page.getByRole('checkbox', { name: 'Labels' })).toBeDisabled();
-    await page.getByRole('button', { name: 'Interfaces', exact: true }).click();
-    await page.getByRole('checkbox', { name: 'Labels' }).uncheck();
-    await expect(page.locator('.network-foundations-renderer')).toHaveAttribute('data-interface-labels', 'hidden');
-    await expect(page.locator('.network-interface-labels')).toHaveCount(0);
-    await page.getByRole('checkbox', { name: 'Labels' }).check();
     const calloutsAvoidOtherDevices = await page.locator('.network-foundations-svg').evaluate((svg) => {
       const intersects = (a, b) => a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1;
       const devices = [...svg.querySelectorAll('.network-foundation-device')].map((item) => ({ id: item.dataset.deviceId, box: item.getBoundingClientRect() }));
@@ -288,17 +285,25 @@ test('Network Lab starts with host roles, pages four steps at a time, and preser
   await expect(page.locator('.network-carousel-range')).toHaveText('Steps 1–4 of 8');
   await expect(page.locator('[data-link-id="link-client-home"]')).toHaveAttribute('data-from-interface-id', 'client-laptop-eth0');
   await expect(page.locator('[data-link-id="link-client-home"]')).toHaveAttribute('data-to-interface-id', 'home-router-g0-0');
-  await (await visualizerTimeline(page)).fill('5');
-  if (testInfo.project.name === 'laptop') {
-    const callouts = page.locator('.network-device-callout');
-    await expect(callouts).toHaveCount(3);
-    const calloutText = await callouts.evaluateAll((items) => items.map((item) => item.getAttribute('aria-label')));
-    expect(calloutText).toEqual(['The email server handles SMTP and IMAP requests.', 'The web server handles HTTP and HTTPS requests.', 'The file server provides shared files through SMB.']);
-    expect(calloutText.join(' ')).not.toMatch(/\bI am\b|\bI have\b|\bmy\b/i);
-  }
+  await page.getByRole('combobox', { name: 'Situation' }).selectOption('open-website');
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 24');
+  await expect(page.locator('.network-foundations-renderer')).toHaveAttribute('data-situation-id', 'open-website');
+  const timeline = await visualizerTimeline(page);
+  await timeline.fill('4');
+  await expect(page.locator('[data-device-id="web-server"]')).toHaveClass(/is-focused/);
+  await expect(page.locator('[data-callout-device-id="web-server"]')).toHaveAttribute('aria-label', 'Web server provides the web service.');
+  await timeline.fill('10');
+  await expect(page.locator('[data-device-id="home-router"]')).toHaveClass(/is-focused/);
+  await timeline.fill('12');
+  await expect(page.locator('[data-device-id="internet-cloud"]')).toHaveClass(/is-focused/);
+  await timeline.fill('15');
+  await expect(page.locator('[data-device-id="service-router"]')).toHaveClass(/is-focused/);
+  await timeline.fill('17');
+  await expect(page.locator('[data-device-id="web-server"]')).toHaveClass(/is-focused/);
+  const calloutText = await page.locator('.network-device-callout').first().getAttribute('aria-label');
+  expect(calloutText).not.toMatch(/\bI am\b|\bI have\b|\bmy\b/i);
   await (await visualizerTimeline(page)).fill('16');
-  await expect(page.locator('.network-detail-label')).toContainText('Detail 2 of 3 · Read the logical topology');
-  await expect(page.locator('.network-foundations-renderer')).toHaveClass(/representation-logical/);
+  await expect(page.locator('.network-detail-label')).toContainText('Detail 2 of 3 · Select the final link');
   await expect(page.locator('.network-carousel-range')).toHaveText('Steps 5–8 of 8');
   await page.getByRole('button', { name: 'Overview', exact: true }).click();
   await expect(page.locator('.integrated-step strong')).toHaveText('6 / 8');
@@ -307,32 +312,37 @@ test('Network Lab starts with host roles, pages four steps at a time, and preser
   if (testInfo.project.name === 'phone') {
     for (const name of ['Diagram', 'Concepts', 'Evidence', 'Steps']) await expect(page.getByRole('tab', { name, exact: true })).toBeVisible();
     await page.getByRole('tab', { name: 'Concepts', exact: true }).click();
-    await expect(page.locator('.network-foundation-concepts')).toContainText('The logical view groups one client LAN');
+    await expect(page.locator('.network-foundation-concepts')).toContainText('selects the link leading to Web server');
     await page.getByRole('tab', { name: 'Evidence', exact: true }).click();
-    await expect(page.locator('.network-foundation-evidence')).toContainText('Representation');
+    await expect(page.locator('.network-foundation-evidence')).toContainText('Open a website');
     await page.getByRole('tab', { name: 'Steps', exact: true }).click();
-    await expect(page.locator('.network-current-movement')).toContainText('HOME LAN → INTERNET → SERVICES LAN');
+    await expect(page.locator('.network-current-movement')).toContainText('Service router → Web server');
   } else {
     const desktopMovement = page.locator('.workspace-main > .network-current-movement');
-    await expect(desktopMovement).toContainText('HOME LAN → INTERNET → SERVICES LAN');
+    await expect(desktopMovement).toContainText('Service router → Web server');
     const movementBox = await desktopMovement.boundingBox();
     const workbenchBox = await page.locator('.network-workbench').boundingBox();
     expect(movementBox.y + movementBox.height).toBeLessThanOrEqual(workbenchBox.y);
   }
 });
 
-test('Module 1 selector opens five fixed networks with named interfaces and distinct roles', async ({ page }, testInfo) => {
+test('Module 1 topology chooser opens five fixed networks with named interfaces and distinct roles', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'laptop');
   await page.addInitScript(() => localStorage.setItem('itcc47:visualizer-motion:v1', 'off'));
   await page.goto('/visualizer.html?course=computer-networking&activity=networking-read-classroom-network');
   const examples = [
-    { preset: 'local-peer-sharing', activity: 'networking-local-peer-sharing', heading: 'Share on a local peer network', scene: 'local-peer-sharing', device: 'peer-laptop-a', text: '192.168.20.0/24' },
-    { preset: 'small-office-components', activity: 'networking-classify-components', heading: 'Classify network components', scene: 'small-office-components', device: 'server-laptop', text: 'END DEVICE' },
-    { preset: 'campus-media', activity: 'networking-compare-media', heading: 'Compare network media', scene: 'campus-media', device: 'building-a-switch', text: 'CAMPUS FIBER BACKBONE' },
-    { preset: 'branch-topology', activity: 'networking-read-network-topologies', heading: 'Read network topologies', scene: 'branch-topology', device: 'hq-app-server', text: 'BRANCH LAN' },
+    { label: 'Local peer sharing', activity: 'networking-local-peer-sharing', heading: 'Share on a local peer network', scene: 'local-peer-sharing', device: 'peer-laptop-a', text: '192.168.20.0/24' },
+    { label: 'Classify office components', activity: 'networking-classify-components', heading: 'Classify network components', scene: 'small-office-components', device: 'server-laptop', text: 'server laptop' },
+    { label: 'Campus media', activity: 'networking-compare-media', heading: 'Compare network media', scene: 'campus-media', device: 'building-a-switch', text: 'CAMPUS FIBER BACKBONE' },
+    { label: 'Branch and headquarters', activity: 'networking-read-network-topologies', heading: 'Read network topologies', scene: 'branch-topology', device: 'hq-app-server', text: 'BRANCH LAN' },
   ];
+  await page.getByRole('button', { name: /Change Network Topology/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Change Network Topology' })).toBeVisible();
+  await expect(page.locator('.network-topology-choices button')).toHaveCount(5);
+  await page.getByRole('button', { name: 'Close topology chooser' }).click();
   for (const example of examples) {
-    await page.getByRole('combobox', { name: 'Network example' }).selectOption(example.preset);
+    await page.getByRole('button', { name: /Change Network Topology/ }).click();
+    await page.locator('.network-topology-choices button').filter({ hasText: example.label }).click();
     await expect(page).toHaveURL(new RegExp(`activity=${example.activity}`));
     await expect(page.getByRole('heading', { name: example.heading })).toBeVisible();
     await expect(page.locator('.network-foundations-renderer')).toHaveAttribute('data-scene-id', example.scene);
@@ -350,7 +360,8 @@ test('Module 1 selector opens five fixed networks with named interfaces and dist
     }));
     expect(attached).toBe(true);
   }
-  await page.getByRole('combobox', { name: 'Network example' }).selectOption('local-peer-sharing');
+  await page.getByRole('button', { name: /Change Network Topology/ }).click();
+  await page.locator('.network-topology-choices button').filter({ hasText: 'Local peer sharing' }).click();
   await expect(page.locator('[data-device-id="internet-cloud"]')).toHaveCount(0);
   await expect(page.locator('[data-device-id="peer-laptop-a"]')).toContainText('client + file server');
   await expect(page.locator('[data-device-id="peer-laptop-b"]')).toContainText('client + print server');

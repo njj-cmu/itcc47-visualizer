@@ -182,55 +182,92 @@ const ComputerNetworkingFoundationsMachine = (() => {
   ]);
   const PRESET_BY_ID = new Map(PRESETS.map((preset) => [preset.id, preset]));
 
-  const labelsForTag = (preset, tag) => preset.devices.filter((item) => item.tags.includes(tag)).map((item) => item.label);
-  const joinedLabels = (items) => items.length > 2 ? `${items.slice(0, -1).join(', ')}, and ${items.at(-1)}` : items.join(' and ');
-  const mediaForPreset = (preset) => [...new Set(preset.links.map((item) => item.media))];
-  const resolve = (value, preset) => typeof value === 'function' ? value(preset) : value;
+  const SITUATIONS_BY_PRESET = freeze({
+    'client-server-services': [
+      { id: 'send-email', label: 'Send an email', intent: 'send an email', request: 'an SMTP mail submission', protocol: 'SMTP', service: 'email service', sourceDeviceId: 'client-laptop', targetDeviceId: 'email-server', pathDeviceIds: ['client-laptop', 'home-router', 'internet-cloud', 'service-router', 'email-server'], pathLinkIds: ['link-client-home', 'link-home-internet', 'link-internet-service', 'link-service-email'], result: 'The email server accepts the message for delivery.' },
+      { id: 'open-website', label: 'Open a website', intent: 'open a website', request: 'an HTTPS page request', protocol: 'HTTPS', service: 'web service', sourceDeviceId: 'client-laptop', targetDeviceId: 'web-server', pathDeviceIds: ['client-laptop', 'home-router', 'internet-cloud', 'service-router', 'web-server'], pathLinkIds: ['link-client-home', 'link-home-internet', 'link-internet-service', 'link-service-web'], result: 'The web server returns the requested page.' },
+      { id: 'upload-file', label: 'Upload a file', intent: 'upload a class file', request: 'an authenticated SFTP upload', protocol: 'SFTP', service: 'file service', sourceDeviceId: 'client-laptop', targetDeviceId: 'file-server', pathDeviceIds: ['client-laptop', 'home-router', 'internet-cloud', 'service-router', 'file-server'], pathLinkIds: ['link-client-home', 'link-home-internet', 'link-internet-service', 'link-service-file'], result: 'The file server stores the uploaded file.' },
+      { id: 'delete-file', label: 'Delete a file', intent: 'delete a shared file', request: 'an authenticated SFTP delete command', protocol: 'SFTP', service: 'file service', sourceDeviceId: 'client-laptop', targetDeviceId: 'file-server', pathDeviceIds: ['client-laptop', 'home-router', 'internet-cloud', 'service-router', 'file-server'], pathLinkIds: ['link-client-home', 'link-home-internet', 'link-internet-service', 'link-service-file'], result: 'The file server checks permission and removes the file.' },
+      { id: 'send-chat-message', label: 'Send a chat message', intent: 'send a chat message', request: 'an HTTPS or WebSocket message', protocol: 'HTTPS / WebSocket', service: 'web application service', sourceDeviceId: 'client-laptop', targetDeviceId: 'web-server', pathDeviceIds: ['client-laptop', 'home-router', 'internet-cloud', 'service-router', 'web-server'], pathLinkIds: ['link-client-home', 'link-home-internet', 'link-internet-service', 'link-service-web'], result: 'The web application accepts the message and makes it available to the recipient.' },
+    ],
+    'local-peer-sharing': [
+      { id: 'request-peer-file', label: 'Request a peer file', intent: 'request a shared file from Peer B', request: 'a local file-sharing request', protocol: 'SMB', service: 'peer file service', sourceDeviceId: 'peer-laptop-a', targetDeviceId: 'peer-laptop-b', pathDeviceIds: ['peer-laptop-a', 'peer-switch', 'peer-laptop-b'], pathLinkIds: ['link-peer-a-switch', 'link-switch-peer-b'], result: 'Peer B returns the shared file without using a router or the Internet.' },
+    ],
+    'small-office-components': [
+      { id: 'save-office-backup', label: 'Save an office backup', intent: 'save a backup on the server laptop', request: 'a protected file copy', protocol: 'SMB', service: 'office file service', sourceDeviceId: 'office-laptop', targetDeviceId: 'server-laptop', pathDeviceIds: ['office-laptop', 'office-ap', 'office-switch', 'server-laptop'], pathLinkIds: ['link-laptop-ap', 'link-ap-switch', 'link-switch-server-laptop'], result: 'The server laptop stores the backup even though it has the same physical form as a client laptop.' },
+    ],
+    'campus-media': [
+      { id: 'open-library-catalog', label: 'Open the library catalog', intent: 'open the library catalog', request: 'an HTTPS catalog request', protocol: 'HTTPS', service: 'library catalog service', sourceDeviceId: 'faculty-pc', targetDeviceId: 'library-server', pathDeviceIds: ['faculty-pc', 'building-a-switch', 'building-b-switch', 'library-server'], pathLinkIds: ['link-faculty-switch-a', 'link-building-fiber', 'link-switch-b-library'], result: 'The library server returns catalog results across the campus fiber backbone.' },
+    ],
+    'branch-topology': [
+      { id: 'open-hq-application', label: 'Open the HQ application', intent: 'open the headquarters application', request: 'an HTTPS application request', protocol: 'HTTPS', service: 'business application', sourceDeviceId: 'branch-laptop', targetDeviceId: 'hq-app-server', pathDeviceIds: ['branch-laptop', 'branch-ap-router', 'branch-internet', 'hq-router', 'hq-switch', 'hq-app-server'], pathLinkIds: ['link-branch-wireless', 'link-branch-provider', 'link-provider-hq', 'link-hq-router-switch', 'link-hq-switch-server'], result: 'The HQ application server returns the business application response to the branch.' },
+    ],
+  });
+
+  const resolve = (value, preset, situation) => typeof value === 'function' ? value(preset, situation) : value;
   const detail = (id, label, message, evidence = {}) => ({ id, label, message, ...evidence });
   const operation = (id, label, summary, phases) => ({ id, label, summary, phases });
 
+  const sourceFocus = (_preset, situation) => [situation.sourceDeviceId];
+  const targetFocus = (_preset, situation) => [situation.targetDeviceId];
+  const departureFocus = (_preset, situation) => [situation.pathDeviceIds[1] || situation.sourceDeviceId];
+  const transitFocus = (_preset, situation) => situation.pathDeviceIds.length > 4
+    ? situation.pathDeviceIds.slice(2, -2)
+    : [situation.pathDeviceIds[Math.max(1, situation.pathDeviceIds.length - 2)]];
+  const arrivalFocus = (_preset, situation) => [situation.pathDeviceIds.at(-2) || situation.targetDeviceId];
+  const fullPathFocus = (_preset, situation) => situation.pathDeviceIds;
+  const linksThrough = (count) => (_preset, situation) => situation.pathLinkIds.slice(0, count < 0 ? undefined : count);
+  const allPathLinks = (_preset, situation) => situation.pathLinkIds;
+  const labelForDevice = (preset, id) => preset.devices.find((item) => item.id === id)?.label || id;
+  const callout = (deviceSelector, message) => (preset, situation) => ({
+    [deviceSelector(preset, situation)[0]]: resolve(message, preset, situation),
+  });
+  const sourceCallout = callout(sourceFocus, (preset, situation) => `${labelForDevice(preset, situation.sourceDeviceId)} wants to ${situation.intent}.`);
+  const targetCallout = callout(targetFocus, (preset, situation) => `${labelForDevice(preset, situation.targetDeviceId)} provides the ${situation.service}.`);
+  const departureCallout = callout(departureFocus, (preset, situation) => `${labelForDevice(preset, situation.pathDeviceIds[1])} forwards the request beyond the source network.`);
+  const transitCallout = callout(transitFocus, (preset, situation) => `${labelForDevice(preset, transitFocus(preset, situation)[0])} carries the request toward the destination network.`);
+  const arrivalCallout = callout(arrivalFocus, (preset, situation) => `${labelForDevice(preset, situation.pathDeviceIds.at(-2))} forwards the request to the selected service.`);
+
   const OPERATIONS = freeze([
-    operation('network-purpose', 'Explain the purpose', 'Begin with the people, resources, and communication need behind the network.', [
-      detail('observe-network-need', 'Observe the network need', (preset) => `${preset.title} exists to ${preset.learning.purpose}.`, { category: 'Purpose', focusTags: ['source', 'destination'], facts: (preset) => [`Source: ${preset.learning.source}`, `Destination: ${preset.learning.destination}`], conclusion: 'A network begins with a communication need.', movement: (preset) => `${preset.learning.source} → network path → ${preset.learning.destination}` }),
-      detail('identify-communication-ends', 'Find both ends', (preset) => `Communication begins at ${preset.learning.source} and ends at ${preset.learning.destination}.`, { category: 'Purpose', focusTags: ['end-device'], facts: ['Messages originate at an end device', 'Messages are received at an end device'], conclusion: 'End devices are the communication endpoints.', movement: (preset) => `${preset.learning.source} → ${preset.learning.destination}` }),
-      detail('state-network-purpose', 'State the purpose', (preset) => `Devices, interfaces, and media work together to ${preset.learning.purpose}.`, { category: 'Purpose', focusTags: ['end-device', 'intermediary', 'network'], focusLinkTags: ['connected'], facts: ['Hosts create or consume data', 'Intermediaries carry it', 'Media carries the signal'], conclusion: 'The network delivers communication between applications.', movement: (preset) => preset.learning.interfacePath }),
+    operation('state-task', 'State the task', 'Begin with what the client is trying to accomplish.', [
+      detail('identify-client', 'Identify the client', (preset, situation) => `${labelForDevice(preset, situation.sourceDeviceId)} is the client because it starts this request.`, { category: 'Client role', focusDeviceIds: sourceFocus, facts: ['A client starts a service request', 'The client is an end device'], conclusion: 'The communication starts at the client.', movement: (preset, situation) => `${labelForDevice(preset, situation.sourceDeviceId)} prepares to ${situation.intent}.`, callouts: sourceCallout }),
+      detail('state-user-goal', 'State the user goal', (_preset, situation) => `The user wants to ${situation.intent}; that goal determines which network service is needed.`, { category: 'Client role', focusDeviceIds: sourceFocus, facts: (_preset, situation) => [`Goal: ${situation.intent}`, `Request: ${situation.request}`], conclusion: 'Start with the user task, not with a cable or protocol name.', movement: (_preset, situation) => `User goal → ${situation.request}`, callouts: sourceCallout }),
+      detail('create-application-data', 'Create application data', (_preset, situation) => `The client application creates ${situation.request}.`, { category: 'Application data', focusDeviceIds: sourceFocus, facts: (_preset, situation) => [`Application protocol: ${situation.protocol}`, 'The data still belongs to the client application'], conclusion: 'Applications create the data that the network must deliver.', movement: (_preset, situation) => `${situation.protocol} data is ready at the client.`, callouts: sourceCallout }),
     ]),
-    operation('host-roles', 'Follow host roles', 'Distinguish hosts from the client and server roles they perform.', [
-      detail('mark-end-devices', 'Mark the hosts', (preset) => `${joinedLabels(labelsForTag(preset, 'end-device'))} are end devices because messages begin or end on them.`, { category: 'Host roles', focusTags: ['end-device'], facts: (preset) => labelsForTag(preset, 'end-device').map((label) => `${label}: end device`), conclusion: 'Host and end device describe a communication endpoint.', movement: 'Highlight every message source and destination.' }),
-      detail('assign-client-server', 'Assign client and server roles', (preset) => preset.learning.clientServer, { category: 'Host roles', focusTags: ['client', 'server-role'], facts: ['Client: requests a service', 'Server: provides a service'], conclusion: 'Client and server describe roles, not hardware shapes.', movement: (preset) => `${joinedLabels(labelsForTag(preset, 'client'))} request → ${joinedLabels(labelsForTag(preset, 'server-role')) || preset.learning.destination} provide` }),
-      detail('match-service-roles', 'Match services to hosts', (preset) => preset.learning.serviceRoles, { category: 'Host roles', focusTags: ['server-role', 'service-email', 'service-web', 'service-file'], facts: (preset) => preset.id === 'client-server-services'
-        ? ['Email server: SMTP sends · IMAP retrieves', 'Web server: HTTP/HTTPS', 'File server: SMB shared folders']
-        : ['Email service handles mail', 'Web service delivers pages and apps', 'File service stores shared files'], conclusion: 'Different server software provides different network services.', movement: (preset) => preset.id === 'client-server-services' ? 'Client eth0 → service path → SMTP/IMAP, HTTP/HTTPS, or SMB host' : `${preset.learning.source} → requested service host` }),
+    operation('choose-endpoint', 'Choose the endpoint', 'Match the task to the server that provides the required service.', [
+      detail('compare-server-roles', 'Compare the server roles', (preset) => preset.id === 'client-server-services' ? 'Email, web, and file servers are separate because each provides different service software.' : preset.learning.serviceRoles, { category: 'Server roles', focusDeviceIds: (preset) => preset.devices.filter((item) => item.tags.includes('server-role') || item.tags.includes('destination')).map((item) => item.id), facts: ['Email server: mail', 'Web server: pages and web applications', 'File server: shared files'], conclusion: 'Server roles are defined by the service they provide.', movement: 'Compare the possible endpoints.' }),
+      detail('select-service-server', 'Select the service server', (preset, situation) => `${labelForDevice(preset, situation.targetDeviceId)} is selected because it provides the ${situation.service}.`, { category: 'Server roles', focusDeviceIds: targetFocus, facts: (_preset, situation) => [`Service: ${situation.service}`, `Protocol: ${situation.protocol}`], conclusion: 'The task identifies the correct endpoint.', movement: (preset, situation) => `Highlight ${labelForDevice(preset, situation.targetDeviceId)} as the destination.`, callouts: targetCallout }),
+      detail('confirm-endpoint-role', 'Confirm the endpoint role', (preset, situation) => `${labelForDevice(preset, situation.targetDeviceId)} is both an end device and a server for this exchange.`, { category: 'Server roles', focusDeviceIds: targetFocus, facts: ['End device: message endpoint', 'Server: provides the requested service'], conclusion: 'End device and server describe different aspects of the same host.', movement: (preset, situation) => `${labelForDevice(preset, situation.sourceDeviceId)} → ${labelForDevice(preset, situation.targetDeviceId)}`, callouts: targetCallout }),
     ]),
-    operation('peer-to-peer', 'Compare peer-to-peer', 'See how a host can request and provide resources on a small local network.', [
-      detail('define-local-peer-network', 'Keep peers local', (preset) => preset.learning.localBoundary, { category: 'Peer-to-peer', focusTags: ['peer', 'end-device'], focusLinkTags: ['local'], facts: ['Peers share a local IP network', 'Internet access is not required for local sharing'], conclusion: 'Peer-to-peer communication can stay entirely inside a LAN.', movement: (preset) => preset.id === 'local-peer-sharing' ? '192.168.20.10/24 ↔ local switch ↔ 192.168.20.11/24' : 'Compare this managed design with the Local peer sharing example.' }),
-      detail('recognize-both-roles', 'Recognize both roles', (preset) => preset.learning.peerModel, { category: 'Peer-to-peer', focusTags: ['peer', 'client', 'server-role'], facts: ['A peer can request', 'The same peer can provide'], conclusion: 'One host may act as both client and server.', movement: (preset) => preset.id === 'local-peer-sharing' ? 'Peer A requests from Peer B; Peer B can request from Peer A.' : 'Dedicated service role now; peer role in the local example.' }),
-      detail('weigh-peer-tradeoffs', 'Weigh the tradeoffs', 'Peer networks are easy and inexpensive for small tasks, but they lack centralized administration, scale, and consistent security.', { category: 'Peer-to-peer', focusTags: ['peer', 'end-device', 'intermediary'], facts: ['Easy to set up', 'Lower cost', 'No central administration', 'Not very scalable'], conclusion: 'Peer-to-peer fits very small networks and simple sharing.', movement: 'Compare simple local sharing with managed client-server service.' }),
+    operation('prepare-request', 'Prepare the request', 'Name the service and prepare the request before it leaves the client.', [
+      detail('select-application-protocol', 'Select the protocol', (_preset, situation) => `${situation.protocol} supplies the application rules for this ${situation.service} request.`, { category: 'Application protocol', focusDeviceIds: sourceFocus, facts: (_preset, situation) => [`Selected protocol: ${situation.protocol}`, 'The protocol must match the server role'], conclusion: 'Applications use a protocol understood by the selected server.', movement: (_preset, situation) => `${situation.protocol} selected`, callouts: sourceCallout }),
+      detail('name-request', 'Name the request', (_preset, situation) => `The client prepares ${situation.request}.`, { category: 'Application protocol', focusDeviceIds: sourceFocus, facts: (_preset, situation) => [`Request: ${situation.request}`, `Destination service: ${situation.service}`], conclusion: 'A precise request describes what the server should do.', movement: (_preset, situation) => `${situation.request} → ready`, callouts: sourceCallout }),
+      detail('queue-request', 'Queue the request', (preset, situation) => `${labelForDevice(preset, situation.sourceDeviceId)} hands the request to its network connection for delivery.`, { category: 'Application protocol', focusDeviceIds: sourceFocus, focusLinkIds: linksThrough(1), facts: ['Application data is ready', 'The first network link is selected'], conclusion: 'The request is ready to leave the client.', movement: (preset, situation) => `${labelForDevice(preset, situation.sourceDeviceId)} → ${labelForDevice(preset, situation.pathDeviceIds[1])}`, callouts: sourceCallout }),
     ]),
-    operation('network-components', 'Classify components', 'Separate end devices, intermediary devices, and server roles.', [
-      detail('classify-end-devices', 'Find end devices', (preset) => `${joinedLabels(labelsForTag(preset, 'end-device'))} originate or receive network messages.`, { category: 'Components', focusTags: ['end-device'], facts: ['Laptop, PC, printer, tablet, and server can be end devices'], conclusion: 'End device is a message-position category.', movement: 'Highlight every endpoint; exclude forwarding-only devices.' }),
-      detail('classify-intermediaries', 'Find intermediaries', (preset) => `${joinedLabels(labelsForTag(preset, 'intermediary')) || 'The network devices'} interconnect endpoints and choose how traffic continues.`, { category: 'Components', focusTags: ['intermediary'], facts: ['Switch: forwards inside a LAN', 'Access point: joins wireless hosts', 'Router: connects networks'], conclusion: 'Intermediary devices carry or control traffic between endpoints.', movement: 'Endpoint → intermediary path → endpoint' }),
-      detail('separate-device-and-role', 'Separate device and role', (preset) => preset.learning.serviceRoles, { category: 'Components', focusTags: ['server-role', 'end-device'], facts: ['End device says where messages begin or end', 'Server says which service the host provides'], conclusion: 'A laptop can be both an end device and a server.', movement: 'Physical device type ≠ communication role.' }),
+    operation('leave-source-network', 'Leave the source network', 'Follow the first link to the device that forwards the request onward.', [
+      detail('enter-first-link', 'Enter the first link', (preset, situation) => `The request leaves ${labelForDevice(preset, situation.sourceDeviceId)} on the first link.`, { category: 'Source network', focusDeviceIds: sourceFocus, focusLinkIds: linksThrough(1), facts: (preset) => [preset.learning.media, 'Only the used path is highlighted'], conclusion: 'The physical medium carries bits to the next device.', movement: (preset, situation) => `${labelForDevice(preset, situation.sourceDeviceId)} → first link`, callouts: sourceCallout }),
+      detail('reach-source-intermediary', 'Reach the first intermediary', (preset, situation) => `${labelForDevice(preset, situation.pathDeviceIds[1])} receives the request and decides where it should continue.`, { category: 'Source network', focusDeviceIds: departureFocus, focusLinkIds: linksThrough(1), facts: ['Intermediary devices receive and forward traffic', 'The next hop follows the destination path'], conclusion: 'The first intermediary moves the request beyond the client.', movement: (preset, situation) => `${labelForDevice(preset, situation.sourceDeviceId)} → ${labelForDevice(preset, situation.pathDeviceIds[1])}`, callouts: departureCallout }),
+      detail('forward-beyond-source', 'Forward beyond the source', (preset, situation) => `${labelForDevice(preset, situation.pathDeviceIds[1])} forwards the request toward the next network.`, { category: 'Source network', focusDeviceIds: departureFocus, focusLinkIds: linksThrough(Math.min(2, 99)), facts: ['The intermediary does not provide the requested application service', 'It forwards toward the endpoint'], conclusion: 'Forwarding continues the path without changing the user task.', movement: (preset, situation) => `${labelForDevice(preset, situation.pathDeviceIds[1])} → ${labelForDevice(preset, situation.pathDeviceIds[2] || situation.targetDeviceId)}`, callouts: departureCallout }),
     ]),
-    operation('interfaces-and-media', 'Trace interfaces and media', 'Follow named attachment points and compare copper, fiber, and wireless signals.', [
-      detail('inspect-named-interfaces', 'Inspect named interfaces', (preset) => preset.learning.interfacePath, { category: 'Interfaces', focusTags: ['source', 'destination', 'intermediary'], focusLinkTags: ['connected'], facts: ['NIC connects a host', 'Port is a physical connector', 'Interface names the attachment point'], conclusion: 'Connections belong to interfaces, not device centers.', movement: (preset) => preset.learning.interfacePath }),
-      detail('compare-signal-media', 'Compare signal media', (preset) => preset.learning.media, { category: 'Media', focusLinkTags: ['connected'], facts: (preset) => mediaForPreset(preset).map((media) => `${media}: ${media === 'copper' ? 'electrical signals' : media === 'fiber' ? 'pulses of light' : 'radio waves'}`), conclusion: 'The medium determines how bits cross each link.', movement: (preset) => `Trace ${mediaForPreset(preset).join(' → ')} media in this scene.` }),
-      detail('choose-long-distance-media', 'Choose for distance', (preset) => preset.learning.longDistance, { category: 'Media', focusLinkTags: ['long-distance'], facts: ['Copper: local runs', 'Fiber: long distance and electrical isolation', 'Wireless: mobility'], conclusion: 'Distance and environment guide the media choice.', movement: (preset) => preset.links.some((item) => item.tags.includes('long-distance')) ? 'Highlight the long-distance fiber span.' : 'This local example has no long-distance span.' }),
+    operation('cross-network-path', 'Cross the network path', 'Trace the request through the transit network one hop at a time.', [
+      detail('enter-transit', 'Enter the transit network', (preset, situation) => `${labelForDevice(preset, transitFocus(preset, situation)[0])} carries the request between the source and destination networks.`, { category: 'Transit path', focusDeviceIds: transitFocus, focusLinkIds: linksThrough(Math.max(2, 1)), facts: ['Transit devices carry traffic', 'They are not the application endpoint'], conclusion: 'The request is moving between networks.', movement: (preset, situation) => `${labelForDevice(preset, situation.pathDeviceIds[1])} → ${labelForDevice(preset, transitFocus(preset, situation)[0])}`, callouts: transitCallout }),
+      detail('follow-transit-hop', 'Follow the transit hop', (preset, situation) => `Each highlighted link advances the same ${situation.protocol} request toward ${labelForDevice(preset, situation.targetDeviceId)}.`, { category: 'Transit path', focusDeviceIds: transitFocus, focusLinkIds: (preset, situation) => situation.pathLinkIds.slice(0, Math.max(2, situation.pathLinkIds.length - 1)), facts: ['The service request remains the same', 'The physical link changes at each hop'], conclusion: 'One application request can cross several network links.', movement: (_preset, situation) => situation.pathDeviceIds.slice(1, -1).join(' → '), callouts: transitCallout }),
+      detail('approach-destination-network', 'Approach the destination network', (preset, situation) => `The request is now approaching the network that contains ${labelForDevice(preset, situation.targetDeviceId)}.`, { category: 'Transit path', focusDeviceIds: transitFocus, focusLinkIds: (preset, situation) => situation.pathLinkIds.slice(0, -1), facts: ['The endpoint has not acted yet', 'One destination-side forwarding step remains'], conclusion: 'Transit ends at the destination network edge.', movement: (preset, situation) => `${labelForDevice(preset, transitFocus(preset, situation).at(-1))} → destination network`, callouts: transitCallout }),
     ]),
-    operation('network-representations', 'Compare representations', 'Use physical and logical topology views for different questions.', [
-      detail('read-physical-topology', 'Read the physical topology', (preset) => preset.learning.physical, { category: 'Representation', representation: 'physical', focusTags: ['end-device', 'intermediary', 'network'], focusLinkTags: ['connected'], facts: ['Where devices are', 'Which interfaces are joined', 'Which medium is installed'], conclusion: 'Physical topology explains placement and attachment.', movement: (preset) => preset.learning.interfacePath }),
-      detail('read-logical-topology', 'Read the logical topology', (preset) => preset.learning.logical, { category: 'Representation', representation: 'logical', focusTags: ['end-device', 'intermediary', 'network'], focusLinkTags: ['connected'], facts: ['Which hosts share a LAN', 'Which device marks a boundary', 'How networks are grouped'], conclusion: 'Logical topology explains communication organization.', movement: (preset) => `${preset.zones.map((zone) => zone.label).join(' → ')}` }),
-      detail('choose-useful-view', 'Choose the useful view', 'Use physical topology for ports, cables, and location. Use logical topology for addressing, boundaries, and communication paths.', { category: 'Representation', representation: 'split', facts: ['Cable or port question: physical', 'LAN/WAN or addressing question: logical'], conclusion: 'Both views describe the same network from different angles.', movement: 'Physical attachment ↔ logical organization' }),
+    operation('reach-destination-network', 'Reach the destination network', 'Let the destination-side intermediary select the final server link.', [
+      detail('reach-destination-edge', 'Reach the destination edge', (preset, situation) => `${labelForDevice(preset, situation.pathDeviceIds.at(-2))} receives the request for the destination network.`, { category: 'Destination network', focusDeviceIds: arrivalFocus, focusLinkIds: (preset, situation) => situation.pathLinkIds.slice(0, -1), facts: ['The destination network is now reached', 'The final server link is known'], conclusion: 'The destination-side device prepares the final forwarding step.', movement: (preset, situation) => `Transit path → ${labelForDevice(preset, situation.pathDeviceIds.at(-2))}`, callouts: arrivalCallout }),
+      detail('select-final-link', 'Select the final link', (preset, situation) => `${labelForDevice(preset, situation.pathDeviceIds.at(-2))} selects the link leading to ${labelForDevice(preset, situation.targetDeviceId)}.`, { category: 'Destination network', focusDeviceIds: arrivalFocus, focusLinkIds: allPathLinks, facts: ['The correct server path is selected', 'Unused service links remain inactive'], conclusion: 'The requested service determines the final endpoint link.', movement: (preset, situation) => `${labelForDevice(preset, situation.pathDeviceIds.at(-2))} → ${labelForDevice(preset, situation.targetDeviceId)}`, callouts: arrivalCallout }),
+      detail('deliver-to-server', 'Deliver to the server', (preset, situation) => `The request arrives at ${labelForDevice(preset, situation.targetDeviceId)}.`, { category: 'Destination network', focusDeviceIds: targetFocus, focusLinkIds: allPathLinks, facts: (_preset, situation) => [`Delivered request: ${situation.request}`, `Endpoint protocol: ${situation.protocol}`], conclusion: 'The network has delivered the request to the correct endpoint.', movement: (preset, situation) => `Final link → ${labelForDevice(preset, situation.targetDeviceId)}`, callouts: targetCallout }),
     ]),
-    operation('network-scope', 'Classify network scope', 'Place local networks, WAN links, and Internet interconnection in context.', [
-      detail('classify-local-network', 'Classify the LAN', (preset) => preset.learning.localBoundary, { category: 'Scope', focusTags: ['end-device', 'intermediary'], focusLinkTags: ['local'], facts: ['LAN: limited area', 'Common local administration'], conclusion: 'A LAN interconnects devices in a limited managed area.', movement: (preset) => preset.zones.filter((zone) => zone.scope === 'LAN').map((zone) => zone.label).join(' · ') }),
-      detail('classify-wide-network', 'Classify the WAN', (preset) => preset.learning.scope, { category: 'Scope', focusTags: ['router', 'internet'], focusLinkTags: ['wan', 'long-distance'], facts: ['WAN: interconnects distant LANs', 'Routers mark network boundaries'], conclusion: 'A WAN joins networks across a wider area.', movement: (preset) => preset.links.some((item) => item.scope === 'WAN') ? 'LAN → edge router → WAN → remote LAN' : 'This example remains inside one LAN.' }),
-      detail('place-the-internet', 'Place the Internet', (preset) => preset.devices.some((item) => item.tags.includes('internet')) ? 'The Internet is the public interconnection between independently managed networks in this scene.' : 'This scene does not require the Internet; local communication can remain inside the LAN.', { category: 'Scope', focusTags: ['internet', 'router'], focusLinkTags: ['wan'], facts: ['Internet: public interconnection', 'Intranet: private organizational network', 'Extranet: limited outside access'], conclusion: 'Internet access is not the definition of a network.', movement: (preset) => preset.devices.some((item) => item.tags.includes('internet')) ? 'Local edge → public interconnection → remote edge' : 'Local source → local destination' }),
+    operation('server-acts', 'Let the server act', 'Show that the selected server performs the requested service operation.', [
+      detail('server-reads-request', 'Read the request', (preset, situation) => `${labelForDevice(preset, situation.targetDeviceId)} reads ${situation.request}.`, { category: 'Server action', focusDeviceIds: targetFocus, facts: ['The server application receives the data', 'The protocol tells it how to interpret the request'], conclusion: 'The network delivers; the server application acts.', movement: (_preset, situation) => `${situation.protocol} request → server application`, callouts: targetCallout }),
+      detail('perform-service-action', 'Perform the service action', (_preset, situation) => situation.result, { category: 'Server action', focusDeviceIds: targetFocus, facts: (_preset, situation) => [`Service: ${situation.service}`, `Action: ${situation.intent}`], conclusion: 'Different services perform different work on the same network topology.', movement: (_preset, situation) => `${situation.service} performs the requested action`, callouts: targetCallout }),
+      detail('prepare-result', 'Prepare the result', (preset, situation) => `${labelForDevice(preset, situation.targetDeviceId)} prepares a result for the client.`, { category: 'Server action', focusDeviceIds: targetFocus, facts: ['The result becomes new application data', 'The server now sends and the original client receives'], conclusion: 'The response reverses the application roles for the return trip.', movement: (preset, situation) => `${labelForDevice(preset, situation.targetDeviceId)} → response ready`, callouts: targetCallout }),
     ]),
-    operation('reliable-network', 'Evaluate the design', 'Connect fault tolerance, scalability, QoS, security, and professional practice to the scene.', [
-      detail('check-fault-tolerance', 'Check fault tolerance', (preset) => preset.learning.reliability, { category: 'Reliable networks', quality: 'fault-tolerance', focusTags: ['intermediary', 'server-role'], facts: ['Avoid one critical failure point', 'Recover service predictably'], conclusion: 'Fault tolerance limits disruption.', movement: 'Identify the path or device whose failure would stop service.' }),
-      detail('check-scale-and-quality', 'Check scale and quality', 'A dependable network must add users and services without rebuilding everything, while prioritizing delay-sensitive voice or video when links are busy.', { category: 'Reliable networks', quality: 'scale-qos', focusTags: ['intermediary', 'end-device'], facts: ['Scalability supports growth', 'QoS protects time-sensitive traffic'], conclusion: 'Scalability and QoS protect the user experience.', movement: 'More hosts and services → managed capacity and priority.' }),
-      detail('check-security-and-practice', 'Check security and practice', (preset) => `${preset.learning.security} An IT professional documents interfaces, verifies operation, protects access, and communicates changes.`, { category: 'Security and profession', quality: 'security', focusTags: ['router', 'gateway', 'server-role'], facts: ['Confidentiality', 'Integrity', 'Availability', 'Document and verify'], conclusion: (preset) => preset.learning.summary, movement: 'Document → secure → verify → communicate' }),
+    operation('return-result', 'Return the result', 'Trace the response back to the original client and complete the task.', [
+      detail('reverse-the-path', 'Reverse the path', (preset, situation) => `The result follows the network path back from ${labelForDevice(preset, situation.targetDeviceId)} to ${labelForDevice(preset, situation.sourceDeviceId)}.`, { category: 'Response', focusDeviceIds: fullPathFocus, focusLinkIds: allPathLinks, facts: ['The response crosses the same network roles in reverse', 'The server is now the sender'], conclusion: 'The return path carries the service result.', movement: (_preset, situation) => [...situation.pathDeviceIds].reverse().join(' → '), callouts: targetCallout }),
+      detail('deliver-result-to-client', 'Deliver the result', (preset, situation) => `${labelForDevice(preset, situation.sourceDeviceId)} receives the result from ${labelForDevice(preset, situation.targetDeviceId)}.`, { category: 'Response', focusDeviceIds: sourceFocus, focusLinkIds: allPathLinks, facts: (_preset, situation) => [`Completed task: ${situation.intent}`, `Application protocol: ${situation.protocol}`], conclusion: 'The client receives the service result.', movement: (preset, situation) => `${labelForDevice(preset, situation.targetDeviceId)} → ${labelForDevice(preset, situation.sourceDeviceId)}`, callouts: sourceCallout }),
+      detail('complete-user-task', 'Complete the user task', (_preset, situation) => `The network exchange is complete: the client was able to ${situation.intent}.`, { category: 'Completion', focusDeviceIds: fullPathFocus, focusLinkIds: allPathLinks, facts: ['Client chose a service', 'Intermediaries carried the request', 'The server acted and replied'], conclusion: 'A network connects an application need to the correct service through a traceable path.', movement: (_preset, situation) => `Complete · ${situation.label}`, callouts: sourceCallout }),
     ]),
   ]);
 
@@ -248,6 +285,14 @@ const ComputerNetworkingFoundationsMachine = (() => {
     if (allIds.some((id) => !id) || new Set(allIds).size !== allIds.length) throw new Error('Foundation entity IDs must be present and unique.');
     const interfaceSet = new Set(interfaces);
     if (preset.links.some((item) => !interfaceSet.has(item.fromInterfaceId) || !interfaceSet.has(item.toInterfaceId))) throw new Error('Every foundation link must terminate at declared interfaces.');
+    const deviceSet = new Set(preset.devices.map((item) => item.id));
+    const linkSet = new Set(preset.links.map((item) => item.id));
+    const situations = SITUATIONS_BY_PRESET[preset.id];
+    if (!Array.isArray(situations) || !situations.length) throw new Error('Every foundation preset requires at least one situation.');
+    if (situations.some((item) => !item.id || !item.label || !deviceSet.has(item.sourceDeviceId) || !deviceSet.has(item.targetDeviceId)
+      || item.pathDeviceIds.some((id) => !deviceSet.has(id)) || item.pathLinkIds.some((id) => !linkSet.has(id))
+      || item.pathDeviceIds[0] !== item.sourceDeviceId || item.pathDeviceIds.at(-1) !== item.targetDeviceId
+      || item.pathLinkIds.length !== item.pathDeviceIds.length - 1)) throw new Error('Foundation situations must declare a valid source-to-target path.');
     return true;
   }
 
@@ -256,6 +301,16 @@ const ComputerNetworkingFoundationsMachine = (() => {
     if (!preset) throw new Error(`Unknown foundation preset: ${presetOrId}`);
     validatePreset(preset);
     return preset;
+  }
+
+  function listSituations(presetOrId = PRESETS[0].id) {
+    const preset = resolvePreset(presetOrId);
+    return SITUATIONS_BY_PRESET[preset.id];
+  }
+
+  function resolveSituation(preset, situationId) {
+    const situations = listSituations(preset);
+    return situations.find((item) => item.id === situationId) || situations[0];
   }
 
   function normalizeGranularity(value) { return value === 'micro' ? 'micro' : 'operation'; }
@@ -292,61 +347,67 @@ const ComputerNetworkingFoundationsMachine = (() => {
     });
   }
 
-  function frameFor(preset, operationIndex, detailIndex, granularity) {
+  function frameFor(preset, situation, operationIndex, detailIndex, granularity) {
     const item = OPERATIONS[operationIndex];
     const phase = item.phases[detailIndex];
     const globalIndex = FLAT_DETAILS.findIndex((entry) => entry.operationIndex === operationIndex && entry.detailIndex === detailIndex);
     const terminal = globalIndex === FLAT_DETAILS.length - 1;
-    const explanation = resolve(phase.message, preset);
+    const explanation = resolve(phase.message, preset, situation);
+    const explicitDeviceIds = resolve(phase.focusDeviceIds, preset, situation);
+    const explicitLinkIds = resolve(phase.focusLinkIds, preset, situation);
     return {
-      kind: 'network-foundations', presetId: preset.id, playbackGranularity: granularity,
+      kind: 'network-foundations', presetId: preset.id, situationId: situation.id, playbackGranularity: granularity,
       scene: { id: preset.id, title: preset.title, label: preset.label, description: preset.description, networkType: preset.networkType },
+      situation: { id: situation.id, label: situation.label, intent: situation.intent, request: situation.request, protocol: situation.protocol, service: situation.service, sourceDeviceId: situation.sourceDeviceId, targetDeviceId: situation.targetDeviceId, pathDeviceIds: situation.pathDeviceIds, pathLinkIds: situation.pathLinkIds, result: situation.result },
       operation: { id: item.id, index: operationIndex + 1, total: OPERATIONS.length, label: item.label, summary: item.summary },
       detail: { id: phase.id, index: detailIndex + 1, total: item.phases.length, globalIndex: globalIndex + 1, globalTotal: FLAT_DETAILS.length, label: phase.label },
       phase: { id: phase.id, index: globalIndex + 1, total: FLAT_DETAILS.length, label: phase.label, explanation, next: terminal ? 'Continue with practice or preview Topic 6.' : FLAT_DETAILS[globalIndex + 1].phase.label },
       topology: { devices: preset.devices, links: preset.links, zones: preset.zones },
-      focus: { deviceIds: idsForTags(preset, phase.focusTags || []), linkIds: linksForTags(preset, phase.focusLinkTags || []), representation: phase.representation || 'physical' },
-      movement: { label: phase.label, path: resolve(phase.movement, preset) || explanation },
-      evidence: { category: phase.category, facts: [...resolve(phase.facts, preset)], conclusion: resolve(phase.conclusion, preset), quality: phase.quality || null },
+      focus: { deviceIds: explicitDeviceIds || idsForTags(preset, phase.focusTags || []), linkIds: explicitLinkIds || linksForTags(preset, phase.focusLinkTags || []), representation: 'generic' },
+      callouts: resolve(phase.callouts, preset, situation) || {},
+      movement: { label: phase.label, path: resolve(phase.movement, preset, situation) || explanation },
+      evidence: { category: phase.category, facts: [...resolve(phase.facts, preset, situation)], conclusion: resolve(phase.conclusion, preset, situation), quality: phase.quality || null },
       operationTimeline: operationTimeline(operationIndex, detailIndex, granularity, terminal),
     };
   }
 
   function timelineFor(presetOrId = PRESETS[0].id, options = {}) {
     const preset = resolvePreset(presetOrId);
+    const situation = resolveSituation(preset, options.situationId);
     const granularity = normalizeGranularity(options.granularity);
     if (granularity === 'micro') {
       return freeze(FLAT_DETAILS.map(({ item, phase, operationIndex, detailIndex }, eventIndex) => {
-        const frame = frameFor(preset, operationIndex, detailIndex, granularity);
+        const frame = frameFor(preset, situation, operationIndex, detailIndex, granularity);
         return BSITPlayback.timelineEvent({
-          id: `${ACTIVITY_ID}:${preset.id}:micro:${phase.id}`, domain: DOMAIN, type: phase.id, message: frame.phase.explanation, frame,
-          transition: eventIndex === 0 ? null : { kind: 'network-foundation-detail', wait: true, sequenceId: `network-foundation:${preset.id}:${phase.id}`, durationUnits: 1, phases: [{ id: phase.id, label: phase.label, durationWeight: 1, frame }] },
+          id: `${ACTIVITY_ID}:${preset.id}:${situation.id}:micro:${phase.id}`, domain: DOMAIN, type: phase.id, message: frame.phase.explanation, frame,
+          transition: eventIndex === 0 ? null : { kind: 'network-foundation-detail', wait: true, sequenceId: `network-foundation:${preset.id}:${situation.id}:${phase.id}`, durationUnits: 1, phases: [{ id: phase.id, label: phase.label, durationWeight: 1, frame }] },
           source: { line: operationIndex + 1, code: item.label }, segment: { id: item.id, index: operationIndex + 1 }, boundary: detailIndex === item.phases.length - 1, terminal: eventIndex === FLAT_DETAILS.length - 1,
         });
       }));
     }
     return freeze(OPERATIONS.map((item, operationIndex) => {
-      const frames = item.phases.map((phase, detailIndex) => ({ id: phase.id, label: phase.label, durationWeight: 1, frame: frameFor(preset, operationIndex, detailIndex, granularity) }));
+      const frames = item.phases.map((phase, detailIndex) => ({ id: phase.id, label: phase.label, durationWeight: 1, frame: frameFor(preset, situation, operationIndex, detailIndex, granularity) }));
       return BSITPlayback.timelineEvent({
-        id: `${ACTIVITY_ID}:${preset.id}:operation:${item.id}`, domain: DOMAIN, type: item.id, message: frames.at(-1).frame.phase.explanation, frame: frames.at(-1).frame,
-        transition: operationIndex === 0 ? null : { kind: 'network-foundation-operation', wait: true, sequenceId: `network-foundation:${preset.id}:${item.id}`, durationUnits: frames.length, phases: frames },
+        id: `${ACTIVITY_ID}:${preset.id}:${situation.id}:operation:${item.id}`, domain: DOMAIN, type: item.id, message: frames.at(-1).frame.phase.explanation, frame: frames.at(-1).frame,
+        transition: operationIndex === 0 ? null : { kind: 'network-foundation-operation', wait: true, sequenceId: `network-foundation:${preset.id}:${situation.id}:${item.id}`, durationUnits: frames.length, phases: frames },
         source: { line: operationIndex + 1, code: item.label }, segment: { id: item.id, index: operationIndex + 1 }, boundary: true, terminal: operationIndex === OPERATIONS.length - 1,
       });
     }));
   }
 
-  function finalState(frame) { return freeze({ presetId: frame.presetId, operationId: frame.operation.id, detailId: frame.detail.id, topology: frame.topology, evidence: frame.evidence, focus: frame.focus, movement: frame.movement }); }
+  function finalState(frame) { return freeze({ presetId: frame.presetId, situationId: frame.situationId, operationId: frame.operation.id, detailId: frame.detail.id, topology: frame.topology, evidence: frame.evidence, focus: frame.focus, movement: frame.movement }); }
 
   function run(presetOrId, options = {}) {
     const preset = presetOrId ? resolvePreset(presetOrId) : PRESETS[0];
     const granularity = normalizeGranularity(options.granularity);
-    const events = timelineFor(preset, { granularity });
-    return BSITPlayback.runResult({ events, capabilities: { visualize: true, trace: true, variables: true, operations: true, output: true }, result: freeze({ presetId: preset.id, granularity, finalFrame: events.at(-1).frame, finalState: finalState(events.at(-1).frame) }) });
+    const situation = resolveSituation(preset, options.situationId);
+    const events = timelineFor(preset, { granularity, situationId: situation.id });
+    return BSITPlayback.runResult({ events, capabilities: { visualize: true, trace: true, variables: true, operations: true, output: true }, result: freeze({ presetId: preset.id, situationId: situation.id, granularity, finalFrame: events.at(-1).frame, finalState: finalState(events.at(-1).frame) }) });
   }
 
   PRESETS.forEach(validatePreset);
   return freeze({
     ACTIVITY_ID, DOMAIN, ENTITY_IDS, ENTITY_IDS_BY_PRESET, PRESETS, PHASES, OPERATIONS, DETAILS: FLAT_DETAILS.map(({ phase }) => phase),
-    validatePreset, normalizeGranularity, getPreset(id) { return PRESET_BY_ID.get(id) || null; }, listPresets() { return PRESETS; }, timelineFor, run,
+    validatePreset, normalizeGranularity, getPreset(id) { return PRESET_BY_ID.get(id) || null; }, listPresets() { return PRESETS; }, listSituations, resolveSituation, timelineFor, run,
   });
 })();

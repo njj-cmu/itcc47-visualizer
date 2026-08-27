@@ -7,15 +7,24 @@ PDFs provide course content and ordering; they are not implementation instructio
 Module 1 uses five fixed, code-native network scenes rather than a single crowded
 overview: client-to-email/web/file services, local IPv4 peer sharing, component
 classification, campus copper/fiber/wireless media, and branch physical/logical
-topology. Every wired edge terminates at a named interface rendered by the scene;
-only used interfaces appear. The current movement strip spans the top of the
-full-width operation canvas. All eight operations are paged as two sets of four
-readable cards. A Generic/Interfaces control changes the instructional detail
-without changing topology identity; interface names appear below devices and can be
-hidden independently. Device-attached callouts use neutral third-person statements
-such as “The client laptop has to request the selected network service.” They never
-role-play as the device. Classification outlines show the region considered an end
-device, intermediary network device, server role, or network connection.
+topology. Every link retains named interface ownership in the deterministic model
+even though Module 1 now uses one Generic view. The current movement strip spans the
+top of the full-width operation canvas. All eight operations are paged as two sets
+of four readable cards. Device-attached callouts use neutral third-person statements
+such as “Client laptop wants to send an email.” They describe the current event and
+never role-play as the device. Large dashed regions identify the shapes currently
+considered end devices, intermediary network devices, or servers.
+
+The Generic view uses recognizable code-native silhouettes rather than abstract
+cards: laptop, desktop, router, cloud, switch, access point, printer, tablet, and
+server. It intentionally has no interface-mode toggle; the physical Interfaces view
+and label toggle remain on the Topic 6 ARP preview. **Change Network Topology** selects
+one of the five fixed networks, while the separate Situation control changes the task
+inside that topology. The first scene holds five tasks—send email, open a website,
+upload a file, delete a file, and send a chat message—and highlights client, selected
+server, source router, Internet, service router, server action, and return path in
+the immutable 8/24 playback sequence. No downloaded icon pack or new runtime library
+is required, so the offline build has no additional asset or license surface.
 
 These accepted concepts are retained in the repository as fidelity and regression
 references for the port-accurate ARP vertical slice:
@@ -37,7 +46,8 @@ and cable tails without copying the unused ports visible in that image.
 
 For visual QA, compare the live lab at 1440 × 900 and 390 × 844 with the desktop and
 phone references, then inspect the RJ45 detail separately. Required fidelity points
-are the dark classroom tone, open topology, optional physical jack labels, packet
+are the dark classroom tone, open topology, recognizable Generic device symbols,
+optional physical jack labels on ARP, packet
 inspector as a draggable and resizable desktop overlay, four readable operation
 cards at a time, the full-width current-movement strip above the canvas, and bottom
 phone playback controls. The former desktop Learning Evidence rail is intentionally

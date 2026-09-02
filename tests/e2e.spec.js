@@ -1216,27 +1216,103 @@ test('Midterm Review presents every reviewed checkpoint and resource on laptop a
   const summary = page.locator('#midterm-review-summary');
   for (const item of ['18 reviewed checkpoints', '2 local learning tools', '29 guided activities', '33 checked problems']) await expect(summary).toContainText(item);
   await expect(page.locator('.midterm-module-locked, .curriculum-lock')).toHaveCount(0);
-  await expect(page.locator('.midterm-module-panel[open]')).toHaveCount(1);
-  await expect(page.locator('[data-midterm-module="1"] .midterm-module-panel')).toHaveAttribute('open', '');
+  const deployedModuleNumber = await page.evaluate(() => {
+    const profile = ITCC47Curriculum.activeProfile({ preview: false, search: '' });
+    return ITCC47Curriculum.getModule(ITCC47Curriculum.getCheckpoint(profile.currentCheckpointId).moduleId).number;
+  });
+  expect(deployedModuleNumber).toBe(4);
+  await expect(page.locator('.midterm-module-body:not([hidden])')).toHaveCount(1);
+  await expect(page.locator(`[data-midterm-module="${deployedModuleNumber}"] [data-midterm-module-toggle]`)).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator(`[data-midterm-module="${deployedModuleNumber}"] .midterm-module-body`)).toBeVisible();
 
   const module2 = page.locator('[data-midterm-module="2"]');
   const module2Toggle = module2.locator('[data-midterm-module-toggle="2"]');
   await module2Toggle.focus();
   await page.keyboard.press('Enter');
-  await expect(module2.locator('.midterm-module-panel')).toHaveAttribute('open', '');
-  await expect(module2Toggle).toHaveAccessibleName(/Module 2.*Arrays, Lists, Searching, and Sorting.*Hide checkpoints/i);
+  await expect(module2Toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(module2.locator('.midterm-module-body')).toBeVisible();
+  await expect(page.locator('[data-midterm-module="4"] [data-midterm-module-toggle]')).toHaveAttribute('aria-expanded', 'false');
+  await expect(module2Toggle).toHaveAccessibleName(/Module 2.*Arrays, Lists, Searching, and Sorting.*Selected module/i);
   const moreExamples = module2.locator('[data-midterm-checkpoint="m2-binary-search"] [data-midterm-more="examples"]');
   await moreExamples.locator('summary').focus();
   await page.keyboard.press('Enter');
   await expect(moreExamples).toHaveAttribute('open', '');
   await expect(moreExamples.locator('summary')).toHaveAccessibleName('More examples 1');
 
-  await page.locator('.midterm-module-panel, .midterm-more').evaluateAll((items) => items.forEach((item) => { item.open = true; }));
-  expect(await page.locator('[data-midterm-resource]').evaluateAll((links) => links.filter((link) => link.getClientRects().length > 0).length)).toBe(64);
+  const reachedResources = [];
+  for (const moduleNumber of [1, 2, 3, 4]) {
+    const module = page.locator(`[data-midterm-module="${moduleNumber}"]`);
+    await module.locator('[data-midterm-module-toggle]').click();
+    await expect(module.locator('.midterm-module-body')).toBeVisible();
+    await module.locator('.midterm-more').evaluateAll((items) => items.forEach((item) => { item.open = true; }));
+    reachedResources.push(...await module.locator('[data-midterm-resource]').evaluateAll((links) => links.filter((link) => link.getClientRects().length > 0).map((link) => link.dataset.midtermResource)));
+  }
+  expect(new Set(reachedResources).size).toBe(64);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
   await page.locator('[data-midterm-resource="activity:deque-end-operations"]').click();
   await expect(page.getByRole('heading', { name: 'Use both ends of a deque' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+});
+
+test('desktop Midterm navigator selects every module and browser history restores the prior selection', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/problems.html?view=midterm');
+  const navigator = page.getByRole('navigation', { name: 'Midterm module navigator' });
+  await expect(navigator).toBeVisible();
+  await expect(page.locator('.midterm-module-jump')).toBeHidden();
+  for (const moduleNumber of [1, 2, 3, 4]) {
+    const navButton = navigator.locator(`[data-midterm-nav-module="${moduleNumber}"]`);
+    await navButton.focus();
+    await page.keyboard.press('Enter');
+    await expect(navButton).toHaveAttribute('aria-current', 'true');
+    await expect(navButton.locator('.midterm-nav-selected')).toHaveText('Selected');
+    await expect(page.locator(`[data-midterm-module="${moduleNumber}"] [data-midterm-module-toggle]`)).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator(`[data-midterm-module="${moduleNumber}"] .midterm-module-body`)).toBeVisible();
+    await expect(page.locator('.midterm-module-body:not([hidden])')).toHaveCount(1);
+    expect(new URL(page.url()).searchParams.get('module')).toBe(String(moduleNumber));
+    const headingBox = await page.locator(`[data-midterm-module="${moduleNumber}"] [data-midterm-module-toggle]`).boundingBox();
+    expect(headingBox.y).toBeGreaterThanOrEqual(0);
+    expect(headingBox.y).toBeLessThan(220);
+  }
+  await page.goBack();
+  await expect(page.locator('[data-midterm-module="3"] [data-midterm-module-toggle]')).toHaveAttribute('aria-expanded', 'true');
+  await expect(navigator.locator('[data-midterm-nav-module="3"]')).toHaveAttribute('aria-current', 'true');
+});
+
+test('mobile Midterm jump control selects every module without horizontal overflow', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/problems.html?view=midterm');
+  const jump = page.locator('#midterm-module-select');
+  await expect(page.getByRole('navigation', { name: 'Midterm module navigator' })).toBeHidden();
+  await expect(jump).toBeVisible();
+  await expect(jump).toHaveValue('4');
+  for (const moduleNumber of [1, 2, 3, 4]) {
+    await jump.selectOption(String(moduleNumber));
+    await expect(page.locator(`[data-midterm-module="${moduleNumber}"] [data-midterm-module-toggle]`)).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator(`[data-midterm-module="${moduleNumber}"] .midterm-module-body`)).toBeVisible();
+    await expect(page.locator('.midterm-module-body:not([hidden])')).toHaveCount(1);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+});
+
+test('Midterm stage numbers follow only the stages that exist', async ({ page }) => {
+  await page.goto('/problems.html?view=midterm&module=1');
+  const expectStages = async (checkpointId, expectedTypes) => {
+    const path = page.locator(`[data-midterm-checkpoint="${checkpointId}"] .midterm-core-path`);
+    await expect(path).toHaveAttribute('data-stage-count', String(expectedTypes.length));
+    expect(await path.locator('[data-midterm-stage]').evaluateAll((stages) => stages.map((stage) => stage.dataset.midtermStage))).toEqual(expectedTypes);
+    expect(await path.locator('.midterm-flow-label > span').allTextContents()).toEqual(expectedTypes.map((_, index) => String(index + 1)));
+  };
+  await expectStages('orientation', ['learn']);
+  await expect(page.locator('[data-midterm-checkpoint="orientation"] [data-midterm-stage="learn"] [data-midterm-resource="tool:writer"]')).toBeVisible();
+  await expectStages('m1-ipo', ['learn', 'practice']);
+  await expect(page.locator('[data-midterm-checkpoint="m1-ipo"] [data-midterm-stage="visualize"]')).toHaveCount(0);
+  await page.locator('[data-midterm-module="2"] [data-midterm-module-toggle]').click();
+  await expectStages('m2-linear-search', ['learn', 'visualize', 'practice']);
+  await expectStages('m2-industry-workbench', ['learn', 'visualize']);
+  await expect(page.locator('[data-midterm-checkpoint="m2-arrays"] [data-midterm-stage="visualize"]')).toHaveCount(0);
 });
 
 test('Midterm Review derives core choices from checkpoint sequence and frames Module 3 around references', async ({ page }) => {

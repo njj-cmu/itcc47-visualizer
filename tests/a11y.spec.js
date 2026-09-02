@@ -83,7 +83,7 @@ test('reviewed visualization progress remains accessible', async ({ page }) => {
   expect(important.map((violation) => ({ id: violation.id, targets: violation.nodes.map((node) => node.target.join(' ')) }))).toEqual([]);
 });
 
-test('expanded Midterm Review disclosures and local progress remain accessible', async ({ page }) => {
+test('selected Midterm modules, disclosures, navigation, and local progress remain accessible', async ({ page }) => {
   await page.goto('/problems.html?view=midterm');
   await page.evaluate(() => {
     const contentVersion = PROBLEMS.find((problem) => problem.id === 'linked-node-count').contentVersion;
@@ -97,14 +97,19 @@ test('expanded Midterm Review disclosures and local progress remain accessible',
     }));
   });
   await page.reload();
-  await page.locator('.midterm-module-panel, .midterm-more').evaluateAll((items) => items.forEach((item) => { item.open = true; }));
   await expect(page.locator('[data-progress-state="reviewed"]')).toHaveCount(1);
   await expect(page.locator('[data-progress-state="completed"]')).toHaveCount(1);
-  const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    .analyze();
-  const important = results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact));
-  expect(important.map((violation) => ({ id: violation.id, targets: violation.nodes.map((node) => node.target.join(' ')) }))).toEqual([]);
+  for (const moduleNumber of [1, 2, 3, 4]) {
+    const module = page.locator(`[data-midterm-module="${moduleNumber}"]`);
+    await module.locator('[data-midterm-module-toggle]').click();
+    await expect(page.locator('.midterm-module-body:not([hidden])')).toHaveCount(1);
+    await module.locator('.midterm-more').evaluateAll((items) => items.forEach((item) => { item.open = true; }));
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    const important = results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact));
+    expect(important.map((violation) => ({ id: violation.id, targets: violation.nodes.map((node) => node.target.join(' ')) }))).toEqual([]);
+  }
 });
 
 test('instructor-preview problem and later-domain activity have no serious or critical Axe violations', async ({ page }) => {

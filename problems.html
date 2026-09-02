@@ -49,7 +49,19 @@
       <p class="midterm-review-local-note"><strong>Private review aid:</strong> New, Visited, Reviewed, Continue, and Completed reflect only this browser. They are not grades or prerequisites.</p></div>
       <div id="midterm-review-summary" class="midterm-review-summary" aria-label="Midterm release inventory"></div>
     </header>
-    <ol id="midterm-review-grid" class="midterm-review-grid" aria-label="ITCC47 Midterm modules"></ol>
+    <div class="midterm-review-layout">
+      <nav class="midterm-module-nav" aria-label="Midterm module navigator">
+        <h3 id="midterm-module-nav-title">Jump to module</h3>
+        <ol id="midterm-module-nav-list" class="midterm-module-nav-list"></ol>
+      </nav>
+      <div class="midterm-review-content">
+        <div class="midterm-module-jump">
+          <label for="midterm-module-select">Jump to module</label>
+          <select id="midterm-module-select"></select>
+        </div>
+        <ol id="midterm-review-grid" class="midterm-review-grid" aria-label="ITCC47 Midterm modules"></ol>
+      </div>
+    </div>
   </section>
 
   <section id="visualization-catalog" class="catalog-view" role="tabpanel" aria-labelledby="visualizations-tab" hidden>

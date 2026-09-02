@@ -95,8 +95,13 @@
   const midtermCheckpoints = ITCC47Curriculum.checkpoints.filter((checkpoint) => ['m1', 'm2', 'm3', 'm4'].includes(checkpoint.moduleId));
   const midtermCheckpointIds = new Set(midtermCheckpoints.map((checkpoint) => checkpoint.id));
   const midtermResources = ITCC47Curriculum.listResources().filter((resource) => midtermCheckpointIds.has(resource.checkpointId));
+  const midtermModules = ITCC47Curriculum.modules.filter((module) => module.number <= 4);
   const midtermReviewGrid = document.getElementById('midterm-review-grid');
   const midtermReviewSummary = document.getElementById('midterm-review-summary');
+  const midtermModuleNavList = document.getElementById('midterm-module-nav-list');
+  const midtermModuleSelect = document.getElementById('midterm-module-select');
+  let selectedMidtermModuleNumber = null;
+  let selectMidtermModule = () => {};
 
   function midtermResourceDetails(resource, moduleNumber) {
     if (resource.kind === 'tool') {
@@ -156,20 +161,21 @@
     const practiceStates = resources.filter((resource) => resource.kind === 'problem').map(midtermResourceProgress);
     const visualCount = (state) => visualStates.filter((item) => item.state === state).length;
     const practiceCount = (state) => practiceStates.filter((item) => item.state === state).length;
-    return `<div class="midterm-module-progress" aria-label="Module ${moduleNumber} browser-local review summary">
+    return `<span class="midterm-module-progress" aria-label="Module ${moduleNumber} browser-local review summary">
       ${visualStates.length ? `<span><strong>Visualize</strong><span>${visualCount('reviewed')} reviewed · ${visualCount('visited')} visited · ${visualCount('new')} new</span></span>` : ''}
       ${practiceStates.length ? `<span><strong>Practice</strong><span>${practiceCount('completed')} completed · ${practiceCount('continue')} continue · ${practiceCount('start')} start</span></span>` : ''}
-    </div>`;
+    </span>`;
   }
 
-  if (midtermReviewGrid && midtermReviewSummary) {
+  if (midtermReviewGrid && midtermReviewSummary && midtermModuleNavList && midtermModuleSelect) {
     const counts = {
       tool: midtermResources.filter((resource) => resource.kind === 'tool').length,
       activity: midtermResources.filter((resource) => resource.kind === 'activity').length,
       problem: midtermResources.filter((resource) => resource.kind === 'problem').length,
     };
     midtermReviewSummary.innerHTML = `<span><strong>${midtermCheckpoints.length}</strong> reviewed checkpoints</span><span><strong>${counts.tool}</strong> local learning tools</span><span><strong>${counts.activity}</strong> guided activities</span><span><strong>${counts.problem}</strong> checked problems</span>`;
-    ITCC47Curriculum.modules.filter((module) => module.number <= 4).forEach((module) => {
+
+    const moduleModels = midtermModules.map((module) => {
       const checkpoints = midtermCheckpoints.filter((checkpoint) => checkpoint.moduleId === module.id);
       const resources = midtermResources.filter((resource) => checkpoints.some((checkpoint) => checkpoint.id === resource.checkpointId));
       const resourceSummary = [
@@ -179,27 +185,95 @@
       ].filter(Boolean).join(' · ');
       const stateRows = checkpoints.map((checkpoint) => ITCC47Curriculum.stateForCheckpoint(checkpoint.id, options));
       const moduleState = stateRows.some((row) => row.state === 'current') ? 'current' : 'available';
+      return { module, checkpoints, resources, resourceSummary, moduleState };
+    });
+
+    const deployedProfile = ITCC47Curriculum.activeProfile({ preview: false, search: '' });
+    const deployedCheckpoint = ITCC47Curriculum.getCheckpoint(deployedProfile.currentCheckpointId);
+    const deployedModule = ITCC47Curriculum.getModule(deployedCheckpoint?.moduleId);
+    const defaultModuleNumber = moduleModels.some((model) => model.module.number === deployedModule?.number)
+      ? deployedModule.number : moduleModels.at(-1)?.module.number;
+
+    midtermModuleNavList.innerHTML = moduleModels.map(({ module, checkpoints, resources, moduleState }) => `<li><button type="button" class="midterm-module-nav-button" data-midterm-nav-module="${module.number}" aria-controls="midterm-module-body-${module.number}"><span class="midterm-nav-number" aria-hidden="true">${module.number}</span><span class="midterm-nav-copy"><strong>Module ${module.number}</strong><span>${ui.esc(module.title)}</span><small>${checkpoints.length} checkpoint${checkpoints.length === 1 ? '' : 's'} · ${resources.length} resources</small></span>${ui.badge(moduleState)}<span class="midterm-nav-selected">Selected</span></button></li>`).join('');
+    midtermModuleSelect.innerHTML = moduleModels.map(({ module, moduleState }) => `<option value="${module.number}">Module ${module.number}: ${ui.esc(module.title)}${moduleState === 'current' ? ' — Current' : ''}</option>`).join('');
+
+    moduleModels.forEach(({ module, checkpoints, resources, resourceSummary, moduleState }) => {
       const item = document.createElement('li');
       item.className = `midterm-module-card midterm-module-${moduleState}`;
       item.dataset.midtermModule = String(module.number);
-      item.innerHTML = `<details class="midterm-module-panel" ${module.number === 1 ? 'open' : ''}><summary class="midterm-module-head" data-midterm-module-toggle="${module.number}"><span class="module-number" aria-hidden="true">${module.number}</span><span class="midterm-module-copy"><span class="module-label">Module ${module.number}</span><strong class="midterm-module-title">${ui.esc(module.title)}</strong><span>${checkpoints.length} checkpoint${checkpoints.length === 1 ? '' : 's'} · ${ui.esc(resourceSummary)}</span></span>${midtermModuleProgress(resources, module.number)}<span class="midterm-module-state">${ui.badge(moduleState)}<span class="midterm-module-toggle"><span class="when-closed">Open module</span><span class="when-open">Hide checkpoints</span><i aria-hidden="true"></i></span></span></summary>
-        <ol class="midterm-checkpoint-list">${checkpoints.map((checkpoint, checkpointIndex) => {
+      const toggleId = `midterm-module-toggle-${module.number}`;
+      const bodyId = `midterm-module-body-${module.number}`;
+      item.innerHTML = `<section class="midterm-module-panel"><h3 class="midterm-module-heading"><button id="${toggleId}" type="button" class="midterm-module-head" data-midterm-module-toggle="${module.number}" aria-expanded="false" aria-controls="${bodyId}"><span class="module-number" aria-hidden="true">${module.number}</span><span class="midterm-module-copy"><span class="module-label">Module ${module.number}</span><span class="midterm-module-title">${ui.esc(module.title)}</span><span>${checkpoints.length} checkpoint${checkpoints.length === 1 ? '' : 's'} · ${ui.esc(resourceSummary)}</span></span>${midtermModuleProgress(resources, module.number)}<span class="midterm-module-state">${ui.badge(moduleState)}<span class="midterm-module-toggle"><span class="when-closed">Open module</span><span class="when-open">Selected module</span><i aria-hidden="true"></i></span></span></button></h3>
+        <div id="${bodyId}" class="midterm-module-body" role="region" aria-labelledby="${toggleId}" hidden><ol class="midterm-checkpoint-list">${checkpoints.map((checkpoint, checkpointIndex) => {
           const sequenceOrder = new Map((checkpoint.sequence || []).map((reference, index) => [reference, index]));
           const checkpointResources = midtermResources.filter((resource) => resource.checkpointId === checkpoint.id)
             .sort((left, right) => (sequenceOrder.get(`${left.kind}:${left.id}`) ?? Number.MAX_SAFE_INTEGER) - (sequenceOrder.get(`${right.kind}:${right.id}`) ?? Number.MAX_SAFE_INTEGER));
-          const primaryExperience = checkpointResources.find((resource) => resource.kind !== 'problem');
+          const primaryTool = checkpointResources.find((resource) => resource.kind === 'tool');
+          const primaryActivity = checkpointResources.find((resource) => resource.kind === 'activity');
           const primaryProblem = checkpointResources.find((resource) => resource.kind === 'problem');
-          const additionalExamples = checkpointResources.filter((resource) => resource.kind !== 'problem' && resource !== primaryExperience);
+          const additionalExamples = checkpointResources.filter((resource) => resource.kind !== 'problem' && resource !== primaryTool && resource !== primaryActivity);
           const additionalProblems = checkpointResources.filter((resource) => resource.kind === 'problem' && resource !== primaryProblem);
           const headingId = `midterm-checkpoint-${checkpoint.id}`;
-          return `<li class="midterm-checkpoint" data-midterm-checkpoint="${ui.esc(checkpoint.id)}" aria-labelledby="${ui.esc(headingId)}"><p class="midterm-checkpoint-position">Checkpoint ${checkpointIndex + 1} of ${checkpoints.length}</p><ol class="midterm-core-path" aria-label="Core review path">
-            <li class="midterm-flow-stage midterm-flow-learn"><p class="midterm-flow-label"><span aria-hidden="true">1</span> Understand</p><h4 id="${ui.esc(headingId)}">${ui.esc(checkpoint.title)}</h4><p>${ui.esc(checkpoint.summary)}</p>${checkpoint.goals?.[0] ? `<span class="midterm-understand-focus"><strong>Focus:</strong> ${ui.esc(checkpoint.goals[0])}</span>` : ''}</li>
-            ${primaryExperience ? `<li class="midterm-flow-stage midterm-flow-visualize"><p class="midterm-flow-label"><span aria-hidden="true">2</span> Inspect / Visualize</p><div class="midterm-resource-links">${midtermResourceLinks([primaryExperience], module.number, 'primary')}</div></li>` : ''}
-            ${primaryProblem ? `<li class="midterm-flow-stage midterm-flow-practice"><p class="midterm-flow-label"><span aria-hidden="true">${primaryExperience ? 3 : 2}</span> Practice</p><div class="midterm-resource-links">${midtermResourceLinks([primaryProblem], module.number, 'primary')}</div></li>` : ''}
-          </ol><div class="midterm-additional-material">${midtermMoreResources(additionalExamples, module.number, 'examples', 'More examples')}${midtermMoreResources(additionalProblems, module.number, 'practice', 'More practice')}</div></li>`;
-        }).join('')}</ol></details>`;
+          const stages = [{
+            type: 'learn', label: 'Learn', content: `<h4 id="${ui.esc(headingId)}">${ui.esc(checkpoint.title)}</h4><p>${ui.esc(checkpoint.summary)}</p>${checkpoint.goals?.[0] ? `<span class="midterm-understand-focus"><strong>Focus:</strong> ${ui.esc(checkpoint.goals[0])}</span>` : ''}${primaryTool ? `<div class="midterm-resource-links">${midtermResourceLinks([primaryTool], module.number, 'primary')}</div>` : ''}`,
+          }];
+          if (primaryActivity) stages.push({ type: 'visualize', label: 'Visualize', content: `<div class="midterm-resource-links">${midtermResourceLinks([primaryActivity], module.number, 'primary')}</div>` });
+          if (primaryProblem) stages.push({ type: 'practice', label: 'Practice', content: `<div class="midterm-resource-links">${midtermResourceLinks([primaryProblem], module.number, 'primary')}</div>` });
+          const stageMarkup = stages.map((stage, stageIndex) => `<li class="midterm-flow-stage midterm-flow-${stage.type}" data-midterm-stage="${stage.type}"><p class="midterm-flow-label"><span aria-hidden="true">${stageIndex + 1}</span>${stage.label}</p>${stage.content}</li>`).join('');
+          return `<li class="midterm-checkpoint" data-midterm-checkpoint="${ui.esc(checkpoint.id)}" aria-labelledby="${ui.esc(headingId)}"><p class="midterm-checkpoint-position">Checkpoint ${checkpointIndex + 1} of ${checkpoints.length}</p><ol class="midterm-core-path" data-stage-count="${stages.length}" aria-label="Core review path">${stageMarkup}</ol><div class="midterm-additional-material">${midtermMoreResources(additionalExamples, module.number, 'examples', 'More examples')}${midtermMoreResources(additionalProblems, module.number, 'practice', 'More practice')}</div></li>`;
+        }).join('')}</ol></div></section>`;
       midtermReviewGrid.appendChild(item);
     });
+
+    function updateMidtermModuleUrl(moduleNumber, mode) {
+      const url = new URL(location.href);
+      url.searchParams.set('view', 'midterm');
+      url.searchParams.set('module', String(moduleNumber));
+      if (url.href === location.href) return;
+      try {
+        if (mode === 'replace') history.replaceState({}, '', url);
+        else history.pushState({}, '', url);
+      } catch { /* Query targeting is optional in restricted file contexts. */ }
+    }
+
+    selectMidtermModule = (requestedNumber, settings = {}) => {
+      const { updateUrl = true, historyMode = 'push', scroll = false } = settings;
+      const selectedModel = moduleModels.find((model) => model.module.number === Number(requestedNumber))
+        || moduleModels.find((model) => model.module.number === defaultModuleNumber)
+        || moduleModels[0];
+      if (!selectedModel) return;
+      selectedMidtermModuleNumber = selectedModel.module.number;
+      moduleModels.forEach(({ module }) => {
+        const selected = module.number === selectedMidtermModuleNumber;
+        const card = midtermReviewGrid.querySelector(`[data-midterm-module="${module.number}"]`);
+        const toggle = card?.querySelector('[data-midterm-module-toggle]');
+        const body = card?.querySelector('.midterm-module-body');
+        card?.classList.toggle('is-selected', selected);
+        toggle?.setAttribute('aria-expanded', String(selected));
+        if (body) body.hidden = !selected;
+        const navButton = midtermModuleNavList.querySelector(`[data-midterm-nav-module="${module.number}"]`);
+        if (selected) navButton?.setAttribute('aria-current', 'true');
+        else navButton?.removeAttribute('aria-current');
+      });
+      midtermModuleSelect.value = String(selectedMidtermModuleNumber);
+      if (updateUrl) updateMidtermModuleUrl(selectedMidtermModuleNumber, historyMode);
+      if (scroll) requestAnimationFrame(() => {
+        const heading = midtermReviewGrid.querySelector(`[data-midterm-module="${selectedMidtermModuleNumber}"] [data-midterm-module-toggle]`);
+        const behavior = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+        heading?.scrollIntoView({ behavior, block: 'start' });
+      });
+    };
+
+    midtermReviewGrid.querySelectorAll('[data-midterm-module-toggle]').forEach((toggle) => {
+      toggle.addEventListener('click', () => selectMidtermModule(toggle.dataset.midtermModuleToggle));
+    });
+    midtermModuleNavList.querySelectorAll('[data-midterm-nav-module]').forEach((button) => {
+      button.addEventListener('click', () => selectMidtermModule(button.dataset.midtermNavModule, { scroll: true }));
+    });
+    midtermModuleSelect.addEventListener('change', () => selectMidtermModule(midtermModuleSelect.value, { scroll: true }));
+    const requestedModuleNumber = Number(new URLSearchParams(location.search).get('module'));
+    selectMidtermModule(requestedModuleNumber, { updateUrl: false });
+
     midtermReviewGrid.addEventListener('click', (event) => {
       const link = event.target.closest('[data-midterm-resource^="activity:"]');
       if (!link || !focusedProgress) return;
@@ -270,8 +344,20 @@
     const selected = views[name] ? name : 'problems';
     tabs.forEach((tab) => { const active = tab.dataset.catalogView === selected; tab.setAttribute('aria-selected', String(active)); tab.tabIndex = active ? 0 : -1; if (active && focus) tab.focus(); });
     Object.entries(views).forEach(([key, panel]) => { panel.hidden = key !== selected; });
-    if (updateUrl) { const url = new URL(location.href); selected === 'problems' ? url.searchParams.delete('view') : url.searchParams.set('view', selected); history.replaceState({}, '', url); }
+    if (updateUrl) {
+      const url = new URL(location.href);
+      selected === 'problems' ? url.searchParams.delete('view') : url.searchParams.set('view', selected);
+      if (selected === 'midterm' && selectedMidtermModuleNumber) url.searchParams.set('module', String(selectedMidtermModuleNumber));
+      else url.searchParams.delete('module');
+      history.replaceState({}, '', url);
+    }
   }
   tabs.forEach((tab, index) => { tab.addEventListener('click', () => selectView(tab.dataset.catalogView)); tab.addEventListener('keydown', (event) => { if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return; event.preventDefault(); const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length; selectView(tabs[next].dataset.catalogView, true, true); }); });
   selectView(new URLSearchParams(location.search).get('view') || 'problems', false);
+  window.addEventListener('popstate', () => {
+    const params = new URLSearchParams(location.search);
+    const view = params.get('view') || 'problems';
+    selectView(view, false);
+    if (view === 'midterm') selectMidtermModule(Number(params.get('module')), { updateUrl: false, scroll: true });
+  });
 })();

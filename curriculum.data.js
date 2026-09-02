@@ -55,7 +55,7 @@ const ITCC47_CURRICULUM_DATA = {
     {
       "id": "m3",
       "number": 3,
-      "title": "Linked Lists",
+      "title": "Linked Lists: References and Identity",
       "cloIds": [
         1,
         2,
@@ -419,19 +419,19 @@ const ITCC47_CURRICULUM_DATA = {
       "moduleId": "m3",
       "order": 130,
       "reviewStatus": "reviewed",
-      "title": "Linked nodes and traversal",
-      "summary": "Follow explicit references instead of assuming contiguous positions.",
+      "title": "Linked storage, identity, and reachability",
+      "summary": "Compare contiguous storage with explicit links, then follow references from head to determine which stable node identities remain reachable.",
       "goals": [
-        "Identify node identity and next",
-        "Trace head and current",
-        "Compare array and linked storage"
+        "Compare contiguous positions with explicit links",
+        "Track stable node identity through head and next references",
+        "Explain why losing a reference makes part of a chain unreachable"
       ],
       "prerequisiteIds": [
         "m2-industry-workbench"
       ],
       "sequence": [
-        "activity:linked-list-traversal",
         "activity:array-linked-comparison",
+        "activity:linked-list-traversal",
         "problem:linked-node-count",
         "problem:linked-find-value"
       ]
@@ -441,12 +441,12 @@ const ITCC47_CURRICULUM_DATA = {
       "moduleId": "m3",
       "order": 140,
       "reviewStatus": "reviewed",
-      "title": "Linked-list mutation",
-      "summary": "Allocate, reconnect, update, detach, and delete nodes without losing the reachable chain.",
+      "title": "Safe linked-list mutation",
+      "summary": "Preserve reachability by relinking in a safe order, then check mutation invariants before detaching or deleting nodes.",
       "goals": [
-        "Perform pointer writes in a safe order",
-        "Maintain sorted insertion",
-        "Explain deletion invariants"
+        "Perform pointer writes in a safe relinking order",
+        "Preserve every node that should remain reachable",
+        "Check head, next, sorted-order, and detached-node invariants"
       ],
       "prerequisiteIds": [
         "m3-linked-foundations"

@@ -13,7 +13,7 @@
   "modules": [
     { "id": "m1", "number": 1, "title": "Algorithmic Thinking", "cloIds": [1, 2, 3] },
     { "id": "m2", "number": 2, "title": "Arrays, Lists, Searching, and Sorting", "cloIds": [1, 2, 3, 4, 5] },
-    { "id": "m3", "number": 3, "title": "Linked Lists", "cloIds": [1, 2, 3, 4, 6] },
+    { "id": "m3", "number": 3, "title": "Linked Lists: References and Identity", "cloIds": [1, 2, 3, 4, 6] },
     { "id": "m4", "number": 4, "title": "Stacks, Queues, and Deques", "cloIds": [2, 3, 4, 5, 6] },
     { "id": "m5", "number": 5, "title": "Recursion and Divide-and-Conquer", "cloIds": [4, 5, 6] },
     { "id": "m6", "number": 6, "title": "Trees and Binary Search Trees", "cloIds": [1, 2, 4, 5, 6] },
@@ -106,15 +106,15 @@
       "prerequisiteIds": ["m2-array-mutation"], "sequence": ["activity:industry-sla-breach-scan", "activity:industry-priority-range-recall", "activity:industry-stable-priority-dispatch", "activity:industry-review-queue-mutation"]
     },
     {
-      "id": "m3-linked-foundations", "moduleId": "m3", "order": 130, "reviewStatus": "reviewed", "title": "Linked nodes and traversal",
-      "summary": "Follow explicit references instead of assuming contiguous positions.",
-      "goals": ["Identify node identity and next", "Trace head and current", "Compare array and linked storage"],
-      "prerequisiteIds": ["m2-industry-workbench"], "sequence": ["activity:linked-list-traversal", "activity:array-linked-comparison", "problem:linked-node-count", "problem:linked-find-value"]
+      "id": "m3-linked-foundations", "moduleId": "m3", "order": 130, "reviewStatus": "reviewed", "title": "Linked storage, identity, and reachability",
+      "summary": "Compare contiguous storage with explicit links, then follow references from head to determine which stable node identities remain reachable.",
+      "goals": ["Compare contiguous positions with explicit links", "Track stable node identity through head and next references", "Explain why losing a reference makes part of a chain unreachable"],
+      "prerequisiteIds": ["m2-industry-workbench"], "sequence": ["activity:array-linked-comparison", "activity:linked-list-traversal", "problem:linked-node-count", "problem:linked-find-value"]
     },
     {
-      "id": "m3-linked-mutation", "moduleId": "m3", "order": 140, "reviewStatus": "reviewed", "title": "Linked-list mutation",
-      "summary": "Allocate, reconnect, update, detach, and delete nodes without losing the reachable chain.",
-      "goals": ["Perform pointer writes in a safe order", "Maintain sorted insertion", "Explain deletion invariants"],
+      "id": "m3-linked-mutation", "moduleId": "m3", "order": 140, "reviewStatus": "reviewed", "title": "Safe linked-list mutation",
+      "summary": "Preserve reachability by relinking in a safe order, then check mutation invariants before detaching or deleting nodes.",
+      "goals": ["Perform pointer writes in a safe relinking order", "Preserve every node that should remain reachable", "Check head, next, sorted-order, and detached-node invariants"],
       "prerequisiteIds": ["m3-linked-foundations"], "sequence": ["activity:linked-list-insert-head", "activity:linked-list-sorted-insert", "activity:linked-list-find-update", "activity:linked-list-delete", "problem:linked-insert-head-problem", "problem:linked-delete-first", "problem:linked-relocate-sorted", "problem:linked-invariant-audit"]
     },
     {

@@ -83,6 +83,30 @@ test('reviewed visualization progress remains accessible', async ({ page }) => {
   expect(important.map((violation) => ({ id: violation.id, targets: violation.nodes.map((node) => node.target.join(' ')) }))).toEqual([]);
 });
 
+test('expanded Midterm Review disclosures and local progress remain accessible', async ({ page }) => {
+  await page.goto('/problems.html?view=midterm');
+  await page.evaluate(() => {
+    const contentVersion = PROBLEMS.find((problem) => problem.id === 'linked-node-count').contentVersion;
+    localStorage.setItem('itcc47.visualizer-progress:v1', JSON.stringify({
+      schemaVersion: 1,
+      activities: { 'bubble-sort': { lastVisitedAt: '2026-09-01T01:02:03.000Z', reviewedAt: '2026-09-01T01:02:03.000Z' } },
+    }));
+    localStorage.setItem('itcc47.practice-records:v2', JSON.stringify({
+      schemaVersion: 2,
+      records: { 'linked-node-count': { contentVersion, draft: 'completed draft', completed: true } },
+    }));
+  });
+  await page.reload();
+  await page.locator('.midterm-module-panel, .midterm-more').evaluateAll((items) => items.forEach((item) => { item.open = true; }));
+  await expect(page.locator('[data-progress-state="reviewed"]')).toHaveCount(1);
+  await expect(page.locator('[data-progress-state="completed"]')).toHaveCount(1);
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  const important = results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact));
+  expect(important.map((violation) => ({ id: violation.id, targets: violation.nodes.map((node) => node.target.join(' ')) }))).toEqual([]);
+});
+
 test('instructor-preview problem and later-domain activity have no serious or critical Axe violations', async ({ page }) => {
   await page.addInitScript((token) => {
     localStorage.setItem('itcc47.instructor-access:v1', JSON.stringify({ schemaVersion: 1, profileId: 'itcc47-2026-2027-s1', profileVersion: 6, token }));

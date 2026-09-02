@@ -10,6 +10,13 @@ const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html
 
 const curriculumSource = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'curriculum.public.json'), 'utf8'));
 const checkpointById = new Map(curriculumSource.checkpoints.map((checkpoint) => [checkpoint.id, checkpoint]));
+const midtermCheckpoints = curriculumSource.checkpoints.filter((checkpoint) => ['m1', 'm2', 'm3', 'm4'].includes(checkpoint.moduleId));
+const expectedMidtermPrimaryResources = midtermCheckpoints.flatMap((checkpoint) => {
+  const sequenceOrder = new Map(checkpoint.sequence.map((reference, index) => [reference, index]));
+  const resources = curriculumSource.resources.filter((resource) => resource.checkpointId === checkpoint.id)
+    .sort((left, right) => sequenceOrder.get(`${left.kind}:${left.id}`) - sequenceOrder.get(`${right.kind}:${right.id}`));
+  return [resources.find((resource) => resource.kind !== 'problem'), resources.find((resource) => resource.kind === 'problem')].filter(Boolean);
+});
 const midtermResourcesByModule = new Map([1, 2, 3, 4].map((moduleNumber) => [moduleNumber,
   curriculumSource.resources.filter((resource) => checkpointById.get(resource.checkpointId)?.moduleId === `m${moduleNumber}`),
 ]));
@@ -1205,13 +1212,85 @@ test('Midterm Review presents every reviewed checkpoint and resource on laptop a
   await expect(page.locator('[data-midterm-module]')).toHaveCount(4);
   await expect(page.locator('[data-midterm-checkpoint]')).toHaveCount(18);
   await expect(page.locator('[data-midterm-resource]')).toHaveCount(64);
+  await expect(page.locator('[data-midterm-placement="primary"]')).toHaveCount(expectedMidtermPrimaryResources.length);
   const summary = page.locator('#midterm-review-summary');
   for (const item of ['18 reviewed checkpoints', '2 local learning tools', '29 guided activities', '33 checked problems']) await expect(summary).toContainText(item);
   await expect(page.locator('.midterm-module-locked, .curriculum-lock')).toHaveCount(0);
+  await expect(page.locator('.midterm-module-panel[open]')).toHaveCount(1);
+  await expect(page.locator('[data-midterm-module="1"] .midterm-module-panel')).toHaveAttribute('open', '');
+
+  const module2 = page.locator('[data-midterm-module="2"]');
+  const module2Toggle = module2.locator('[data-midterm-module-toggle="2"]');
+  await module2Toggle.focus();
+  await page.keyboard.press('Enter');
+  await expect(module2.locator('.midterm-module-panel')).toHaveAttribute('open', '');
+  await expect(module2Toggle).toHaveAccessibleName(/Module 2.*Arrays, Lists, Searching, and Sorting.*Hide checkpoints/i);
+  const moreExamples = module2.locator('[data-midterm-checkpoint="m2-binary-search"] [data-midterm-more="examples"]');
+  await moreExamples.locator('summary').focus();
+  await page.keyboard.press('Enter');
+  await expect(moreExamples).toHaveAttribute('open', '');
+  await expect(moreExamples.locator('summary')).toHaveAccessibleName('More examples 1');
+
+  await page.locator('.midterm-module-panel, .midterm-more').evaluateAll((items) => items.forEach((item) => { item.open = true; }));
+  expect(await page.locator('[data-midterm-resource]').evaluateAll((links) => links.filter((link) => link.getClientRects().length > 0).length)).toBe(64);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
   await page.locator('[data-midterm-resource="activity:deque-end-operations"]').click();
   await expect(page.getByRole('heading', { name: 'Use both ends of a deque' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+});
+
+test('Midterm Review derives core choices from checkpoint sequence and frames Module 3 around references', async ({ page }) => {
+  await page.goto('/problems.html?view=midterm');
+  const module3 = page.locator('[data-midterm-module="3"]');
+  await module3.locator('[data-midterm-module-toggle="3"]').click();
+  const foundation = module3.locator('[data-midterm-checkpoint="m3-linked-foundations"]');
+  await expect(foundation).toContainText('Linked storage, identity, and reachability');
+  await expect(foundation).toContainText('contiguous storage with explicit links');
+  await expect(foundation.locator('[data-midterm-placement="primary"][data-midterm-resource^="activity:"]')).toHaveAttribute('data-midterm-resource', 'activity:array-linked-comparison');
+  const moreExamples = foundation.locator('[data-midterm-more="examples"]');
+  await moreExamples.locator('summary').click();
+  await expect(moreExamples.locator('[data-midterm-resource="activity:linked-list-traversal"]')).toBeVisible();
+  const mutation = module3.locator('[data-midterm-checkpoint="m3-linked-mutation"]');
+  await expect(mutation).toContainText('relinking in a safe order');
+  await expect(mutation).toContainText('mutation invariants');
+});
+
+test('Midterm Review shows neutral progress in a fresh browser', async ({ page }) => {
+  await page.goto('/problems.html?view=midterm');
+  await expect(page.locator('.midterm-progress-badge.is-new')).toHaveCount(29);
+  await expect(page.locator('.midterm-progress-badge.is-start')).toHaveCount(33);
+  await expect(page.locator('.midterm-progress-badge.is-visited, .midterm-progress-badge.is-reviewed, .midterm-progress-badge.is-continue, .midterm-progress-badge.is-completed')).toHaveCount(0);
+  await expect(page.locator('[data-midterm-module="2"] .midterm-module-progress')).toContainText('0 reviewed · 0 visited · 13 new');
+  await expect(page.locator('[data-midterm-module="3"] .midterm-module-progress')).toContainText('0 completed · 0 continue · 6 start');
+});
+
+test('Midterm Review reflects existing visualization and practice records', async ({ page }) => {
+  await page.goto('/problems.html?view=midterm');
+  await page.evaluate(() => {
+    const versionFor = (id) => PROBLEMS.find((problem) => problem.id === id).contentVersion;
+    localStorage.setItem('itcc47.visualizer-progress:v1', JSON.stringify({
+      schemaVersion: 1,
+      activities: {
+        'bubble-sort': { lastVisitedAt: '2026-09-01T01:02:03.000Z', reviewedAt: '2026-09-01T01:02:03.000Z' },
+        'selection-sort': { lastVisitedAt: '2026-09-01T02:03:04.000Z' },
+      },
+    }));
+    localStorage.setItem('itcc47.practice-records:v2', JSON.stringify({
+      schemaVersion: 2,
+      records: {
+        'linked-node-count': { contentVersion: versionFor('linked-node-count'), draft: 'completed draft', completed: true },
+        'linked-find-value': { contentVersion: versionFor('linked-find-value'), draft: 'work in progress', completed: false },
+      },
+    }));
+  });
+  await page.reload();
+  await expect(page.locator('[data-midterm-resource="activity:bubble-sort"] [data-progress-state]')).toHaveText('Reviewed');
+  await expect(page.locator('[data-midterm-resource="activity:selection-sort"] [data-progress-state]')).toHaveText('Visited');
+  await expect(page.locator('[data-midterm-resource="problem:linked-node-count"] [data-progress-state]')).toHaveText('Completed');
+  await expect(page.locator('[data-midterm-resource="problem:linked-find-value"] [data-progress-state]')).toHaveText('Continue');
+  await expect(page.locator('[data-midterm-module="2"] .midterm-module-progress')).toContainText('1 reviewed · 1 visited · 11 new');
+  await expect(page.locator('[data-midterm-module="3"] .midterm-module-progress')).toContainText('1 completed · 1 continue · 4 start');
+  await expect(page.locator('[data-progress-state="reviewed"]')).toHaveAttribute('aria-label', 'Review status: Reviewed');
 });
 
 for (const moduleNumber of [1, 2, 3, 4]) {
@@ -2361,7 +2440,7 @@ test('Recent Documents what-if controls keep one selected representation synchro
 
 test('linked foundations companion teaches Recent Documents and the reference progression', async ({ page }) => {
   await page.goto('/lesson.html?checkpoint=m3-linked-foundations&preview=1');
-  await expect(page.getByRole('heading', { name: 'Linked nodes and traversal' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Linked storage, identity, and reachability' })).toBeVisible();
   await expect(page.locator('.companion-thesis')).toHaveText('DATA + REFERENCES = STRUCTURE');
   await expect(page.locator('.companion-code')).toContainText('recent.remove(document)');
   await expect(page.locator('.companion-code')).toContainText('simple Python-list implementation is probably the sensible choice');
@@ -2777,6 +2856,7 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
   await page.goto(`file:///${path.resolve(__dirname, '..', 'problems.html').replace(/\\/g, '/')}?view=midterm`);
   await expect(page.getByRole('heading', { name: /Move from understanding/ })).toBeVisible();
   await expect(page.locator('[data-midterm-module]')).toHaveCount(4);
+  await page.locator('[data-midterm-module="4"] [data-midterm-module-toggle="4"]').click();
   await page.locator('[data-midterm-resource="activity:stack-lifo-basics"]').click();
   await expect(page.getByRole('heading', { name: 'Push, peek, and pop' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();

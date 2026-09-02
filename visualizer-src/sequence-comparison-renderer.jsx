@@ -77,18 +77,22 @@ export const SequenceComparisonRenderer = memo(function SequenceComparisonRender
     : null);
   const activeChangeLabel = linkedState.lastWrite?.change === 'removed' ? 'Removed reference'
     : linkedState.lastWrite?.change === 'added' ? 'Added reference'
-      : linkedState.lastWrite?.change === 'head' ? 'Head reference' : linkedState.lastWrite ? 'Rewritten reference' : 'Active assignment';
+      : linkedState.lastWrite?.change === 'head' ? 'Head reference'
+        : linkedState.lastWrite?.change === 'tail' ? 'Tail reference' : linkedState.lastWrite ? 'Rewritten reference' : 'Active assignment';
+  const openedLabel = recordsById.get(frame?.openedId)?.label || frame?.openedId || 'Unknown document';
+  const selectedRepresentation = frame?.representation || 'array';
+  const linkedOrder = (linkedState.reachableIds || []).map((id) => recordsById.get(id)?.label || id).join(', ');
 
-  return <div className="sequence-comparison" data-active-representation={frame?.activeRepresentation || 'scenario'} data-motion-mode={motionMode}>
+  return <div className="sequence-comparison" data-active-representation={frame?.activeRepresentation || selectedRepresentation} data-selected-representation={selectedRepresentation} data-motion-mode={motionMode}>
     <header className="sequence-scenario">
-      <div><span>Recent Documents scenario</span><h2>{REPRESENTATION_LABELS[frame?.activeRepresentation] || 'Representation comparison'}</h2></div>
-      <p><strong>Opened:</strong> Attendance.xlsx</p>
+      <div><span>Recent Documents scenario</span><h2>{REPRESENTATION_LABELS[selectedRepresentation] || 'Representation comparison'}</h2></div>
+      <p><strong>Opened:</strong> {openedLabel}</p>
       <p className="sequence-question">{frame?.explanation?.question}</p>
     </header>
 
-    <div className="sequence-representations">
-      <section className={`sequence-panel sequence-array-panel ${frame?.activeRepresentation === 'array' ? 'is-active' : ''}`} aria-labelledby="sequence-array-title">
-        <header><div><span>POSITION</span><h3 id="sequence-array-title">Indexed dynamic list</h3></div><p><strong>{arrayState.shifts || 0}</strong> shifts <span aria-hidden="true">·</span> <strong>{arrayState.placements || 0}</strong> placement</p></header>
+    <div className="sequence-representation">
+      {selectedRepresentation === 'array' ? <section className="sequence-panel sequence-array-panel is-active" aria-labelledby="sequence-array-title">
+        <header><div><span>POSITION</span><h3 id="sequence-array-title">Indexed dynamic list</h3></div><p><strong>{arrayState.shifts || 0}</strong> shifts <span aria-hidden="true">·</span> <strong>{arrayState.placements || 0}</strong> {arrayState.placements === 1 ? 'placement' : 'placements'}</p></header>
         <div className="sequence-array-scroll" role="region" aria-label="Indexed Recent Documents slots" tabIndex="0">
           <LayoutGroup id="recent-array">
             <div className="sequence-array-track" data-array-order={finalArrayOrder}>
@@ -104,13 +108,13 @@ export const SequenceComparisonRenderer = memo(function SequenceComparisonRender
           </LayoutGroup>
         </div>
         <footer><span>Logical size: {arrayState.logicalSize}</span>{arrayState.lastMove ? <code aria-label={`Active array shift ${activeAssignment}`}>{activeAssignment}</code> : <span>References or records occupy numbered slots.</span>}</footer>
-      </section>
+      </section> : null}
 
-      <section className={`sequence-panel sequence-linked-panel ${frame?.activeRepresentation === 'linked' ? 'is-active' : ''}`} aria-labelledby="sequence-linked-title">
+      {selectedRepresentation === 'linked' ? <section className="sequence-panel sequence-linked-panel is-active" aria-labelledby="sequence-linked-title">
         <header><div><span>RELATIONSHIPS</span><h3 id="sequence-linked-title">Doubly linked order</h3></div><p><strong>{event?.metrics?.pointerWrites || 0}</strong> pointer writes</p></header>
         <div className="sequence-linked-scroll" role="region" aria-label="Doubly linked Recent Documents nodes" tabIndex="0">
           <LayoutGroup id="recent-linked">
-            <div className="sequence-linked-track">
+            <div className="sequence-linked-track" data-linked-order={linkedOrder} data-head-id={linkedState.headId || ''} data-tail-id={linkedState.tailId || ''}>
               {linkedItems.map((item) => {
                 if (item.kind === 'edge') return <span className="sequence-link-symbol" aria-hidden="true" key={item.id}>⇄</span>;
                 if (item.kind === 'break') return <span className="sequence-detached-break" key={item.id}><b>held outside chain</b><small>not reachable from head</small></span>;
@@ -125,7 +129,7 @@ export const SequenceComparisonRenderer = memo(function SequenceComparisonRender
           <span className={linkedState.stable ? 'is-stable' : 'is-transient'}>{linkedState.stable ? 'Stable stage' : 'Temporary relink in progress'}</span>
           {linkedState.lastWrite ? <code className={`change-${linkedState.lastWrite.change}`} aria-label={`${activeChangeLabel}: ${activeAssignment}`}><b>{activeChangeLabel}</b>{activeAssignment}</code> : <span>Each node stores explicit prev and next references.</span>}
         </footer>
-      </section>
+      </section> : null}
     </div>
 
     {frame?.comparisonRows?.length ? <section className="sequence-complexity" aria-labelledby="sequence-complexity-title">

@@ -628,12 +628,6 @@ ok('head insertion preserves the old chain after the new node', linkedInsert.eve
 ok('linked transitions preserve pointer and edge identities', linkedInsert.events.some((event) => event.transition?.moves?.some((move) => move.entityId === 'pointer:head')) && linkedInsert.events.some((event) => event.frame.links.every((link) => link.id === `edge:${link.from}->${link.to}`)));
 ok('linked-list events use immutable V2 frames', Object.isFrozen(linkedInsert.events[0]) && Object.isFrozen(linkedInsert.events[0].frame) && linkedInsert.events.every((event, index) => event.id === `linked-list-insert-head:${index}`));
 const recentComparisonActivity = Activities.get('array-linked-comparison');
-const recentComparison = recentComparisonActivity.run();
-const recentComparisonAgain = recentComparisonActivity.run();
-const recentFinal = recentComparison.events.at(-1);
-const recentFinalLinked = recentFinal.frame.linkedState;
-const recentFinalNodes = new Map(recentFinalLinked.nodes.map((node) => [node.id, node]));
-const expectedRecentOrder = ['doc:attendance','doc:grades','doc:syllabus','doc:module3','doc:notes'];
 function recentStageIsValid(frame) {
   const state = frame.linkedState;
   const byId = new Map(state.nodes.map((node) => [node.id, node]));
@@ -656,24 +650,42 @@ function recentStageIsValid(frame) {
     return node.prev === expectedPrev && node.next === expectedNext;
   });
 }
-ok('Recent Documents keeps its Module 3 placement and dedicated renderer', recentComparisonActivity.module === 3 && recentComparisonActivity.checkpointId === 'm3-linked-foundations' && recentComparisonActivity.renderer === 'sequence-comparison' && recentComparisonActivity.contentVersion !== traversalActivity.contentVersion);
-ok('Recent Documents timeline is deterministic from initialize to terminal', JSON.stringify(recentComparison) === JSON.stringify(recentComparisonAgain) && recentComparison.events[0].type === 'initialize' && recentComparison.events[0].segment.id === 'scenario' && recentFinal.terminal && recentFinal.type === 'return');
-ok('Recent Documents maps every event to a displayed conceptual source line', recentComparison.events.every((event) => event.source?.line >= 1 && event.source.line <= recentComparisonActivity.source.length && event.source.code === recentComparisonActivity.source[event.source.line - 1]));
-ok('Recent Documents keeps unique stable record identities in every frame', recentComparison.events.every((event) => new Set(event.frame.records.map((record) => record.id)).size === 5 && event.frame.records.map((record) => record.id).join(',') === 'doc:grades,doc:syllabus,doc:attendance,doc:module3,doc:notes'));
-ok('Recent Documents linked targets exist and every stable stage is reciprocal and cycle-free', recentComparison.events.every((event) => recentStageIsValid(event.frame)));
-const recentDetach = recentComparison.events.find((event) => event.frame.linkedState.lastWrite?.code === 'Module3.prev ← Syllabus');
-const detachNodes = new Map(recentDetach.frame.linkedState.nodes.map((node) => [node.id, node]));
-ok('Recent Documents detach stage bypasses Attendance and reports it outside the chain', detachNodes.get('doc:syllabus').next === 'doc:module3' && detachNodes.get('doc:module3').prev === 'doc:syllabus' && recentDetach.frame.linkedState.detachedIds.join(',') === 'doc:attendance' && !recentDetach.frame.linkedState.reachableIds.includes('doc:attendance'));
-ok('Recent Documents final array order is exact and uses one placement', recentFinal.frame.arrayState.slots.join(',') === expectedRecentOrder.join(',') && recentFinal.frame.arrayState.placements === 1);
-ok('Recent Documents final linked order and boundary references are exact', recentFinalLinked.headId === 'doc:attendance' && recentFinalLinked.tailId === 'doc:notes' && recentFinalLinked.reachableIds.join(',') === expectedRecentOrder.join(',')
-  && recentFinalNodes.get('doc:attendance').prev === null && recentFinalNodes.get('doc:attendance').next === 'doc:grades'
-  && recentFinalNodes.get('doc:grades').prev === 'doc:attendance' && recentFinalNodes.get('doc:grades').next === 'doc:syllabus'
-  && recentFinalNodes.get('doc:syllabus').prev === 'doc:grades' && recentFinalNodes.get('doc:syllabus').next === 'doc:module3'
-  && recentFinalNodes.get('doc:module3').prev === 'doc:syllabus' && recentFinalNodes.get('doc:module3').next === 'doc:notes'
-  && recentFinalNodes.get('doc:notes').prev === 'doc:module3' && recentFinalNodes.get('doc:notes').next === null);
-ok('Recent Documents final metrics count six shifts and six pointer writes', recentFinal.metrics.arrayShifts === 6 && recentFinal.metrics.pointerWrites === 6 && recentFinal.result === undefined && recentComparison.result.arrayPlacements === 1);
-ok('Recent Documents visibly separates lookup cost from local mutation cost', recentComparison.events.every((event) => /finding Attendance\.xlsx from head.*O\(n\)/i.test(event.frame.explanation.caveat)) && !/complete operation.*O\(1\)/i.test(recentComparisonActivity.blurb));
-ok('Recent Documents owns four deterministic teaching segments', [...new Set(recentComparison.events.map((event) => event.segment.id))].join(',') === 'scenario,array-list,linked-list,comparison' && recentComparison.events.filter((event) => event.boundary).map((event) => event.segment.id).join(',') === 'scenario,array-list,linked-list,comparison');
+const recentInitialIds = ['doc:grades','doc:syllabus','doc:attendance','doc:module3','doc:notes'];
+const recentPresetIds = ['grades','syllabus','attendance','module3','notes'];
+ok('Recent Documents keeps its Module 3 placement, activity ID, and dedicated renderer', recentComparisonActivity.id === 'array-linked-comparison' && recentComparisonActivity.module === 3 && recentComparisonActivity.checkpointId === 'm3-linked-foundations' && recentComparisonActivity.renderer === 'sequence-comparison' && recentComparisonActivity.contentVersion !== traversalActivity.contentVersion);
+ok('Recent Documents exposes five what-if presets with Attendance and array defaults', recentComparisonActivity.input.presets.map((preset) => preset.id).join(',') === recentPresetIds.join(',') && recentComparisonActivity.input.defaultPreset === 'attendance' && recentComparisonActivity.input.representation === 'array' && recentComparisonActivity.input.representations.map((item) => item.id).join(',') === 'array,linked');
+const recentRuns = new Map();
+recentPresetIds.forEach((preset) => {
+  const openedId = `doc:${preset}`;
+  const expectedOrder = [openedId, ...recentInitialIds.filter((id) => id !== openedId)];
+  ['array','linked'].forEach((representation) => {
+    const inputs = { preset, representation };
+    const run = recentComparisonActivity.run(inputs);
+    const again = recentComparisonActivity.run(inputs);
+    const source = recentComparisonActivity.sourceFor(inputs);
+    const final = run.events.at(-1);
+    recentRuns.set(`${preset}:${representation}`, run);
+    ok(`Recent Documents ${preset}/${representation} is deterministic and terminal`, JSON.stringify(run) === JSON.stringify(again) && run.events[0].type === 'initialize' && final.terminal && final.type === 'return');
+    ok(`Recent Documents ${preset}/${representation} source stays synchronized`, run.events.length === source.length && run.events.every((event) => event.source?.line >= 1 && event.source.line <= source.length && event.source.code === source[event.source.line - 1]));
+    ok(`Recent Documents ${preset}/${representation} preserves opened identity in every frame`, run.events.every((event) => event.frame.openedId === openedId && event.frame.requiredOrder.join(',') === expectedOrder.join(',') && event.frame.records.map((record) => record.id).join(',') === recentInitialIds.join(',') && new Set(event.frame.records.map((record) => record.id)).size === 5));
+    ok(`Recent Documents ${preset}/${representation} reaches the exact final order`, run.result.openedId === openedId && run.result.finalOrder.join(',') === expectedOrder.join(','));
+    if (representation === 'linked') {
+      const finalState = final.frame.linkedState;
+      const finalNodes = new Map(finalState.nodes.map((node) => [node.id, node]));
+      ok(`Recent Documents ${preset}/linked remains reciprocal and cycle-free`, run.events.every((event) => recentStageIsValid(event.frame)) && finalState.reachableIds.join(',') === expectedOrder.join(',') && finalState.detachedIds.length === 0);
+      ok(`Recent Documents ${preset}/linked has correct head and tail`, finalState.headId === expectedOrder[0] && finalState.tailId === expectedOrder.at(-1) && finalNodes.get(finalState.headId).prev === null && finalNodes.get(finalState.tailId).next === null);
+    }
+  });
+  ok(`Recent Documents ${preset} array and linked modes agree`, recentRuns.get(`${preset}:array`).result.finalOrder.join(',') === recentRuns.get(`${preset}:linked`).result.finalOrder.join(','));
+});
+const recentArrayAttendance = recentRuns.get('attendance:array');
+const recentLinkedAttendance = recentRuns.get('attendance:linked');
+ok('Recent Documents Attendance retains six shown shifts and six pointer writes', recentArrayAttendance.result.arrayShifts === 6 && recentArrayAttendance.result.arrayPlacements === 1 && recentLinkedAttendance.result.pointerWrites === 6);
+ok('Recent Documents Grades uses deliberate zero-work paths', ['array','linked'].every((representation) => { const run = recentRuns.get(`grades:${representation}`); return run.events.some((event) => event.type === 'no-op' && /already.*most recent|already first/i.test(`${event.frame.markers.teaching.title} ${event.message}`)) && run.result.arrayShifts === 0 && run.result.arrayPlacements === 0 && run.result.pointerWrites === 0; }));
+const recentLinkedNotes = recentRuns.get('notes:linked');
+ok('Recent Documents Notes uses the tail-safe rewrite path', recentLinkedNotes.result.pointerWrites === 6 && recentLinkedNotes.result.tailId === 'doc:module3' && recentLinkedNotes.events.some((event) => event.frame.linkedState.lastWrite?.field === 'tail') && recentLinkedNotes.events.every((event) => !/current\.next\.prev/.test(event.source.code)));
+ok('Recent Documents caveat follows the selected filename and remains honest', recentPresetIds.every((preset) => recentRuns.get(`${preset}:linked`).events.every((event) => new RegExp(`finding ${event.frame.records.find((record) => record.id === `doc:${preset}`).label.replace('.', '\\.') } from head.*O\\(n\\)`, 'i').test(event.frame.explanation.caveat))) && !/complete operation.*O\(1\)/i.test(recentComparisonActivity.blurb));
+ok('Recent Documents runs own scenario, selected representation, and comparison segments only', [...recentRuns.values()].every((run) => { const representationSegment = run.result.representation === 'array' ? 'array-list' : 'linked-list'; return [...new Set(run.events.map((event) => event.segment.id))].join(',') === `scenario,${representationSegment},comparison`; }));
 ok('existing singly linked activities retain linked-list frames and renderer behavior', ['linked-list-traversal','linked-list-insert-head','linked-list-sorted-insert','linked-list-find-update','linked-list-delete'].every((id) => Activities.get(id).renderer === 'linked-list' && Activities.get(id).run().events.every((event) => event.frame.kind === 'linked-list')));
 const semanticLineAudit = {
   'bubble-sort': { lines: [1, 2, 3, 4, 5, 6, 7, 10, 11, 14], cases: [{ values: [3, 1, 2] }] },

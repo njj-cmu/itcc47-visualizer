@@ -650,7 +650,14 @@ const CollapsibleEvidencePanel = memo(function CollapsibleEvidencePanel({ conten
   </aside>;
 });
 
-function ArrayDataControls({ activity, inputs, setInputs, onShuffle }) {
+function CuratedSegmentedControl({ label, options, value, onChange, className = '' }) {
+  return <fieldset className={`curated-segmented ${className}`}>
+    <legend>{label}</legend>
+    <div>{options.map((option) => <button type="button" aria-pressed={value === option.id} className={value === option.id ? 'is-selected' : ''} onClick={() => onChange(option.id)} key={option.id}>{option.label}</button>)}</div>
+  </fieldset>;
+}
+
+function ArrayDataControls({ activity, inputs, setInputs, onShuffle, controller }) {
   const [draft, setDraft] = useState(inputs.values.join(', '));
   const [error, setError] = useState('');
   const [controlsOpen, setControlsOpen] = useState(() => window.innerWidth > 1000 && window.innerHeight >= 800);
@@ -664,7 +671,7 @@ function ArrayDataControls({ activity, inputs, setInputs, onShuffle }) {
   }
   if (activity.input.editable === false) {
     const curatedDescription = activity.renderer === 'sequence-comparison'
-      ? 'The Recent Documents timeline stays fixed so every indexed shift, reference rewrite, and source line remains synchronized.'
+      ? 'Each what-if starts from the same five documents so the selected representation, playback, and source lines stay synchronized.'
       : activity.renderer === 'linear-adt'
       ? 'The operations stay fixed so top, front, back, and held values remain synchronized with each source line.'
       : activity.renderer === 'linked-list'
@@ -672,7 +679,20 @@ function ArrayDataControls({ activity, inputs, setInputs, onShuffle }) {
         : activity.renderer === 'array'
           ? 'Each preset keeps comparisons, boundaries, held records, and mutations synchronized with each source line.'
           : 'The example stays fixed so every teaching annotation remains synchronized with its source line.';
-    return <div className="data-controls curated-note"><strong>{activity.renderer === 'linear-adt' ? `${activity.exampleKind} scenario` : 'Curated pseudocode activity'}</strong><span>{curatedDescription}</span>{activity.input.presets?.length ? <label>Case preset<select aria-label="Case preset" value={inputs.preset || activity.input.presets[0].id} onChange={(event) => setInputs((current) => ({ ...current, preset: event.target.value }))}>{activity.input.presets.map((preset) => <option value={preset.id} key={preset.id}>{preset.label}</option>)}</select></label> : null}</div>;
+    const changeCuratedInput = (key, value) => {
+      controller?.pause();
+      setInputs((current) => ({ ...current, [key]: value }));
+    };
+    const presetValue = inputs.preset || activity.input.defaultPreset || activity.input.presets?.[0]?.id;
+    const representationValue = inputs.representation || activity.input.representation || activity.input.representations?.[0]?.id;
+    return <div className={`data-controls curated-note ${activity.input.presetDisplay === 'segmented' ? 'has-segmented-inputs' : ''}`}>
+      <div className="curated-note-copy"><strong>{activity.renderer === 'linear-adt' ? `${activity.exampleKind} scenario` : 'Curated pseudocode activity'}</strong><span>{curatedDescription}</span></div>
+      {activity.input.presets?.length ? activity.input.presetDisplay === 'segmented'
+        ? <CuratedSegmentedControl label={activity.input.presetLabel || 'Case preset'} options={activity.input.presets} value={presetValue} onChange={(value) => changeCuratedInput('preset', value)} className="curated-preset-options"/>
+        : <label>Case preset<select aria-label="Case preset" value={presetValue} onChange={(event) => changeCuratedInput('preset', event.target.value)}>{activity.input.presets.map((preset) => <option value={preset.id} key={preset.id}>{preset.label}</option>)}</select></label>
+      : null}
+      {activity.input.representations?.length ? <CuratedSegmentedControl label="Representation" options={activity.input.representations} value={representationValue} onChange={(value) => changeCuratedInput('representation', value)} className="curated-representation-options"/> : null}
+    </div>;
   }
   return <details className="data-controls" open={controlsOpen} onToggle={(event) => setControlsOpen(event.currentTarget.open)}>
     <summary>Data and inputs</summary>
@@ -910,7 +930,8 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
       values: [...(nextActivity.input.defaultValues || [])],
       target: nextActivity.input.needsTarget ? nextActivity.input.defaultValues[Math.floor(nextActivity.input.defaultValues.length / 2)] : null,
       index: nextActivity.input.index ?? null, value: nextActivity.input.value ?? null,
-      preset: nextActivity.input.presets?.[0]?.id || null,
+      preset: nextActivity.input.defaultPreset || nextActivity.input.presets?.[0]?.id || null,
+      representation: nextActivity.input.representation || nextActivity.input.representations?.[0]?.id || null,
     };
   }, []);
   const [inputs, setInputs] = useState(() => initialInputs(activity));
@@ -1023,7 +1044,7 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   return <LazyMotion features={domMax} strict><MotionConfig reducedMotion={motionPreference.mode === 'on' ? 'never' : 'always'} transition={{ duration }}><div className={`visualizer-workspace course-${courseId} evidence-${workspaceLayout.evidence} motion-${motionPreference.mode} navigation-${playback.navigationSource} composition-${workspaceComposition}`} data-motion-duration={isComputerNetworking ? networkDuration : duration} data-workspace-composition={workspaceComposition}>
     <main className="workspace-main">
       <div className="activity-heading"><div>{!isComputerArchitecture ? <p><a href={isITCC45 || isComputerNetworking ? backHref : ITCC47CurriculumUI.href(backHref)}><Icon name="back" size={14}/>{backLabel}</a><span>{isITCC45 ? `Topic ${activity.module} / ${activity.topic} / Example ${exampleIndex + 1} of ${topicActivities.length}` : `Module ${activity.module} / ${activity.topic}${activity.exampleKind ? ` / ${activity.exampleKind}` : ''}`}</span></p> : null}<h1>{activity.title}</h1>{isITCC45 ? <span className="activity-learning-goal"><em>{activity.context}</em>{activity.learningGoal}</span> : <span>{activity.subtitle}</span>}</div><div className="activity-action-stack">{isITCC45 ? <nav className="activity-example-nav" aria-label="Examples in this topic">{previousExample ? <a href={exampleHref(previousExample)} aria-label={`Previous example: ${previousExample.title}`}><Icon name="back" size={14}/>Previous</a> : <span aria-disabled="true"><Icon name="back" size={14}/>Previous</span>}{nextExample ? <a href={exampleHref(nextExample)} aria-label={`Next example: ${nextExample.title}`}>Next<Icon name="next" size={14}/></a> : <span aria-disabled="true">Next<Icon name="next" size={14}/></span>}</nav> : null}<div className="activity-actions">{isITCC45 ? <OOPDataControls activity={activity} inputs={inputs} setInputs={setInputs}/> : isComputerArchitecture || isComputerNetworking ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : <a className="edit-code" href={itcc47ActionHref}><Icon name={activity.traceHandoff === false || activity.renderer === 'linear-adt' ? 'grid' : 'code'} size={17}/>{itcc47ActionLabel}</a>}</div></div></div>
-      {!isITCC45 && !isComputerArchitecture && !isComputerNetworking ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} onShuffle={shuffle} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : null}
+      {!isITCC45 && !isComputerArchitecture && !isComputerNetworking ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} onShuffle={shuffle} controller={controller} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : null}
       <div className="mobile-surface-tabs" role="tablist" aria-label="Workspace view">{mobileTabs.map(([id, icon, label]) => <button type="button" role="tab" aria-selected={mobileTab === id} className={mobileTab === id ? 'active' : ''} onClick={() => setMobileTab(id)} key={id}><Icon name={icon}/>{label}</button>)}</div>
       {isITCC45 ? <ITCC45LabStage activity={activity} event={event} previousEvent={previousEvent} index={playback.index} source={source} mobileTab={mobileTab} layout={workspaceLayout} onRatioChange={(sourceRatio) => updateWorkspaceLayout({ sourceRatio })} duration={objectVisualDuration} motionMode={motionPreference.mode}/> : isComputerArchitecture ? <div className="cpu-workbench">
         {isCpuDecode ? <div className={`cpu-auxiliary-surface mobile-surface ${mobileTab === 'fields' ? 'mobile-active' : ''}`}><DecodeFieldsPane frame={cpuFrame} numberFormat={viewOptions.numberFormat}/></div> : <div className={`cpu-memory-surface mobile-surface ${mobileTab === 'memory' ? 'mobile-active' : ''}`}><MainMemoryPane frame={cpuFrame} numberFormat={viewOptions.numberFormat}/></div>}

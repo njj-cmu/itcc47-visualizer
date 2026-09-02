@@ -2289,12 +2289,16 @@ test('OS reduced motion becomes the default when no override is saved', async ({
   await context.close();
 });
 
-test('Recent Documents comparison exposes every indexed shift, linked rewrite, and lookup caveat', async ({ page }) => {
+test('Recent Documents what-if controls keep one selected representation synchronized with playback', async ({ page }) => {
   await page.goto('/visualizer.html?activity=array-linked-comparison&preview=1');
   await expect(page.getByRole('heading', { name: 'Recent Documents: positions versus relationships' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Review mental model' })).toHaveAttribute('href', /lesson\.html\?checkpoint=m3-linked-foundations/);
+  await expect(page.getByRole('group', { name: 'What if I open this instead?' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Representation' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Attendance.xlsx', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Indexed Dynamic List', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.sequence-array-panel [data-record-id]')).toHaveCount(5);
-  await expect(page.locator('.sequence-linked-panel [data-linked-node-id]')).toHaveCount(5);
+  await expect(page.locator('.sequence-linked-panel')).toHaveCount(0);
   await expect(page.locator('.sequence-array-panel [data-record-id="doc:attendance"]')).toHaveClass(/is-opened/);
   await expect(page.locator('.sequence-scenario')).toContainText('Opened: Attendance.xlsx');
   for (const filename of ['Grades.xlsx', 'Syllabus.docx', 'Attendance.xlsx', 'Module3.pptx', 'Notes.txt']) {
@@ -2302,29 +2306,56 @@ test('Recent Documents comparison exposes every indexed shift, linked rewrite, a
   }
 
   await (await visualizerMotion(page)).selectOption('off');
-  for (let step = 0; step < 7; step += 1) await page.getByRole('button', { name: 'Step', exact: true }).click();
-  await expect(page.locator('.sequence-array-panel > footer code')).toContainText('Module3.pptx: [3] → [2]');
-  await expect(page.locator('.source-line.is-current')).toContainText('recent[2] <- recent[3]');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  const notesChoice = page.getByRole('button', { name: 'Notes.txt', exact: true });
+  await notesChoice.focus();
+  await notesChoice.press('Space');
+  await expect(notesChoice).toBeFocused();
+  await expect(notesChoice).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
+  await expect(await visualizerTimeline(page)).toHaveValue('0');
+  await expect(page.locator('.sequence-scenario')).toContainText('Opened: Notes.txt');
 
-  const timeline = await visualizerTimeline(page);
-  await timeline.fill('16');
-  await expect(page.locator('.sequence-linked-panel > footer code')).toContainText('Syllabus.next ← Module3');
-  await expect(page.locator('.source-line.is-current')).toContainText('current.prev.next <- current.next');
-  await timeline.fill('17');
-  await expect(page.locator('[data-linked-node-id="doc:attendance"]')).toHaveClass(/is-detached/);
-  await expect(page.locator('.sequence-detached-break')).toContainText('not reachable from head');
+  let timeline = await visualizerTimeline(page);
+  await timeline.fill(await timeline.getAttribute('max'));
+  await expect(page.locator('.sequence-array-track')).toHaveAttribute('data-array-order', 'Notes.txt, Grades.xlsx, Syllabus.docx, Attendance.xlsx, Module3.pptx');
+  await expect(page.locator('.sequence-array-panel > header')).toContainText(/4\s*shifts/);
+  await expect(page.locator('.sequence-array-panel > header')).toContainText(/1\s*placement/);
 
-  await timeline.fill('23');
-  await expect(page.locator('.sequence-array-track')).toHaveAttribute('data-array-order', 'Attendance.xlsx, Grades.xlsx, Syllabus.docx, Module3.pptx, Notes.txt');
-  const linkedOrder = await page.locator('.sequence-linked-track [data-linked-node-id]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-linked-node-id')));
-  expect(linkedOrder).toEqual(['doc:attendance', 'doc:grades', 'doc:syllabus', 'doc:module3', 'doc:notes']);
+  const linkedChoice = page.getByRole('button', { name: 'Doubly Linked List', exact: true });
+  await linkedChoice.click();
+  await expect(linkedChoice).toHaveAttribute('aria-pressed', 'true');
+  await expect(notesChoice).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.sequence-array-panel')).toHaveCount(0);
+  await expect(page.locator('.sequence-linked-panel [data-linked-node-id]')).toHaveCount(5);
+  await expect(page.locator('.sequence-scenario')).toContainText('Opened: Notes.txt');
+  await expect(await visualizerTimeline(page)).toHaveValue('0');
+  timeline = await visualizerTimeline(page);
+  await timeline.fill(await timeline.getAttribute('max'));
+  await expect(page.locator('.sequence-linked-track')).toHaveAttribute('data-linked-order', 'Notes.txt, Grades.xlsx, Syllabus.docx, Attendance.xlsx, Module3.pptx');
+  await expect(page.locator('.sequence-linked-track')).toHaveAttribute('data-head-id', 'doc:notes');
+  await expect(page.locator('.sequence-linked-track')).toHaveAttribute('data-tail-id', 'doc:module3');
   await expect(page.locator('.sequence-linked-node').first()).toContainText('HEAD');
-  await expect(page.locator('.sequence-caveat')).toContainText('finding Attendance.xlsx from head still requires O(n) traversal');
+  await expect(page.locator('.sequence-linked-node').last()).toContainText('TAIL');
+  await expect(page.locator('.sequence-linked-panel > header')).toContainText(/6\s*pointer writes/);
+  await expect(page.locator('.sequence-caveat')).toContainText('finding Notes.txt from head still requires O(n) traversal');
   await expect(page.locator('.sequence-takeaway')).toContainText('POSITION');
   await expect(page.locator('.sequence-takeaway')).toContainText('RELATIONSHIPS');
-  await expect(page.locator('.sequence-array-panel > header')).toContainText(/6\s*shifts/);
-  await expect(page.locator('.sequence-linked-panel > header')).toContainText(/6\s*pointer writes/);
   await expect(page.locator('.source-line.is-current')).toContainText('RETURN recent order');
+
+  const gradesChoice = page.getByRole('button', { name: 'Grades.xlsx', exact: true });
+  await gradesChoice.click();
+  timeline = await visualizerTimeline(page);
+  await timeline.fill('5');
+  await expect(page.locator('.integrated-step span')).toContainText('No detach, neighbor rewrite, or head update is necessary');
+  await expect(page.locator('.sequence-linked-panel > header')).toContainText(/0\s*pointer writes/);
+  await page.getByRole('button', { name: 'Indexed Dynamic List', exact: true }).click();
+  timeline = await visualizerTimeline(page);
+  await timeline.fill('6');
+  await expect(page.locator('.integrated-step span')).toContainText('No reordering is necessary');
+  await expect(page.locator('.sequence-array-panel > header')).toContainText(/0\s*shifts/);
+  await expect(page.locator('.sequence-array-panel > header')).toContainText(/0\s*placements/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
 });
 
@@ -2434,29 +2465,33 @@ test('linked foundations keep the active pointer and comparison readable on a ph
 
   await page.goto('/visualizer.html?activity=array-linked-comparison');
   await expect(page.locator('.sequence-array-panel')).toBeVisible();
-  await expect(page.locator('.sequence-linked-panel')).toBeVisible();
-  const comparisonGeometry = await page.evaluate(() => {
+  await expect(page.locator('.sequence-linked-panel')).toHaveCount(0);
+  const arrayGeometry = await page.evaluate(() => {
     const canvas = document.querySelector('.visual-canvas').getBoundingClientRect();
-    const sequence = document.querySelector('.sequence-comparison');
     const array = document.querySelector('.sequence-array-panel').getBoundingClientRect();
-    const linked = document.querySelector('.sequence-linked-panel').getBoundingClientRect();
+    const scroll = document.querySelector('.sequence-array-scroll');
     return {
       height: canvas.height,
       arrayFitsWidth: array.left >= canvas.left && array.right <= canvas.right,
-      linkedFitsWidth: linked.left >= canvas.left && linked.right <= canvas.right,
-      panelsDoNotOverlap: array.bottom <= linked.top,
-      canvasScrollsInternally: sequence.scrollHeight > sequence.clientHeight,
+      structureScrollsHorizontally: scroll.scrollWidth > scroll.clientWidth,
       overflow: document.documentElement.scrollWidth - innerWidth,
     };
   });
-  expect(comparisonGeometry.height).toBe(610);
-  expect(comparisonGeometry.arrayFitsWidth).toBe(true);
-  expect(comparisonGeometry.linkedFitsWidth).toBe(true);
-  expect(comparisonGeometry.panelsDoNotOverlap).toBe(true);
-  expect(comparisonGeometry.canvasScrollsInternally).toBe(true);
-  expect(comparisonGeometry.overflow).toBe(0);
+  expect(arrayGeometry.height).toBe(560);
+  expect(arrayGeometry.arrayFitsWidth).toBe(true);
+  expect(arrayGeometry.structureScrollsHorizontally).toBe(true);
+  expect(arrayGeometry.overflow).toBe(0);
+  await page.getByRole('button', { name: 'Doubly Linked List', exact: true }).click();
+  await expect(page.locator('.sequence-array-panel')).toHaveCount(0);
+  await expect(page.locator('.sequence-linked-panel')).toBeVisible();
+  const linkedGeometry = await page.evaluate(() => {
+    const canvas = document.querySelector('.visual-canvas').getBoundingClientRect();
+    const linked = document.querySelector('.sequence-linked-panel').getBoundingClientRect();
+    return { linkedFitsWidth: linked.left >= canvas.left && linked.right <= canvas.right, overflow: document.documentElement.scrollWidth - innerWidth };
+  });
+  expect(linkedGeometry).toEqual({ linkedFitsWidth: true, overflow: 0 });
   await page.getByRole('button', { name: 'Step', exact: true }).click();
-  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 24');
+  await expect(page.locator('.integrated-step strong')).toHaveText(/2 \/ \d+/);
 });
 
 test('curated linked-list pseudocode opens in the lab and retains trace, output, and diagnostics', async ({ page }, testInfo) => {
@@ -2732,7 +2767,8 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
   await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}?activity=array-linked-comparison&preview=1`);
   await expect(page.getByRole('heading', { name: 'Recent Documents: positions versus relationships' })).toBeVisible();
   await (await visualizerMotion(page)).selectOption('off');
-  await (await visualizerTimeline(page)).fill('23');
+  const recentTimeline = await visualizerTimeline(page);
+  await recentTimeline.fill(await recentTimeline.getAttribute('max'));
   await expect(page.locator('.sequence-array-track')).toHaveAttribute('data-array-order', 'Attendance.xlsx, Grades.xlsx, Syllabus.docx, Module3.pptx, Notes.txt');
 
   await page.goto(`file:///${path.resolve(__dirname, '..', 'lesson.html').replace(/\\/g, '/')}?checkpoint=m3-linked-foundations&preview=1`);

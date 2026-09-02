@@ -21,6 +21,27 @@ for (const entry of ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.
   });
 }
 
+test('Recent Documents segmented what-if controls are keyboard operable and Axe-clean', async ({ page }) => {
+  await page.goto('/visualizer.html?activity=array-linked-comparison&preview=1');
+  await expect(page.getByRole('group', { name: 'What if I open this instead?' })).toBeVisible();
+  await expect(page.getByRole('group', { name: 'Representation' })).toBeVisible();
+  const notes = page.getByRole('button', { name: 'Notes.txt', exact: true });
+  await notes.focus();
+  await notes.press('Space');
+  await expect(notes).toBeFocused();
+  await expect(notes).toHaveAttribute('aria-pressed', 'true');
+  const linked = page.getByRole('button', { name: 'Doubly Linked List', exact: true });
+  await linked.focus();
+  await linked.press('Enter');
+  await expect(linked).toBeFocused();
+  await expect(linked).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.sequence-scenario')).toContainText('Opened: Notes.txt');
+  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+  const important = results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact));
+  const summary = important.map((violation) => ({ id: violation.id, targets: violation.nodes.map((node) => node.target.join(' ')) }));
+  expect(summary, important.map((violation) => `${violation.id}: ${violation.help}`).join('\n')).toEqual([]);
+});
+
 test('ITCC45 scenario and expanded-model dialogs have no serious or critical Axe violations', async ({ page }) => {
   await page.goto('/visualizer.html?course=itcc45&activity=itcc45-classes-blueprint');
   for (const buttonName of ['Edit scenario', 'Expand model']) {

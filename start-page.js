@@ -6,7 +6,7 @@
   const currentCard = document.getElementById('current-checkpoint');
   if (checkpoint && practiceLink && currentCard) {
     practiceLink.href = `problem-list.html?module=${encodeURIComponent(checkpoint.moduleId.replace(/^m/, ''))}`;
-    currentCard.innerHTML = `<span>Current module</span><strong>${ITCC47CurriculumUI.esc(checkpoint.title)}</strong><small>${ITCC47CurriculumUI.esc(checkpoint.summary)}</small>`;
+    currentCard.innerHTML = `<span>Midterm scope ends here</span><strong>${ITCC47CurriculumUI.esc(checkpoint.title)}</strong><small>${ITCC47CurriculumUI.esc(checkpoint.summary)}</small>`;
   }
   const link = document.getElementById('explore-tools');
   const section = document.getElementById('tools');

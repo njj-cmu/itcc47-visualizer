@@ -37,19 +37,19 @@
       "id": "m1-pseudocode", "moduleId": "m1", "order": 20, "reviewStatus": "reviewed", "title": "Pseudocode and control flow",
       "summary": "Express decisions and repetition in a consistent, executable pseudocode language.",
       "goals": ["Use READ, WRITE, assignment, IF, CASE, FOR, and WHILE", "Keep branches complete", "Translate a plain-language algorithm"],
-      "prerequisiteIds": ["m1-ipo"], "sequence": ["tool:writer", "tool:tracer", "problem:library-fine"]
+      "prerequisiteIds": ["m1-ipo"], "sequence": ["tool:writer", "tool:tracer", "problem:library-fine", "problem:CH01-PS01"]
     },
     {
       "id": "m1-tracing", "moduleId": "m1", "order": 30, "reviewStatus": "reviewed", "title": "Manual tracing",
       "summary": "Follow state changes line by line before trusting the final program.",
       "goals": ["Build a trace table", "Locate the first incorrect state", "Explain why a loop stops"],
-      "prerequisiteIds": ["m1-pseudocode"], "sequence": ["tool:tracer", "problem:parking-fee"]
+      "prerequisiteIds": ["m1-pseudocode"], "sequence": ["tool:tracer", "problem:parking-fee", "problem:CH01-PS02", "problem:CH01-PS03"]
     },
     {
       "id": "m1-exact-io", "moduleId": "m1", "order": 40, "reviewStatus": "reviewed", "title": "Exact input and output",
       "summary": "Treat capitalization, spacing, ordering, and omitted prompts as part of correctness.",
       "goals": ["Match an output contract character for character", "Separate debug traces from final output", "Test boundary inputs"],
-      "prerequisiteIds": ["m1-tracing"], "sequence": ["problem:package-class"]
+      "prerequisiteIds": ["m1-tracing"], "sequence": ["problem:package-class", "problem:CH01-PS04"]
     },
     {
       "id": "m1-complexity", "moduleId": "m1", "order": 50, "reviewStatus": "reviewed", "title": "Complexity basics",
@@ -61,7 +61,7 @@
       "id": "m2-arrays", "moduleId": "m2", "order": 60, "reviewStatus": "reviewed", "title": "Arrays, lists, and traversal",
       "summary": "Store related values together and process them by position or by traversal.",
       "goals": ["Use a collection for related values", "Traverse every element", "Aggregate, filter, and detect duplicates"],
-      "prerequisiteIds": ["m1-complexity"], "sequence": ["problem:array-total", "problem:largest-value", "problem:has-duplicate"]
+      "prerequisiteIds": ["m1-complexity"], "sequence": ["problem:array-total", "problem:largest-value", "problem:has-duplicate", "problem:above-average"]
     },
     {
       "id": "m2-linear-search", "moduleId": "m2", "order": 70, "reviewStatus": "reviewed", "title": "Linear search",
@@ -79,25 +79,25 @@
       "id": "m2-bubble-sort", "moduleId": "m2", "order": 90, "reviewStatus": "reviewed", "title": "Bubble Sort",
       "summary": "Compare adjacent values, swap when needed, and shrink the unsorted boundary.",
       "goals": ["Identify values[j] and values[j + 1]", "Track swapped", "Explain early stopping"],
-      "prerequisiteIds": ["m2-arrays"], "sequence": ["activity:bubble-sort"]
+      "prerequisiteIds": ["m2-arrays"], "sequence": ["activity:bubble-sort", "problem:bubble-pass"]
     },
     {
       "id": "m2-selection-sort", "moduleId": "m2", "order": 100, "reviewStatus": "reviewed", "title": "Selection Sort",
       "summary": "Search the unsorted region for one minimum, then place it after the search completes.",
       "goals": ["Track minIndex and values[j]", "Separate candidate search from placement", "Explain the fixed comparison count"],
-      "prerequisiteIds": ["m2-bubble-sort"], "sequence": ["activity:selection-sort"]
+      "prerequisiteIds": ["m2-bubble-sort"], "sequence": ["activity:selection-sort", "problem:selection-minimum"]
     },
     {
       "id": "m2-insertion-sort", "moduleId": "m2", "order": 110, "reviewStatus": "reviewed", "title": "Insertion Sort and stability",
       "summary": "Hold a key outside the array, shift larger records, and insert into a growing sorted prefix.",
       "goals": ["Distinguish key, j, hole, and shifting value", "Preserve equal-key arrival order", "Explain best and worst cases"],
-      "prerequisiteIds": ["m2-selection-sort"], "sequence": ["activity:insertion-sort", "activity:stable-insertion-dispatch"]
+      "prerequisiteIds": ["m2-selection-sort"], "sequence": ["activity:insertion-sort", "activity:stable-insertion-dispatch", "problem:stable-ticket-insertion"]
     },
     {
       "id": "m2-array-mutation", "moduleId": "m2", "order": 120, "reviewStatus": "reviewed", "title": "Indexed array-list mutation",
       "summary": "Create or close a hole while preserving contiguous logical storage.",
       "goals": ["Trace shift source and destination", "Keep the held value separate", "Relate index to O(n) movement"],
-      "prerequisiteIds": ["m2-insertion-sort"], "sequence": ["activity:array-list-insert", "activity:array-list-remove"]
+      "prerequisiteIds": ["m2-insertion-sort"], "sequence": ["activity:array-list-insert", "activity:array-list-remove", "problem:indexed-array-mutation"]
     },
     {
       "id": "m2-industry-workbench", "moduleId": "m2", "order": 125, "reviewStatus": "reviewed", "title": "Industry data integration",
@@ -115,19 +115,19 @@
       "id": "m3-linked-mutation", "moduleId": "m3", "order": 140, "reviewStatus": "reviewed", "title": "Linked-list mutation",
       "summary": "Allocate, reconnect, update, detach, and delete nodes without losing the reachable chain.",
       "goals": ["Perform pointer writes in a safe order", "Maintain sorted insertion", "Explain deletion invariants"],
-      "prerequisiteIds": ["m3-linked-foundations"], "sequence": ["activity:linked-list-insert-head", "activity:linked-list-sorted-insert", "activity:linked-list-find-update", "activity:linked-list-delete"]
+      "prerequisiteIds": ["m3-linked-foundations"], "sequence": ["activity:linked-list-insert-head", "activity:linked-list-sorted-insert", "activity:linked-list-find-update", "activity:linked-list-delete", "problem:linked-insert-head-problem", "problem:linked-delete-first", "problem:linked-relocate-sorted", "problem:linked-invariant-audit"]
     },
     {
       "id": "m4-stack", "moduleId": "m4", "order": 150, "reviewStatus": "reviewed", "title": "Stacks: LIFO operations and applications",
       "summary": "Use one last-in-first-out end for direct operations, expression evaluation, nested parsing, and reversible history.",
       "goals": ["Trace push, peek, and pop", "Evaluate postfix expressions with correct operand order", "Connect LIFO state to parsing and undo/redo"],
-      "prerequisiteIds": ["m3-linked-mutation"], "sequence": ["activity:stack-lifo-basics", "activity:stack-postfix-evaluator", "activity:stack-delimiter-audit", "activity:stack-editor-undo"]
+      "prerequisiteIds": ["m3-linked-mutation"], "sequence": ["activity:stack-lifo-basics", "activity:stack-postfix-evaluator", "activity:stack-delimiter-audit", "activity:stack-editor-undo", "problem:stack-reverse", "problem:postfix-operand-order", "problem:balanced-delimiters"]
     },
     {
       "id": "m4-queue-deque", "moduleId": "m4", "order": 160, "reviewStatus": "reviewed", "title": "Queues and deques: fair and two-ended access",
       "summary": "Preserve FIFO service with queues, then deliberately use both deque ends for candidate windows and priority rules.",
       "goals": ["Trace enqueue, front, and dequeue", "Re-enqueue unfinished scheduled work", "Distinguish deque front/back operations from arbitrary middle access", "Explain O(1) end-operation costs"],
-      "prerequisiteIds": ["m4-stack"], "sequence": ["activity:queue-fifo-basics", "activity:queue-round-robin", "activity:queue-printer-jobs", "activity:deque-end-operations", "activity:deque-sliding-window", "activity:deque-service-lane"]
+      "prerequisiteIds": ["m4-stack"], "sequence": ["activity:queue-fifo-basics", "activity:queue-round-robin", "activity:queue-printer-jobs", "activity:deque-end-operations", "activity:deque-sliding-window", "activity:deque-service-lane", "problem:queue-service", "problem:round-robin-reenqueue", "problem:deque-priority"]
     },
     {
       "id": "m5-recursion", "moduleId": "m5", "order": 170, "reviewStatus": "draft", "title": "Recursion and recursive search",

@@ -9,6 +9,10 @@
     .filter((item) => ITCC47Curriculum.getCheckpoint(item.checkpointId)?.moduleId === moduleId);
   const resourceCountLabel = (kind, count) => `${count} ${count === 1 ? kind : kind === 'activity' ? 'activities' : `${kind}s`}`;
   const problemById = new Map(PROBLEMS.map((problem) => [problem.id, problem]));
+  const toolDetails = new Map([
+    ['writer', { title: 'Algorithm Writer', description: 'Turn a plain-language plan into clear nested steps.' }],
+    ['tracer', { title: 'Pseudocode Tracer', description: 'Run pseudocode line by line and inspect changing state.' }],
+  ]);
 
   function readPracticeRecords() {
     const progress = new Map();
@@ -85,6 +89,80 @@
   const visualizationGrid = document.getElementById('visualization-grid');
   const workbenchGrid = document.getElementById('workbench-grid');
   const allActivities = typeof ITCC47Activities === 'undefined' ? [] : ITCC47Activities.list();
+  const activityById = new Map(allActivities.map((activity) => [activity.id, activity]));
+  const midtermCheckpoints = ITCC47Curriculum.checkpoints.filter((checkpoint) => ['m1', 'm2', 'm3', 'm4'].includes(checkpoint.moduleId));
+  const midtermCheckpointIds = new Set(midtermCheckpoints.map((checkpoint) => checkpoint.id));
+  const midtermResources = ITCC47Curriculum.listResources().filter((resource) => midtermCheckpointIds.has(resource.checkpointId));
+  const midtermReviewGrid = document.getElementById('midterm-review-grid');
+  const midtermReviewSummary = document.getElementById('midterm-review-summary');
+
+  function midtermResourceDetails(resource, moduleNumber) {
+    if (resource.kind === 'tool') {
+      const details = toolDetails.get(resource.id) || { title: resource.id, description: 'Open this local learning tool.' };
+      return { ...details, href: resource.route || `${resource.id}.html` };
+    }
+    if (resource.kind === 'problem') {
+      const problem = problemById.get(resource.id);
+      return {
+        title: problem?.title || resource.title || resource.id,
+        description: problem ? `${problem.difficulty} · ${problem.visibleTests.length} visible examples` : 'Checked practice',
+        href: `practice.html?module=${moduleNumber}&problem=${encodeURIComponent(resource.id)}`,
+      };
+    }
+    const activity = activityById.get(resource.id);
+    return {
+      title: activity?.title || resource.title || resource.id,
+      description: activity?.subtitle || 'Guided visualization',
+      href: resource.id.startsWith('industry-')
+        ? `industry-workbench.html?scenario=${encodeURIComponent(resource.id)}`
+        : `visualizer.html?activity=${encodeURIComponent(resource.id)}`,
+    };
+  }
+
+  function midtermResourceLinks(resources, moduleNumber) {
+    return resources.map((resource) => {
+      const details = midtermResourceDetails(resource, moduleNumber);
+      return `<a class="midterm-resource-link midterm-resource-${ui.esc(resource.kind)}" data-midterm-resource="${ui.esc(`${resource.kind}:${resource.id}`)}" href="${ui.href(details.href)}"><strong>${ui.esc(details.title)}</strong><span>${ui.esc(details.description)}</span></a>`;
+    }).join('');
+  }
+
+  if (midtermReviewGrid && midtermReviewSummary) {
+    const counts = {
+      tool: midtermResources.filter((resource) => resource.kind === 'tool').length,
+      activity: midtermResources.filter((resource) => resource.kind === 'activity').length,
+      problem: midtermResources.filter((resource) => resource.kind === 'problem').length,
+    };
+    midtermReviewSummary.innerHTML = `<span><strong>${midtermCheckpoints.length}</strong> reviewed checkpoints</span><span><strong>${counts.tool}</strong> local learning tools</span><span><strong>${counts.activity}</strong> guided activities</span><span><strong>${counts.problem}</strong> checked problems</span>`;
+    ITCC47Curriculum.modules.filter((module) => module.number <= 4).forEach((module) => {
+      const checkpoints = midtermCheckpoints.filter((checkpoint) => checkpoint.moduleId === module.id);
+      const resources = midtermResources.filter((resource) => checkpoints.some((checkpoint) => checkpoint.id === resource.checkpointId));
+      const resourceSummary = [
+        resources.some((resource) => resource.kind === 'tool') ? `${resources.filter((resource) => resource.kind === 'tool').length} learning tools` : '',
+        resources.some((resource) => resource.kind === 'activity') ? `${resources.filter((resource) => resource.kind === 'activity').length} guided activities` : '',
+        resources.some((resource) => resource.kind === 'problem') ? `${resources.filter((resource) => resource.kind === 'problem').length} checked problems` : '',
+      ].filter(Boolean).join(' · ');
+      const stateRows = checkpoints.map((checkpoint) => ITCC47Curriculum.stateForCheckpoint(checkpoint.id, options));
+      const moduleState = stateRows.some((row) => row.state === 'current') ? 'current' : 'available';
+      const item = document.createElement('li');
+      item.className = `midterm-module-card midterm-module-${moduleState}`;
+      item.dataset.midtermModule = String(module.number);
+      item.innerHTML = `<header class="midterm-module-head"><span class="module-number" aria-hidden="true">${module.number}</span><div><p class="module-label">Module ${module.number}</p><h3>${ui.esc(module.title)}</h3><p>${checkpoints.length} checkpoint${checkpoints.length === 1 ? '' : 's'} · ${ui.esc(resourceSummary)}</p></div>${ui.badge(moduleState)}</header>
+        <ol class="midterm-checkpoint-list">${checkpoints.map((checkpoint) => {
+          const sequenceOrder = new Map((checkpoint.sequence || []).map((reference, index) => [reference, index]));
+          const checkpointResources = midtermResources.filter((resource) => resource.checkpointId === checkpoint.id)
+            .sort((left, right) => (sequenceOrder.get(`${left.kind}:${left.id}`) ?? Number.MAX_SAFE_INTEGER) - (sequenceOrder.get(`${right.kind}:${right.id}`) ?? Number.MAX_SAFE_INTEGER));
+          const tools = checkpointResources.filter((resource) => resource.kind === 'tool');
+          const activities = checkpointResources.filter((resource) => resource.kind === 'activity');
+          const problems = checkpointResources.filter((resource) => resource.kind === 'problem');
+          return `<li class="midterm-checkpoint" data-midterm-checkpoint="${ui.esc(checkpoint.id)}"><div class="midterm-checkpoint-flow">
+            <section class="midterm-flow-stage midterm-flow-learn"><p class="midterm-flow-label"><span aria-hidden="true">1</span> Learn</p><h4>${ui.esc(checkpoint.title)}</h4><p>${ui.esc(checkpoint.summary)}</p>${tools.length ? `<div class="midterm-resource-links">${midtermResourceLinks(tools, module.number)}</div>` : ''}</section>
+            ${activities.length ? `<section class="midterm-flow-stage midterm-flow-visualize"><p class="midterm-flow-label"><span aria-hidden="true">2</span> Visualize</p><div class="midterm-resource-links">${midtermResourceLinks(activities, module.number)}</div></section>` : ''}
+            ${problems.length ? `<section class="midterm-flow-stage midterm-flow-practice"><p class="midterm-flow-label"><span aria-hidden="true">3</span> Practice</p><div class="midterm-resource-links">${midtermResourceLinks(problems, module.number)}</div></section>` : ''}
+          </div></li>`;
+        }).join('')}</ol>`;
+      midtermReviewGrid.appendChild(item);
+    });
+  }
   const activities = allActivities.filter((activity) => activity.catalogPlacement !== 'featured-workbench');
   const focusedProgress = typeof ITCC47VisualizerProgress === 'undefined' ? null : ITCC47VisualizerProgress;
   const releasedActivityIds = activities
@@ -142,6 +220,7 @@
   const tabs = [...document.querySelectorAll('[data-catalog-view]')];
   const views = {
     problems: document.getElementById('problem-catalog'),
+    midterm: document.getElementById('midterm-review'),
     visualizations: document.getElementById('visualization-catalog'),
     workbenches: document.getElementById('workbench-catalog'),
   };

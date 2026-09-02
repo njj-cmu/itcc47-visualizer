@@ -180,7 +180,8 @@ const ITCC47_CURRICULUM_DATA = {
       "sequence": [
         "tool:writer",
         "tool:tracer",
-        "problem:library-fine"
+        "problem:library-fine",
+        "problem:CH01-PS01"
       ]
     },
     {
@@ -200,7 +201,9 @@ const ITCC47_CURRICULUM_DATA = {
       ],
       "sequence": [
         "tool:tracer",
-        "problem:parking-fee"
+        "problem:parking-fee",
+        "problem:CH01-PS02",
+        "problem:CH01-PS03"
       ]
     },
     {
@@ -219,7 +222,8 @@ const ITCC47_CURRICULUM_DATA = {
         "m1-tracing"
       ],
       "sequence": [
-        "problem:package-class"
+        "problem:package-class",
+        "problem:CH01-PS04"
       ]
     },
     {
@@ -261,7 +265,8 @@ const ITCC47_CURRICULUM_DATA = {
       "sequence": [
         "problem:array-total",
         "problem:largest-value",
-        "problem:has-duplicate"
+        "problem:has-duplicate",
+        "problem:above-average"
       ]
     },
     {
@@ -321,7 +326,8 @@ const ITCC47_CURRICULUM_DATA = {
         "m2-arrays"
       ],
       "sequence": [
-        "activity:bubble-sort"
+        "activity:bubble-sort",
+        "problem:bubble-pass"
       ]
     },
     {
@@ -340,7 +346,8 @@ const ITCC47_CURRICULUM_DATA = {
         "m2-bubble-sort"
       ],
       "sequence": [
-        "activity:selection-sort"
+        "activity:selection-sort",
+        "problem:selection-minimum"
       ]
     },
     {
@@ -360,7 +367,8 @@ const ITCC47_CURRICULUM_DATA = {
       ],
       "sequence": [
         "activity:insertion-sort",
-        "activity:stable-insertion-dispatch"
+        "activity:stable-insertion-dispatch",
+        "problem:stable-ticket-insertion"
       ]
     },
     {
@@ -380,7 +388,8 @@ const ITCC47_CURRICULUM_DATA = {
       ],
       "sequence": [
         "activity:array-list-insert",
-        "activity:array-list-remove"
+        "activity:array-list-remove",
+        "problem:indexed-array-mutation"
       ]
     },
     {
@@ -446,7 +455,11 @@ const ITCC47_CURRICULUM_DATA = {
         "activity:linked-list-insert-head",
         "activity:linked-list-sorted-insert",
         "activity:linked-list-find-update",
-        "activity:linked-list-delete"
+        "activity:linked-list-delete",
+        "problem:linked-insert-head-problem",
+        "problem:linked-delete-first",
+        "problem:linked-relocate-sorted",
+        "problem:linked-invariant-audit"
       ]
     },
     {
@@ -468,7 +481,10 @@ const ITCC47_CURRICULUM_DATA = {
         "activity:stack-lifo-basics",
         "activity:stack-postfix-evaluator",
         "activity:stack-delimiter-audit",
-        "activity:stack-editor-undo"
+        "activity:stack-editor-undo",
+        "problem:stack-reverse",
+        "problem:postfix-operand-order",
+        "problem:balanced-delimiters"
       ]
     },
     {
@@ -493,7 +509,10 @@ const ITCC47_CURRICULUM_DATA = {
         "activity:queue-printer-jobs",
         "activity:deque-end-operations",
         "activity:deque-sliding-window",
-        "activity:deque-service-lane"
+        "activity:deque-service-lane",
+        "problem:queue-service",
+        "problem:round-robin-reenqueue",
+        "problem:deque-priority"
       ]
     },
     {

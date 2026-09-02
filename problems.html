@@ -23,12 +23,13 @@
 
 <main class="catalog-main">
   <header class="catalog-intro">
-    <div><p class="eyebrow">Self-paced practice roadmap</p><h1>Choose what to practise</h1>
-    <p>Choose a practice bank, focused visualization, or industry workbench sample. Opening an activity never advances the semester.</p></div>
+    <div><p class="eyebrow">Self-paced learning roadmap</p><h1>Choose how to review</h1>
+    <p>Follow the Midterm path, open a practice bank, or inspect a focused visualization. Opening an activity never advances the semester.</p></div>
   </header>
 
   <div class="catalog-tabs" role="tablist" aria-label="Module resources">
     <button id="problems-tab" type="button" role="tab" aria-controls="problem-catalog" aria-selected="true" data-catalog-view="problems" data-icon="problemsList">Practice banks</button>
+    <button id="midterm-tab" type="button" role="tab" aria-controls="midterm-review" aria-selected="false" tabindex="-1" data-catalog-view="midterm" data-icon="modules">Midterm Review</button>
     <button id="visualizations-tab" type="button" role="tab" aria-controls="visualization-catalog" aria-selected="false" tabindex="-1" data-catalog-view="visualizations" data-icon="visualize">Visualizations</button>
     <button id="workbenches-tab" type="button" role="tab" aria-controls="workbench-catalog" aria-selected="false" tabindex="-1" data-catalog-view="workbenches" data-icon="database">Workbench Samples</button>
   </div>
@@ -39,6 +40,15 @@
       <span class="practice-note-icon" aria-hidden="true">i</span>
       <p>This is a self-paced practice area. Your drafts and completion indicators stay in this browser.</p>
     </aside>
+  </section>
+
+  <section id="midterm-review" class="catalog-view" role="tabpanel" aria-labelledby="midterm-tab" hidden>
+    <header class="midterm-review-intro">
+      <div><p class="eyebrow">Reviewed Modules 1–4</p><h2>Move from understanding to visible evidence to checked practice</h2>
+      <p>Use each checkpoint as a compact review path. Everything listed here is part of the public Midterm release and stays local to this browser.</p></div>
+      <div id="midterm-review-summary" class="midterm-review-summary" aria-label="Midterm release inventory"></div>
+    </header>
+    <ol id="midterm-review-grid" class="midterm-review-grid" aria-label="ITCC47 Midterm modules"></ol>
   </section>
 
   <section id="visualization-catalog" class="catalog-view" role="tabpanel" aria-labelledby="visualizations-tab" hidden>

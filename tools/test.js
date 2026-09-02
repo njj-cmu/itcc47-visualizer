@@ -1513,7 +1513,7 @@ section('curriculum governance');
 const previewStorage = (() => { const values = new Map(); return { getItem:(key)=>values.has(key)?values.get(key):null,setItem:(key,value)=>values.set(key,String(value)),removeItem:(key)=>values.delete(key) }; })();
 const unitInstructorToken = 'unit-test-instructor-capability-with-sufficient-entropy';
 const curriculumEngine = load(['course-catalog.js','curriculum.data.js','release-profile.js','sha256.js','curriculum.js'], {
-  ITCC47_INSTRUCTOR_ACCESS:{ schemaVersion:1,profileId:'itcc47-2026-2027-s1',profileVersion:5,tokenHash:Hash.hex(unitInstructorToken) },
+  ITCC47_INSTRUCTOR_ACCESS:{ schemaVersion:1,profileId:'itcc47-2026-2027-s1',profileVersion:6,tokenHash:Hash.hex(unitInstructorToken) },
   localStorage:previewStorage,
   location:{ search:'' },
   URLSearchParams,
@@ -1521,7 +1521,7 @@ const curriculumEngine = load(['course-catalog.js','curriculum.data.js','release
 const Curriculum = curriculumEngine.get('ITCC47Curriculum');
 const ReleaseProfile = curriculumEngine.get('ITCC47_RELEASE_PROFILE');
 const InstructorAccess = curriculumEngine.get('ITCC47_INSTRUCTOR_ACCESS');
-ok('semester profile currently opens Module 3 linked foundations', ReleaseProfile.schemaVersion === 2 && ReleaseProfile.profileVersion === 5 && ReleaseProfile.currentCheckpointId === 'm3-linked-foundations' && !('finalProjectId' in ReleaseProfile));
+ok('Midterm profile ends at Module 4 queues and deques', ReleaseProfile.schemaVersion === 2 && ReleaseProfile.profileVersion === 6 && ReleaseProfile.currentCheckpointId === 'm4-queue-deque' && !('finalProjectId' in ReleaseProfile));
 const visualProgressStorage = (() => { const values = new Map(); return { getItem:(key)=>values.has(key)?values.get(key):null,setItem:(key,value)=>values.set(key,String(value)),removeItem:(key)=>values.delete(key) }; })();
 const visualProgressEngine = load(['visualizer-progress.js'], { localStorage: visualProgressStorage });
 const VisualProgress = visualProgressEngine.get('ITCC47VisualizerProgress');
@@ -1539,19 +1539,41 @@ ok('checkpoint order is unique and increasing', new Set(Curriculum.checkpoints.m
 ok('every checkpoint prerequisite points backward', Curriculum.checkpoints.every((item)=>item.prerequisiteIds.every((id)=>Curriculum.getCheckpoint(id)?.order < item.order)));
 ok('every resource mapping resolves', Curriculum.listResources().every((resource)=>resource.alwaysAvailable || Curriculum.getCheckpoint(resource.checkpointId)));
 ok('Modules 1-4 are reviewed while Modules 5-8 remain drafts', Curriculum.checkpoints.filter((item)=>item.order <= Curriculum.getCheckpoint('m4-queue-deque').order).every((item)=>item.reviewStatus === 'reviewed') && Curriculum.checkpoints.filter((item)=>item.order > Curriculum.getCheckpoint('m4-queue-deque').order).every((item)=>item.reviewStatus === 'draft'));
+const midtermEndOrder = Curriculum.getCheckpoint('m4-queue-deque').order;
+const midtermCheckpoints = Curriculum.checkpoints.filter((checkpoint)=>checkpoint.order <= midtermEndOrder);
+const midtermCheckpointIds = new Set(midtermCheckpoints.map((checkpoint)=>checkpoint.id));
+const midtermResources = Curriculum.listResources().filter((resource)=>midtermCheckpointIds.has(resource.checkpointId));
+ok('every Module 1-4 checkpoint is public', midtermCheckpoints.every((checkpoint)=>['available','current'].includes(Curriculum.stateForCheckpoint(checkpoint.id).state)));
+ok('every Module 1-4 resource is public', midtermResources.every((resource)=>['available','current'].includes(Curriculum.stateForResource(resource.kind,resource.id).state)));
+ok('every Module 1-4 mapped resource appears in its checkpoint sequence', midtermCheckpoints.every((checkpoint)=> {
+  const mapped = midtermResources.filter((resource)=>resource.checkpointId === checkpoint.id).map((resource)=>`${resource.kind}:${resource.id}`);
+  return mapped.every((reference)=>checkpoint.sequence.includes(reference));
+}));
+ok('every Module 1-4 resource resolves to student-facing metadata and a canonical route', midtermResources.every((resource)=> {
+  if (resource.kind === 'tool') return typeof resource.route === 'string' && fs.existsSync(path.join(ROOT,resource.route));
+  if (resource.kind === 'activity') {
+    const activity = Activities.list().find((item)=>item.id === resource.id);
+    return Boolean(activity?.title && activity?.subtitle);
+  }
+  const problem = PROBLEMS.find((item)=>item.id === resource.id);
+  return Boolean(problem?.title && problem?.statement && problem?.reviewStatus === 'reviewed');
+}));
 ok('public curriculum exposes tools, activities, and practice problems only', Curriculum.listResources().every((resource)=>['tool','activity','problem'].includes(resource.kind) && !('labRefs' in resource) && ['reviewed','draft'].includes(resource.reviewStatus)));
 ok('checkpoint sequences and resources contain no retired lesson references', Curriculum.listResources().every((resource)=>resource.kind !== 'lesson') && Curriculum.checkpoints.every((checkpoint)=>(checkpoint.sequence || []).every((reference)=>!reference.startsWith('lesson:'))));
-ok('current, available, and locked states share one resolver', Curriculum.stateForResource('problem','sum-two').state === 'available' && Curriculum.stateForResource('activity','industry-priority-range-recall').state === 'available' && Curriculum.stateForResource('activity','linked-list-traversal').state === 'current' && Curriculum.stateForResource('activity','linked-list-insert-head').state === 'locked');
+ok('current, available, and locked states share one resolver', Curriculum.stateForResource('problem','sum-two').state === 'available' && Curriculum.stateForResource('activity','industry-priority-range-recall').state === 'available' && Curriculum.stateForResource('activity','linked-list-insert-head').state === 'available' && Curriculum.stateForResource('activity','deque-service-lane').state === 'current' && Curriculum.stateForResource('activity','recursive-range-search').state === 'locked');
 ok('missing mappings fail closed at runtime', Curriculum.stateForResource('activity','not-mapped').state === 'planned' && !Curriculum.isOpen('activity','not-mapped'));
-ok('student preview requests cannot authorize themselves', Curriculum.writePreview('m8-dp',previewStorage) === null && Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm3-linked-foundations');
+ok('student preview requests cannot authorize themselves', Curriculum.writePreview('m8-dp',previewStorage) === null && Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm4-queue-deque');
 previewStorage.setItem(Curriculum.PREVIEW_STORAGE_KEY, JSON.stringify({ schemaVersion:2,profileId:ReleaseProfile.profileId,profileVersion:ReleaseProfile.profileVersion,currentCheckpointId:'m8-dp' }));
-ok('a stored release checkpoint without instructor access remains locked', Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm3-linked-foundations');
+ok('a stored release checkpoint without instructor access remains locked', Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm4-queue-deque');
 previewStorage.setItem(Curriculum.INSTRUCTOR_ACCESS_STORAGE_KEY, JSON.stringify({ schemaVersion:InstructorAccess.schemaVersion,profileId:InstructorAccess.profileId,profileVersion:InstructorAccess.profileVersion,tokenHash:InstructorAccess.tokenHash }));
 ok('the public verifier hash cannot be copied into storage to forge instructor access', !Curriculum.hasInstructorAccess(previewStorage));
 Curriculum.grantInstructorAccess(unitInstructorToken, previewStorage);
 Curriculum.writePreview('m8-dp',previewStorage);
 ok('authorized preview is explicit and persisted under versioned keys', Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm8-dp' && previewStorage.getItem(Curriculum.PREVIEW_STORAGE_KEY) && previewStorage.getItem(Curriculum.INSTRUCTOR_ACCESS_STORAGE_KEY));
-ok('normal visits ignore an authorized stored preview without the preview query', Curriculum.activeProfile({preview:false,storage:previewStorage,search:''}).currentCheckpointId === 'm3-linked-foundations');
+const finalCheckpointIds = new Set(Curriculum.checkpoints.filter((checkpoint)=>checkpoint.order > midtermEndOrder).map((checkpoint)=>checkpoint.id));
+const finalResources = Curriculum.listResources().filter((resource)=>finalCheckpointIds.has(resource.checkpointId));
+ok('instructor preview reaches every Module 5-8 resource', finalResources.length > 0 && finalResources.every((resource)=>['available','current'].includes(Curriculum.stateForResource(resource.kind,resource.id,{ preview:true,storage:previewStorage }).state)));
+ok('normal visits ignore an authorized stored preview without the preview query', Curriculum.activeProfile({preview:false,storage:previewStorage,search:''}).currentCheckpointId === 'm4-queue-deque');
 Curriculum.revokeInstructorAccess(previewStorage);
 ok('exiting instructor mode removes both access and checkpoint state', !previewStorage.getItem(Curriculum.INSTRUCTOR_ACCESS_STORAGE_KEY) && !previewStorage.getItem(Curriculum.PREVIEW_STORAGE_KEY));
 const activationToken = 'separate-activation-token-with-sufficient-entropy';
@@ -1570,7 +1592,7 @@ ok('array-list mutation belongs to Module 2', Activities.get('array-list-insert'
 ok('industry workbench follows array mutation and precedes Module 3', Curriculum.getCheckpoint('m2-industry-workbench').prerequisiteIds.join(',') === 'm2-array-mutation' && Curriculum.getCheckpoint('m3-linked-foundations').prerequisiteIds.join(',') === 'm2-industry-workbench');
 ok('all industry scenarios release together at one reviewed checkpoint', industryScenarios.every((scenario) => Curriculum.getResource('activity', scenario.id)?.checkpointId === 'm2-industry-workbench') && Curriculum.getCheckpoint('m2-industry-workbench').reviewStatus === 'reviewed');
 ok('student profile keeps every Module 2 industry scenario available', industryScenarios.every((scenario) => Curriculum.stateForResource('activity', scenario.id).state === 'available'));
-ok('student profile opens only the linked foundations checkpoint in Module 3', ['linked-list-traversal','array-linked-comparison'].every((id) => Curriculum.stateForResource('activity', id).state === 'current') && ['linked-node-count','linked-find-value'].every((id) => Curriculum.stateForResource('problem', id).state === 'current') && Curriculum.stateForResource('activity','linked-list-insert-head').state === 'locked');
+ok('student profile opens every reviewed Module 3 resource', midtermResources.filter((resource)=>resource.checkpointId.startsWith('m3-')).every((resource)=>Curriculum.isOpen(resource.kind,resource.id)));
 ok('linked foundations sequence includes both reviewed practice problems', Curriculum.getCheckpoint('m3-linked-foundations').sequence.slice(-2).join(',') === 'problem:linked-node-count,problem:linked-find-value');
 ok('every shipped activity exposes curriculum metadata', Activities.list().filter((activity)=>Curriculum.getResource('activity',activity.id)).every((activity)=>activity.checkpointId && activity.cloIds.length));
 ok('every cataloged visualization has a concrete activity', Curriculum.listResources('activity').every((resource)=>Activities.list().some((activity)=>activity.id === resource.id)));
@@ -1649,8 +1671,8 @@ ok('every future problem starter parses', invalidFutureStarters.length === 0, in
 
 const formerLessonPage = fs.readFileSync(path.join(ROOT,'lesson.html'),'utf8');
 ok('former lesson route is a metadata-free module-practice redirect', /problem-list\.html/.test(formerLessonPage) && !/checkpoint-companions|lesson-app|curriculum\.data|companion-/i.test(formerLessonPage));
-ok('released practice counts are Module 2: 10, Module 3: 6, Module 4: 6', [2,3,4].map((module)=>PROBLEMS.filter((problem)=>problem.module === `Module ${module}`).length).join(',') === '10,6,6');
-ok('released practice contracts are versioned and reviewed', PROBLEMS.filter((problem)=>['Module 2','Module 3','Module 4'].includes(problem.module)).every((problem)=>problem.contentVersion && problem.reviewStatus === 'reviewed' && problem.visibleTests.length >= 2 && problem.hidden.length >= 2));
+ok('released practice counts are Module 1: 11, Module 2: 10, Module 3: 6, Module 4: 6', [1,2,3,4].map((module)=>PROBLEMS.filter((problem)=>problem.module === `Module ${module}`).length).join(',') === '11,10,6,6');
+ok('released practice contracts are versioned and reviewed', PROBLEMS.filter((problem)=>['Module 1','Module 2','Module 3','Module 4'].includes(problem.module)).every((problem)=>problem.contentVersion && problem.reviewStatus === 'reviewed' && problem.visibleTests.length >= 2 && problem.hidden.length >= 2));
 const practiceSource = fs.readFileSync(path.join(ROOT,'problems-app.js'),'utf8');
 ok('practice records are content-version aware with recoverable drafts', practiceSource.includes("itcc47.practice-records:v2") && practiceSource.includes('contentVersion') && practiceSource.includes('recovery'));
 

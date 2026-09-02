@@ -3,10 +3,16 @@ const fs = require('fs');
 const path = require('path');
 
 const instructorAccessToken = fs.readFileSync(path.resolve(__dirname, '..', '.instructor-preview-token'), 'utf8').trim();
-const instructorAccessRecord = { schemaVersion: 1, profileId: 'itcc47-2026-2027-s1', profileVersion: 5, token: instructorAccessToken };
-const instructorPreviewRecord = { schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 5, currentCheckpointId: 'm8-dp' };
+const instructorAccessRecord = { schemaVersion: 1, profileId: 'itcc47-2026-2027-s1', profileVersion: 6, token: instructorAccessToken };
+const instructorPreviewRecord = { schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 6, currentCheckpointId: 'm8-dp' };
 
-const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'computer-architecture.html', 'computer-architecture-modules.html', 'computer-architecture-practice.html', 'computer-networking.html', 'computer-networking-modules.html', 'computer-networking-practice.html', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=deque-sliding-window&preview=1', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', 'visualizer.html?course=computer-architecture&activity=architecture-decode-instruction', 'visualizer.html?course=computer-architecture&activity=architecture-add-immediate', 'visualizer.html?course=computer-networking&activity=networking-read-classroom-network', 'visualizer.html?course=computer-networking&activity=networking-local-peer-sharing', 'visualizer.html?course=computer-networking&activity=networking-classify-components', 'visualizer.html?course=computer-networking&activity=networking-compare-media', 'visualizer.html?course=computer-networking&activity=networking-read-network-topologies', 'visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery', 'industry-workbench.html', 'industry-workbench.html?scenario=industry-priority-range-recall&preview=1', 'writer.html', 'tracer.html', 'problems.html', 'problems.html?view=visualizations', 'problems.html?view=workbenches', 'lesson.html?checkpoint=m2-selection-sort', 'student-materials.html', 'problem-list.html?module=1', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count'];
+const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'computer-architecture.html', 'computer-architecture-modules.html', 'computer-architecture-practice.html', 'computer-networking.html', 'computer-networking-modules.html', 'computer-networking-practice.html', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=deque-sliding-window', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', 'visualizer.html?course=computer-architecture&activity=architecture-decode-instruction', 'visualizer.html?course=computer-architecture&activity=architecture-add-immediate', 'visualizer.html?course=computer-networking&activity=networking-read-classroom-network', 'visualizer.html?course=computer-networking&activity=networking-local-peer-sharing', 'visualizer.html?course=computer-networking&activity=networking-classify-components', 'visualizer.html?course=computer-networking&activity=networking-compare-media', 'visualizer.html?course=computer-networking&activity=networking-read-network-topologies', 'visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery', 'industry-workbench.html', 'industry-workbench.html?scenario=industry-priority-range-recall', 'writer.html', 'tracer.html', 'problems.html', 'problems.html?view=midterm', 'problems.html?view=visualizations', 'problems.html?view=workbenches', 'lesson.html?checkpoint=m2-selection-sort', 'student-materials.html', 'problem-list.html?module=1', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count', 'practice.html?module=4&problem=stack-reverse'];
+
+const curriculumSource = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'curriculum.public.json'), 'utf8'));
+const checkpointById = new Map(curriculumSource.checkpoints.map((checkpoint) => [checkpoint.id, checkpoint]));
+const midtermResourcesByModule = new Map([1, 2, 3, 4].map((moduleNumber) => [moduleNumber,
+  curriculumSource.resources.filter((resource) => checkpointById.get(resource.checkpointId)?.moduleId === `m${moduleNumber}`),
+]));
 
 const studentStateTests = new Set([
   'curriculum roadmap expands the current module and compacts locked modules',
@@ -1170,38 +1176,85 @@ test('CPU Lab respects reduced motion and direct file operation', async ({ page 
 
 test('start page gives students a clear route into the current practice bank', async ({ page }) => {
   await page.goto('/itcc47.html');
-  await expect(page.getByRole('heading', { name: /Start with a problem/ })).toBeVisible();
-  await expect(page.locator('#current-checkpoint')).toContainText('Linked nodes and traversal');
+  await expect(page.getByRole('heading', { name: /Learn the idea/ })).toBeVisible();
+  const workflow = page.getByRole('list', { name: 'Midterm learning workflow' });
+  for (const step of ['Learn the purpose', 'Visualize the state', 'Practice with checks']) await expect(workflow).toContainText(step);
+  await expect(page.locator('#current-checkpoint')).toContainText('Queues and deques');
   await page.getByRole('link', { name: /Open current practice bank/ }).click();
-  await expect(page).toHaveURL(/problem-list\.html\?module=3$/);
-  await expect(page.getByRole('heading', { name: /Linked Lists: select a problem/ })).toBeVisible();
+  await expect(page).toHaveURL(/problem-list\.html\?module=4$/);
+  await expect(page.getByRole('heading', { name: /Stacks, Queues, and Deques: select a problem/ })).toBeVisible();
 });
 
 test('curriculum roadmap expands the current module and compacts locked modules', async ({ page }) => {
   await page.goto('/problems.html');
   await expect(page.locator('.module-card')).toHaveCount(8);
-  await expect(page.locator('.module-card-current')).toContainText('Linked Lists');
-  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(2);
+  await expect(page.locator('.module-card-current')).toContainText('Stacks, Queues, and Deques');
+  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(6);
   await expect(page.locator('.checkpoint-list, .module-lessons, .module-outline')).toHaveCount(0);
-  await expect(page.locator('.module-card-locked').first()).toBeVisible();
+  await expect(page.locator('.module-card-locked')).toHaveCount(4);
   await expect(page.locator('.module-card-locked .module-problem-card')).toHaveCount(0);
   await expect(page.getByText('Instructor preview', { exact: true })).toHaveCount(0);
   await expect(page.locator('#release-controls')).toHaveCount(0);
 });
+
+test('Midterm Review presents every reviewed checkpoint and resource on laptop and phone', async ({ page }) => {
+  await page.goto('/itcc47.html');
+  await page.getByRole('link', { name: 'Open Midterm Review' }).click();
+  await expect(page).toHaveURL(/problems\.html\?view=midterm$/);
+  await expect(page.getByRole('tab', { name: 'Midterm Review' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('[data-midterm-module]')).toHaveCount(4);
+  await expect(page.locator('[data-midterm-checkpoint]')).toHaveCount(18);
+  await expect(page.locator('[data-midterm-resource]')).toHaveCount(64);
+  const summary = page.locator('#midterm-review-summary');
+  for (const item of ['18 reviewed checkpoints', '2 local learning tools', '29 guided activities', '33 checked problems']) await expect(summary).toContainText(item);
+  await expect(page.locator('.midterm-module-locked, .curriculum-lock')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  await page.locator('[data-midterm-resource="activity:deque-end-operations"]').click();
+  await expect(page.getByRole('heading', { name: 'Use both ends of a deque' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+});
+
+for (const moduleNumber of [1, 2, 3, 4]) {
+  test(`every Module ${moduleNumber} public resource resolves through its canonical direct route`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'laptop');
+    test.setTimeout(60_000);
+    for (const resource of midtermResourcesByModule.get(moduleNumber)) {
+      const route = resource.kind === 'tool' ? `/${resource.route}`
+        : resource.kind === 'problem' ? `/practice.html?module=${moduleNumber}&problem=${encodeURIComponent(resource.id)}`
+          : resource.id.startsWith('industry-') ? `/industry-workbench.html?scenario=${encodeURIComponent(resource.id)}`
+            : `/visualizer.html?activity=${encodeURIComponent(resource.id)}`;
+      const response = await page.goto(route);
+      expect(response?.ok(), `${resource.kind}:${resource.id} did not load`).toBe(true);
+      await expect(page.locator('.curriculum-lock'), `${resource.kind}:${resource.id} was unexpectedly locked`).toHaveCount(0);
+      if (resource.kind === 'tool') await expect(page.locator('main')).toBeVisible();
+      if (resource.kind === 'problem') {
+        await expect(page.locator('#p-statement')).toBeVisible();
+        await expect(page.locator('#code-box')).toBeVisible();
+      }
+      if (resource.kind === 'activity') {
+        await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+        await expect(page.locator(resource.id.startsWith('industry-') ? '.industry-workbench' : '.visualizer-workspace')).toBeVisible();
+      }
+    }
+  });
+}
 
 test('student preview query cannot expose instructor controls or locked content', async ({ page }) => {
   await page.addInitScript((preview) => localStorage.setItem('itcc47.release-preview:v1', JSON.stringify(preview)), instructorPreviewRecord);
   await page.goto('/problems.html?preview=1');
   await expect(page.getByText('Instructor preview', { exact: true })).toHaveCount(0);
   await expect(page.locator('#release-controls, .draft-preview-indicator')).toHaveCount(0);
-  await expect(page.locator('.module-card-current')).toContainText('Linked Lists');
+  await expect(page.locator('.module-card-current')).toContainText('Stacks, Queues, and Deques');
   await page.goto('/visualizer.html?activity=recursive-range-search&preview=1');
   await expect(page.locator('.curriculum-lock')).toContainText('Recursive duplicate-range search is coming later');
   await expect(page.locator('.curriculum-lock')).not.toContainText('Practice release');
   await expect(page.locator('.curriculum-lock .release-badge')).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /Continue with Module 3/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Continue with Module 4/ })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Explore available visualizations' })).toBeVisible();
   await expect(page.locator('.visualizer-workspace, .source-panel')).toHaveCount(0);
+  await page.goto('/practice.html?module=5&problem=recursive-sum&preview=1');
+  await expect(page.locator('.curriculum-lock')).toContainText('Recursive range sum is coming later');
+  await expect(page.locator('#p-statement, #code-box')).toHaveCount(0);
 });
 
 test('locked visualization cards use a compact icon and border state', async ({ page }) => {
@@ -1209,10 +1262,10 @@ test('locked visualization cards use a compact icon and border state', async ({ 
   await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.industry-catalog-feature')).toBeHidden();
   await expect(page.locator('.visualization-card')).toHaveCount(35);
-  await expect(page.locator('.visualization-card.visualization-available')).toHaveCount(9);
-  await expect(page.locator('.visualization-card.visualization-current')).toHaveCount(2);
-  await expect(page.locator('.visualization-card.visualization-locked')).toHaveCount(24);
-  await expect(page.locator('.visualization-lock')).toHaveCount(24);
+  await expect(page.locator('.visualization-card.visualization-available')).toHaveCount(19);
+  await expect(page.locator('.visualization-card.visualization-current')).toHaveCount(6);
+  await expect(page.locator('.visualization-card.visualization-locked')).toHaveCount(10);
+  await expect(page.locator('.visualization-lock')).toHaveCount(10);
   await expect(page.locator('.visualization-card .release-badge')).toHaveCount(0);
   await expect(page.locator('.visualization-card').first().locator('.visualization-card-meta')).toContainText('Module 2');
   const familyOrder = await page.locator('.visualization-group h2').allTextContents();
@@ -1224,7 +1277,7 @@ test('focused visualizations remember visits and fade only after the final step'
   await page.goto('/problems.html?view=visualizations');
   await page.evaluate(() => localStorage.removeItem('itcc47.visualizer-progress:v1'));
   await page.reload();
-  await expect(page.getByRole('heading', { name: '0 of 11 available visualizations reviewed' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '0 of 25 available visualizations reviewed' })).toBeVisible();
   let bubbleCard = page.locator('.visualization-card', { hasText: 'Bubble Sort' });
   await expect(bubbleCard).not.toHaveClass(/visualization-visited/);
   await bubbleCard.click();
@@ -1246,7 +1299,7 @@ test('focused visualizations remember visits and fade only after the final step'
   bubbleCard = page.locator('.visualization-card', { hasText: 'Bubble Sort' });
   await expect(bubbleCard).toHaveClass(/visualization-reviewed/);
   await expect(bubbleCard).toContainText('Reviewed');
-  await expect(page.getByRole('heading', { name: '1 of 11 available visualizations reviewed' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '1 of 25 available visualizations reviewed' })).toBeVisible();
   await expect(bubbleCard).toHaveCSS('background-color', 'rgb(32, 33, 38)');
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('itcc47.visualizer-progress:v1')));
   expect(stored.schemaVersion).toBe(1);
@@ -1404,7 +1457,7 @@ test('locked visualizer route renders requirements without source or playback', 
   await expect(page.locator('.curriculum-lock .release-badge')).toHaveCount(0);
   const actions = page.locator('.curriculum-lock-actions .btn');
   await expect(actions).toHaveCount(2);
-  await expect(actions.first()).toContainText('Continue with Module 3');
+  await expect(actions.first()).toContainText('Continue with Module 4');
   await expect(actions.nth(1)).toHaveText('Explore available visualizations');
   expect(await actions.evaluateAll((links) => links.every((link) => getComputedStyle(link).textDecorationLine === 'none'))).toBe(true);
   await expect(actions.first()).toHaveCSS('min-height', '46px');
@@ -1453,28 +1506,60 @@ test('former materials route redirects without exposing downloads or metadata', 
   await expect(page.locator('.topbar-nav a', { hasText: 'Materials' })).toHaveCount(0);
 });
 
-test('instructor preview renders every later-domain teaching activity', async ({ page }) => {
-  const activities = ['binary-range-search','stable-insertion-dispatch','array-linked-comparison','linked-list-sorted-insert','linked-list-find-update','linked-list-delete','recursive-range-search','stable-merge-sort','tree-traversals','bst-insert-search','bst-height-shape','graph-representation','bfs-shortest-path','dfs-reachability','greedy-dp-coin-change','knapsack-dp'];
+test('instructor preview renders every Module 5-8 teaching activity', async ({ page }) => {
+  const activities = ['recursive-range-search','stable-merge-sort','tree-traversals','bst-insert-search','bst-height-shape','graph-representation','bfs-shortest-path','dfs-reachability','greedy-dp-coin-change','knapsack-dp'];
   for (const activity of activities) {
     await page.goto(`/visualizer.html?activity=${activity}&preview=1`);
     await expect(page.locator('.visualizer-workspace')).toBeVisible();
     await expect(page.locator('.source-line')).not.toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
-    if (['recursive-range-search','stable-merge-sort','tree-traversals','bst-insert-search','bst-height-shape','graph-representation','bfs-shortest-path','dfs-reachability','greedy-dp-coin-change','knapsack-dp'].includes(activity)) {
-      await expect(page.locator('.concept-domain')).toBeVisible();
-      await expect(page.locator('.draft-preview-indicator')).toContainText('Draft preview');
-    }
+    await expect(page.locator('.concept-domain')).toBeVisible();
+    await expect(page.locator('.draft-preview-indicator')).toContainText('Draft preview');
   }
 });
 
-test('instructor preview exposes ten line-by-line Module 4 examples', async ({ page }) => {
+test('instructor preview reaches Module 5-8 practice without publishing it', async ({ page }) => {
+  const problems = [
+    [5, 'recursive-sum', 'Recursive range sum'],
+    [6, 'bst-insert-order', 'Build a BST in order'],
+    [7, 'graph-degree', 'Compute graph degrees'],
+    [8, 'greedy-coin-count', 'Greedy coin count'],
+  ];
+  for (const [moduleNumber, problemId, title] of problems) {
+    await page.goto(`/practice.html?module=${moduleNumber}&problem=${problemId}&preview=1`);
+    await expect(page.getByRole('heading', { name: title })).toBeVisible();
+    await expect(page.locator('#p-statement')).toBeVisible();
+    await expect(page.locator('.draft-preview-indicator')).toContainText('Draft preview');
+    await expect(page.locator('.curriculum-lock')).toHaveCount(0);
+  }
+});
+
+test('relocking instructor-preview practice preserves browser-local progress', async ({ page }) => {
+  const savedDraft = 'READ n\nWRITE n';
+  await page.addInitScript((draft) => localStorage.setItem('itcc47.practice-records:v2', JSON.stringify({
+    schemaVersion: 2,
+    records: { 'recursive-sum': { contentVersion: 1, draft, completed: false } },
+    recovery: {},
+  })), savedDraft);
+  await page.goto('/practice.html?module=5&problem=recursive-sum&preview=1');
+  await expect(page.getByRole('heading', { name: 'Recursive range sum' })).toBeVisible();
+  await page.goto('/problems.html?preview=1');
+  await page.getByText('Instructor preview', { exact: true }).click();
+  await page.getByRole('button', { name: 'Exit instructor mode' }).click();
+  await page.goto('/practice.html?module=5&problem=recursive-sum');
+  await expect(page.locator('.curriculum-lock')).toBeVisible();
+  const record = await page.evaluate(() => JSON.parse(localStorage.getItem('itcc47.practice-records:v2')).records['recursive-sum']);
+  expect(record).toEqual({ contentVersion: 1, draft: savedDraft, completed: false });
+});
+
+test('public release exposes ten line-by-line Module 4 examples', async ({ page }) => {
   const activities = ['stack-lifo-basics','stack-postfix-evaluator','stack-delimiter-audit','stack-editor-undo','queue-fifo-basics','queue-round-robin','queue-printer-jobs','deque-end-operations','deque-sliding-window','deque-service-lane'];
-  await page.goto('/problems.html?view=visualizations&preview=1');
+  await page.goto('/problems.html?view=visualizations');
   await expect(page.locator('.visualization-group', { hasText: 'Stacks' }).locator('.visualization-card')).toHaveCount(4);
   await expect(page.locator('.visualization-group', { hasText: 'Queues' }).locator('.visualization-card')).toHaveCount(3);
   await expect(page.locator('.visualization-group', { hasText: 'Deques' }).locator('.visualization-card')).toHaveCount(3);
   for (const activity of activities) {
-    await page.goto(`/visualizer.html?activity=${activity}&preview=1`);
+    await page.goto(`/visualizer.html?activity=${activity}`);
     await expect(page.locator('.linear-adt')).toBeVisible();
     await expect(page.locator('.linear-teaching')).toBeVisible();
     await expect(page.locator('.source-line.is-current')).toHaveCount(1);
@@ -1518,9 +1603,9 @@ test('visualizer workspaces choose a structure-aware desktop composition', async
 });
 
 test('deque foundation names both ends and changes state line by line', async ({ page }) => {
-  await page.goto('/visualizer.html?activity=deque-end-operations&preview=1');
+  await page.goto('/visualizer.html?activity=deque-end-operations');
   await expect(page.getByRole('heading', { name: 'Use both ends of a deque' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Practice this module' })).toHaveAttribute('href', /problem-list\.html\?module=4&preview=1$/);
+  await expect(page.getByRole('link', { name: 'Practice this module' })).toHaveAttribute('href', /problem-list\.html\?module=4$/);
   await expect(page.locator('.linear-end-label.end-front')).toContainText('front');
   await expect(page.locator('.linear-end-label.end-back')).toContainText('back');
   await page.getByRole('button', { name: 'Step' }).click();
@@ -1528,8 +1613,8 @@ test('deque foundation names both ends and changes state line by line', async ({
   await expect(page.locator('.source-line.is-current')).toContainText('ADD_BACK deque, A');
 });
 
-test('instructor preview opens the six-problem Module 3 practice bank', async ({ page }, testInfo) => {
-  await page.goto('/problem-list.html?module=3&preview=1');
+test('public release opens the six-problem Module 3 practice bank', async ({ page }, testInfo) => {
+  await page.goto('/problem-list.html?module=3');
   await expect(page.locator('.problem-choice')).toHaveCount(6);
   await page.locator('.problem-choice-action').first().click();
   await expect(page.getByRole('heading', { name: /Count Reachable Linked Nodes/i })).toBeVisible();
@@ -1538,13 +1623,11 @@ test('instructor preview opens the six-problem Module 3 practice bank', async ({
   await expect(page.locator('#p-statement')).not.toBeEmpty();
 });
 
-test('public Module 3 foundations open two problems and keep mutation gated', async ({ page }) => {
+test('public Module 3 opens all linked practice and mutation visualizations', async ({ page }) => {
   await page.goto('/problem-list.html?module=3');
   await expect(page.locator('.problem-choice')).toHaveCount(6);
-  await expect(page.locator('.problem-choice-current')).toHaveCount(2);
-  await expect(page.locator('.problem-choice-locked')).toHaveCount(4);
-  await expect(page.locator('.problem-choice-current').nth(0)).toContainText('Count Reachable Linked Nodes');
-  await expect(page.locator('.problem-choice-current').nth(1)).toContainText('Lookup and Update a Node');
+  await expect(page.locator('.problem-choice-available')).toHaveCount(6);
+  await expect(page.locator('.problem-choice-locked')).toHaveCount(0);
   for (const [problemId, title] of [['linked-node-count', /Count Reachable Linked Nodes/i], ['linked-find-value', /Lookup and Update a Node/i]]) {
     await page.goto(`/practice.html?module=3&problem=${problemId}`);
     await expect(page.getByRole('heading', { name: title })).toBeVisible();
@@ -1558,8 +1641,9 @@ test('public Module 3 foundations open two problems and keep mutation gated', as
   await expect(page.getByRole('heading', { name: 'Traverse a singly linked list' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Edit pseudocode' })).toHaveAttribute('href', 'tracer.html?activity=linked-list-traversal');
   await page.goto('/visualizer.html?activity=linked-list-insert-head');
-  await expect(page.locator('.curriculum-lock')).toContainText('Insert at the head is coming later');
-  await expect(page.locator('.visualizer-workspace')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Insert at the head' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+  await expect(page.locator('.curriculum-lock')).toHaveCount(0);
 });
 
 test('legacy checkpoint-guide routes redirect to module practice without companion content', async ({ page }) => {
@@ -2487,17 +2571,17 @@ test('problem work tabs reach code and results on a phone', async ({ page }, tes
 
 test('module catalog exposes current practice and retains the full problem list', async ({ page }, testInfo) => {
   await page.goto('/problems.html');
-  await expect(page.getByRole('heading', { name: 'Choose what to practise' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Choose how to review' })).toBeVisible();
   await expect(page.locator('.module-card')).toHaveCount(8);
-  await expect(page.locator('.module-card-current')).toContainText('Linked Lists');
+  await expect(page.locator('.module-card-current')).toContainText('Stacks, Queues, and Deques');
   await expect(page.locator('.module-card-locked')).not.toHaveCount(0);
-  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(2);
-  await page.getByRole('link', { name: /Browse all Module 3 practice/ }).click();
-  await expect(page).toHaveURL(/problem-list\.html\?module=3$/);
-  await expect(page.getByRole('heading', { name: 'Linked Lists: select a problem' })).toBeVisible();
+  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(6);
+  await page.getByRole('link', { name: /Browse all Module 4 practice/ }).click();
+  await expect(page).toHaveURL(/problem-list\.html\?module=4$/);
+  await expect(page.getByRole('heading', { name: 'Stacks, Queues, and Deques: select a problem' })).toBeVisible();
   await page.locator('.problem-choice-action').first().click();
-  await expect(page).toHaveURL(/practice\.html\?module=3&problem=/);
-  await expect(page.locator('#p-module')).toHaveText('Module 3');
+  await expect(page).toHaveURL(/practice\.html\?module=4&problem=/);
+  await expect(page.locator('#p-module')).toHaveText('Module 4');
   await expect(page.locator('#progress-line')).toContainText('of 6 solved');
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
   await expect(page.getByRole('link', { name: 'Back to Problem List' })).toBeVisible();
@@ -2582,6 +2666,13 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
   await expect(page.getByRole('heading', { name: 'Traverse a singly linked list' })).toBeVisible();
   await expect(page.locator('.source-line.is-current')).toContainText('head <- NULL');
 
+  await page.goto(`file:///${path.resolve(__dirname, '..', 'problems.html').replace(/\\/g, '/')}?view=midterm`);
+  await expect(page.getByRole('heading', { name: /Move from understanding/ })).toBeVisible();
+  await expect(page.locator('[data-midterm-module]')).toHaveCount(4);
+  await page.locator('[data-midterm-resource="activity:stack-lifo-basics"]').click();
+  await expect(page.getByRole('heading', { name: 'Push, peek, and pop' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+
   await page.goto(`file:///${path.resolve(__dirname, '..', 'industry-workbench.html').replace(/\\/g, '/')}?scenario=industry-priority-range-recall&preview=1`);
   await page.getByRole('button', { name: 'Step', exact: true }).click();
   await expect(await visualizerTimeline(page)).toHaveValue('1');
@@ -2633,8 +2724,13 @@ test('cached navigation remains available offline', async ({ page, context }, te
   await expect(page.getByRole('heading', { name: 'Check the network from foundations to ARP.' })).toBeVisible();
   await page.goto('/visualizer.html?activity=linked-list-traversal');
   await expect(page.getByRole('heading', { name: 'Traverse a singly linked list' })).toBeVisible();
-  await page.goto('/problem-list.html?module=3');
-  await expect(page.locator('.problem-choice-current')).toHaveCount(2);
+  await page.goto('/problems.html?view=midterm');
+  await expect(page.locator('[data-midterm-checkpoint]')).toHaveCount(18);
+  await page.goto('/visualizer.html?activity=deque-service-lane');
+  await expect(page.getByRole('heading', { name: 'Priority service lane' })).toBeVisible();
+  await page.goto('/problem-list.html?module=4');
+  await expect(page.locator('.problem-choice-current')).toHaveCount(3);
+  await expect(page.locator('.problem-choice-available')).toHaveCount(3);
   await page.goto('/practice.html?module=1');
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
   await expect(page.locator('#code-box')).toBeVisible();

@@ -779,6 +779,7 @@ const ITCC47_CURRICULUM_DATA = {
       "kind": "activity",
       "id": "array-linked-comparison",
       "checkpointId": "m3-linked-foundations",
+      "title": "Recent Documents: positions versus relationships",
       "reviewStatus": "reviewed"
     },
     {

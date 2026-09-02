@@ -273,6 +273,7 @@ function runtimeDiagnostic(source) {
 }
 ok('NULL field access has a friendly diagnostic', runtimeDiagnostic('head <- NULL\nWRITE head.value')?.code === 'E_NULL_REFERENCE');
 ok('invalid node fields have a friendly diagnostic', runtimeDiagnostic('head <- NEW NODE(1)\nWRITE head.left')?.code === 'E_INVALID_NODE_FIELD');
+ok('doubly linked prev remains outside the singly linked interpreter', runtimeDiagnostic('head <- NEW NODE(1)\nWRITE head.prev')?.code === 'E_INVALID_NODE_FIELD');
 ok('next rejects scalar links explicitly', runtimeDiagnostic('head <- NEW NODE(1)\nhead.next <- 7')?.code === 'E_INVALID_NODE_LINK');
 const nodeTimeline = collectForCounting(parseForCounting(NODE_CHAIN), []);
 ok('node timeline snapshots expose deterministic heap identities', nodeTimeline.events.at(-1).frame.heap.map((node) => node.id).join(',') === 'node:1,node:2,node:3');
@@ -626,6 +627,54 @@ const linkedInsert = Activities.get('linked-list-insert-head').run();
 ok('head insertion preserves the old chain after the new node', linkedInsert.events.at(-1).frame.nodes.map((node) => node.value).join(',') === '24,18,7' && linkedInsert.events.at(-1).metrics.pointerWrites === 2);
 ok('linked transitions preserve pointer and edge identities', linkedInsert.events.some((event) => event.transition?.moves?.some((move) => move.entityId === 'pointer:head')) && linkedInsert.events.some((event) => event.frame.links.every((link) => link.id === `edge:${link.from}->${link.to}`)));
 ok('linked-list events use immutable V2 frames', Object.isFrozen(linkedInsert.events[0]) && Object.isFrozen(linkedInsert.events[0].frame) && linkedInsert.events.every((event, index) => event.id === `linked-list-insert-head:${index}`));
+const recentComparisonActivity = Activities.get('array-linked-comparison');
+const recentComparison = recentComparisonActivity.run();
+const recentComparisonAgain = recentComparisonActivity.run();
+const recentFinal = recentComparison.events.at(-1);
+const recentFinalLinked = recentFinal.frame.linkedState;
+const recentFinalNodes = new Map(recentFinalLinked.nodes.map((node) => [node.id, node]));
+const expectedRecentOrder = ['doc:attendance','doc:grades','doc:syllabus','doc:module3','doc:notes'];
+function recentStageIsValid(frame) {
+  const state = frame.linkedState;
+  const byId = new Map(state.nodes.map((node) => [node.id, node]));
+  if (state.nodes.some((node) => (node.prev && !byId.has(node.prev)) || (node.next && !byId.has(node.next)))) return false;
+  if (!state.stable) return true;
+  const reachable = [];
+  const seen = new Set();
+  let current = state.headId;
+  while (current) {
+    if (!byId.has(current) || seen.has(current)) return false;
+    seen.add(current); reachable.push(current); current = byId.get(current).next;
+  }
+  if (reachable.join(',') !== state.reachableIds.join(',')) return false;
+  const detached = state.nodes.map((node) => node.id).filter((id) => !seen.has(id));
+  if (detached.join(',') !== state.detachedIds.join(',')) return false;
+  return reachable.every((id, index) => {
+    const node = byId.get(id);
+    const expectedPrev = index ? reachable[index - 1] : null;
+    const expectedNext = index < reachable.length - 1 ? reachable[index + 1] : null;
+    return node.prev === expectedPrev && node.next === expectedNext;
+  });
+}
+ok('Recent Documents keeps its Module 3 placement and dedicated renderer', recentComparisonActivity.module === 3 && recentComparisonActivity.checkpointId === 'm3-linked-foundations' && recentComparisonActivity.renderer === 'sequence-comparison' && recentComparisonActivity.contentVersion !== traversalActivity.contentVersion);
+ok('Recent Documents timeline is deterministic from initialize to terminal', JSON.stringify(recentComparison) === JSON.stringify(recentComparisonAgain) && recentComparison.events[0].type === 'initialize' && recentComparison.events[0].segment.id === 'scenario' && recentFinal.terminal && recentFinal.type === 'return');
+ok('Recent Documents maps every event to a displayed conceptual source line', recentComparison.events.every((event) => event.source?.line >= 1 && event.source.line <= recentComparisonActivity.source.length && event.source.code === recentComparisonActivity.source[event.source.line - 1]));
+ok('Recent Documents keeps unique stable record identities in every frame', recentComparison.events.every((event) => new Set(event.frame.records.map((record) => record.id)).size === 5 && event.frame.records.map((record) => record.id).join(',') === 'doc:grades,doc:syllabus,doc:attendance,doc:module3,doc:notes'));
+ok('Recent Documents linked targets exist and every stable stage is reciprocal and cycle-free', recentComparison.events.every((event) => recentStageIsValid(event.frame)));
+const recentDetach = recentComparison.events.find((event) => event.frame.linkedState.lastWrite?.code === 'Module3.prev ← Syllabus');
+const detachNodes = new Map(recentDetach.frame.linkedState.nodes.map((node) => [node.id, node]));
+ok('Recent Documents detach stage bypasses Attendance and reports it outside the chain', detachNodes.get('doc:syllabus').next === 'doc:module3' && detachNodes.get('doc:module3').prev === 'doc:syllabus' && recentDetach.frame.linkedState.detachedIds.join(',') === 'doc:attendance' && !recentDetach.frame.linkedState.reachableIds.includes('doc:attendance'));
+ok('Recent Documents final array order is exact and uses one placement', recentFinal.frame.arrayState.slots.join(',') === expectedRecentOrder.join(',') && recentFinal.frame.arrayState.placements === 1);
+ok('Recent Documents final linked order and boundary references are exact', recentFinalLinked.headId === 'doc:attendance' && recentFinalLinked.tailId === 'doc:notes' && recentFinalLinked.reachableIds.join(',') === expectedRecentOrder.join(',')
+  && recentFinalNodes.get('doc:attendance').prev === null && recentFinalNodes.get('doc:attendance').next === 'doc:grades'
+  && recentFinalNodes.get('doc:grades').prev === 'doc:attendance' && recentFinalNodes.get('doc:grades').next === 'doc:syllabus'
+  && recentFinalNodes.get('doc:syllabus').prev === 'doc:grades' && recentFinalNodes.get('doc:syllabus').next === 'doc:module3'
+  && recentFinalNodes.get('doc:module3').prev === 'doc:syllabus' && recentFinalNodes.get('doc:module3').next === 'doc:notes'
+  && recentFinalNodes.get('doc:notes').prev === 'doc:module3' && recentFinalNodes.get('doc:notes').next === null);
+ok('Recent Documents final metrics count six shifts and six pointer writes', recentFinal.metrics.arrayShifts === 6 && recentFinal.metrics.pointerWrites === 6 && recentFinal.result === undefined && recentComparison.result.arrayPlacements === 1);
+ok('Recent Documents visibly separates lookup cost from local mutation cost', recentComparison.events.every((event) => /finding Attendance\.xlsx from head.*O\(n\)/i.test(event.frame.explanation.caveat)) && !/complete operation.*O\(1\)/i.test(recentComparisonActivity.blurb));
+ok('Recent Documents owns four deterministic teaching segments', [...new Set(recentComparison.events.map((event) => event.segment.id))].join(',') === 'scenario,array-list,linked-list,comparison' && recentComparison.events.filter((event) => event.boundary).map((event) => event.segment.id).join(',') === 'scenario,array-list,linked-list,comparison');
+ok('existing singly linked activities retain linked-list frames and renderer behavior', ['linked-list-traversal','linked-list-insert-head','linked-list-sorted-insert','linked-list-find-update','linked-list-delete'].every((id) => Activities.get(id).renderer === 'linked-list' && Activities.get(id).run().events.every((event) => event.frame.kind === 'linked-list')));
 const semanticLineAudit = {
   'bubble-sort': { lines: [1, 2, 3, 4, 5, 6, 7, 10, 11, 14], cases: [{ values: [3, 1, 2] }] },
   'selection-sort': { lines: [1, 2, 3, 4, 5, 6, 9, 10, 12, 13], cases: [{ values: [3, 1, 2] }] },
@@ -1460,14 +1509,14 @@ const orphanScripts = fs.readdirSync(ROOT).filter((file) => file.endsWith('.js')
   .filter((file) => !referencedScripts.has(file));
 ok('every shipped root script has an entry-page owner', orphanScripts.length === 0,
   orphanScripts.length ? `orphan scripts: ${orphanScripts.join(', ')}` : '');
-ok('retired visualizer, bundle, and companion implementations stay removed',
+ok('retired visualizer and student-bundle implementations stay removed while the scoped companion is shipped',
   !fs.existsSync(path.join(ROOT, 'app.js'))
   && !fs.existsSync(path.join(ROOT, 'tools', 'build-student-bundles.js'))
-  && !fs.existsSync(path.join(ROOT, 'lesson-app.js'))
-  && !fs.existsSync(path.join(ROOT, 'checkpoint-companions.js')));
+  && fs.existsSync(path.join(ROOT, 'lesson-app.js'))
+  && fs.existsSync(path.join(ROOT, 'checkpoint-companions.js')));
 const sharedStyles = fs.readFileSync(path.join(ROOT, 'styles.css'), 'utf8');
-ok('retired visualizer, materials, lesson, and companion selectors stay removed',
-  !/\.(?:chart-zero|bar-col|bar-value|bar-index|materials-grid|material-card|material-downloads|lesson-main|lesson-companion|lesson-sequence|companion-mental|companion-trace|companion-self-check)\b/.test(sharedStyles));
+ok('retired visualizer and materials selectors stay removed',
+  !/\.(?:chart-zero|bar-col|bar-value|bar-index|materials-grid|material-card|material-downloads)\b/.test(sharedStyles));
 ok('service worker uses the BSIT cache prefix', swSource.includes("const CACHE_PREFIX = 'bsit-learning-lab-'") && swSource.includes("const RETIRED_CACHE_PREFIX = 'itcc47-practice-'"));
 ok('service worker precaches atomically', swSource.includes('cache.addAll(PRECACHE)'));
 ok('service worker cleans up old caches', swSource.includes('caches.delete'));
@@ -1476,7 +1525,7 @@ ok('service worker ignores non-GET requests', /request\.method\s*!==\s*'GET'/.te
 ok('service worker ignores cross-origin requests', swSource.includes('url.origin !== self.location.origin'));
 
 // Every page must register the worker, or that page is not available offline.
-['index.html', 'visualizer.html', 'industry-workbench.html', 'writer.html', 'tracer.html', 'problems.html', 'problem-list.html', 'practice.html'].forEach((page) => {
+['index.html', 'visualizer.html', 'industry-workbench.html', 'writer.html', 'tracer.html', 'problems.html', 'problem-list.html', 'practice.html', 'lesson.html'].forEach((page) => {
   const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
   ok(`${page} registers the offline worker`, html.includes('sw-register.js'));
 });
@@ -1604,6 +1653,12 @@ extendedIds.forEach((id) => {
     if (annotation.target.kind === 'slot') return annotation.target.index >= 0 && annotation.target.index < event.frame.array.length;
     if (annotation.target.kind === 'entity') return [...(event.frame.nodes || []), ...(event.frame.detachedNodes || []), ...(event.frame.lanes || []).flatMap((lane)=>lane.items || [])].some((item)=>item.id === annotation.target.id);
     if (annotation.target.kind === 'pointer') return Object.prototype.hasOwnProperty.call(event.frame.pointers || {},annotation.target.id);
+    if (annotation.target.kind === 'record') return (event.frame.records || []).some((record)=>record.id === annotation.target.id);
+    if (annotation.target.kind === 'array-slot') return Number.isInteger(annotation.target.index) && annotation.target.index >= 0 && annotation.target.index < (event.frame.arrayState?.slots?.length || 0);
+    if (annotation.target.kind === 'linked-node') return (event.frame.linkedState?.nodes || []).some((node)=>node.id === annotation.target.id);
+    if (annotation.target.kind === 'linked-reference') return annotation.target.nodeId === null
+      ? annotation.target.field === 'head'
+      : (event.frame.linkedState?.nodes || []).some((node)=>node.id === annotation.target.nodeId && ['prev','next'].includes(annotation.target.field));
     return annotation.target.kind === 'held';
   })));
 });
@@ -1669,8 +1724,16 @@ ok('future problem metadata matches the curriculum resolver', FutureProblems.pro
 const invalidFutureStarters = FutureProblems.problems.filter((problem)=>!parses(problem.starter)).map((problem)=>problem.id);
 ok('every future problem starter parses', invalidFutureStarters.length === 0, invalidFutureStarters.join(', '));
 
-const formerLessonPage = fs.readFileSync(path.join(ROOT,'lesson.html'),'utf8');
-ok('former lesson route is a metadata-free module-practice redirect', /problem-list\.html/.test(formerLessonPage) && !/checkpoint-companions|lesson-app|curriculum\.data|companion-/i.test(formerLessonPage));
+const lessonPage = fs.readFileSync(path.join(ROOT,'lesson.html'),'utf8');
+const companionEngine = load(['checkpoint-companions.js']);
+const Companions = companionEngine.get('ITCC47CheckpointCompanions');
+const linkedFoundationCompanion = Companions.get('m3-linked-foundations');
+ok('lesson route loads the governed optional companion layer', /checkpoint-companions\.js/.test(lessonPage) && /lesson-app\.js/.test(lessonPage) && /curriculum\.data\.js/.test(lessonPage));
+ok('only linked foundations opts into the restored companion layer', Companions.checkpointIds.join(',') === 'm3-linked-foundations' && Companions.validate().length === 0);
+ok('linked foundations companion is deeply frozen and complete', Object.isFrozen(linkedFoundationCompanion) && Object.isFrozen(linkedFoundationCompanion.referenceProgression) && Object.isFrozen(linkedFoundationCompanion.referenceProgression.items) && linkedFoundationCompanion.vocabulary.length === 4 && linkedFoundationCompanion.invariants.length === 5 && linkedFoundationCompanion.misconceptions.length === 4);
+ok('linked foundations companion teaches the reference progression and practical Python choice', linkedFoundationCompanion.thesis === 'DATA + REFERENCES = STRUCTURE' && linkedFoundationCompanion.referenceProgression.items.map((item)=>item.structure).join(',') === 'Array,Linked list,Tree,Graph' && linkedFoundationCompanion.codeComparison.lines.join(',') === 'recent.remove(document),recent.insert(0, document)');
+const tracerSource = fs.readFileSync(path.join(ROOT,'tracer-app.js'),'utf8');
+ok('conceptual Recent Documents source is excluded from the singly linked tracer handoff', recentComparisonActivity.traceHandoff === false && tracerSource.includes('activity.traceHandoff === false'));
 ok('released practice counts are Module 1: 11, Module 2: 10, Module 3: 6, Module 4: 6', [1,2,3,4].map((module)=>PROBLEMS.filter((problem)=>problem.module === `Module ${module}`).length).join(',') === '11,10,6,6');
 ok('released practice contracts are versioned and reviewed', PROBLEMS.filter((problem)=>['Module 1','Module 2','Module 3','Module 4'].includes(problem.module)).every((problem)=>problem.contentVersion && problem.reviewStatus === 'reviewed' && problem.visibleTests.length >= 2 && problem.hidden.length >= 2));
 const practiceSource = fs.readFileSync(path.join(ROOT,'problems-app.js'),'utf8');

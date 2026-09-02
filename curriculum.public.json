@@ -196,7 +196,7 @@
     { "kind": "activity", "id": "industry-stable-priority-dispatch", "checkpointId": "m2-industry-workbench", "title": "Stable Priority Dispatch" },
     { "kind": "activity", "id": "industry-review-queue-mutation", "checkpointId": "m2-industry-workbench", "title": "Review Queue Mutation" },
     { "kind": "activity", "id": "linked-list-traversal", "checkpointId": "m3-linked-foundations" },
-    { "kind": "activity", "id": "array-linked-comparison", "checkpointId": "m3-linked-foundations" },
+    { "kind": "activity", "id": "array-linked-comparison", "checkpointId": "m3-linked-foundations", "title": "Recent Documents: positions versus relationships" },
     { "kind": "activity", "id": "linked-list-insert-head", "checkpointId": "m3-linked-mutation" },
     { "kind": "activity", "id": "linked-list-sorted-insert", "checkpointId": "m3-linked-mutation" },
     { "kind": "activity", "id": "linked-list-find-update", "checkpointId": "m3-linked-mutation" },

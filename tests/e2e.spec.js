@@ -6,7 +6,7 @@ const instructorAccessToken = fs.readFileSync(path.resolve(__dirname, '..', '.in
 const instructorAccessRecord = { schemaVersion: 1, profileId: 'itcc47-2026-2027-s1', profileVersion: 6, token: instructorAccessToken };
 const instructorPreviewRecord = { schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 6, currentCheckpointId: 'm8-dp' };
 
-const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'computer-architecture.html', 'computer-architecture-modules.html', 'computer-architecture-practice.html', 'computer-networking.html', 'computer-networking-modules.html', 'computer-networking-practice.html', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=deque-sliding-window', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', 'visualizer.html?course=computer-architecture&activity=architecture-decode-instruction', 'visualizer.html?course=computer-architecture&activity=architecture-add-immediate', 'visualizer.html?course=computer-networking&activity=networking-read-classroom-network', 'visualizer.html?course=computer-networking&activity=networking-local-peer-sharing', 'visualizer.html?course=computer-networking&activity=networking-classify-components', 'visualizer.html?course=computer-networking&activity=networking-compare-media', 'visualizer.html?course=computer-networking&activity=networking-read-network-topologies', 'visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery', 'industry-workbench.html', 'industry-workbench.html?scenario=industry-priority-range-recall', 'writer.html', 'tracer.html', 'problems.html', 'problems.html?view=midterm', 'problems.html?view=visualizations', 'problems.html?view=workbenches', 'lesson.html?checkpoint=m2-selection-sort', 'student-materials.html', 'problem-list.html?module=1', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count', 'practice.html?module=4&problem=stack-reverse'];
+const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'computer-architecture.html', 'computer-architecture-modules.html', 'computer-architecture-practice.html', 'computer-networking.html', 'computer-networking-modules.html', 'computer-networking-practice.html', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=deque-sliding-window', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', 'visualizer.html?course=computer-architecture&activity=architecture-decode-instruction', 'visualizer.html?course=computer-architecture&activity=architecture-add-immediate', 'visualizer.html?course=computer-networking&activity=networking-read-classroom-network', 'visualizer.html?course=computer-networking&activity=networking-local-peer-sharing', 'visualizer.html?course=computer-networking&activity=networking-classify-components', 'visualizer.html?course=computer-networking&activity=networking-compare-media', 'visualizer.html?course=computer-networking&activity=networking-read-network-topologies', 'visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery', 'industry-workbench.html', 'industry-workbench.html?scenario=industry-priority-range-recall', 'writer.html', 'tracer.html', 'problems.html', 'problems.html?view=midterm', 'problems.html?view=visualizations', 'problems.html?view=workbenches', 'lesson.html?checkpoint=m2-selection-sort', 'lesson.html?checkpoint=m3-linked-foundations&preview=1', 'student-materials.html', 'problem-list.html?module=1', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count', 'practice.html?module=4&problem=stack-reverse'];
 
 const curriculumSource = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'curriculum.public.json'), 'utf8'));
 const checkpointById = new Map(curriculumSource.checkpoints.map((checkpoint) => [checkpoint.id, checkpoint]));
@@ -2289,6 +2289,59 @@ test('OS reduced motion becomes the default when no override is saved', async ({
   await context.close();
 });
 
+test('Recent Documents comparison exposes every indexed shift, linked rewrite, and lookup caveat', async ({ page }) => {
+  await page.goto('/visualizer.html?activity=array-linked-comparison&preview=1');
+  await expect(page.getByRole('heading', { name: 'Recent Documents: positions versus relationships' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Review mental model' })).toHaveAttribute('href', /lesson\.html\?checkpoint=m3-linked-foundations/);
+  await expect(page.locator('.sequence-array-panel [data-record-id]')).toHaveCount(5);
+  await expect(page.locator('.sequence-linked-panel [data-linked-node-id]')).toHaveCount(5);
+  await expect(page.locator('.sequence-array-panel [data-record-id="doc:attendance"]')).toHaveClass(/is-opened/);
+  await expect(page.locator('.sequence-scenario')).toContainText('Opened: Attendance.xlsx');
+  for (const filename of ['Grades.xlsx', 'Syllabus.docx', 'Attendance.xlsx', 'Module3.pptx', 'Notes.txt']) {
+    await expect(page.locator('.sequence-array-panel')).toContainText(filename);
+  }
+
+  await (await visualizerMotion(page)).selectOption('off');
+  for (let step = 0; step < 7; step += 1) await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('.sequence-array-panel > footer code')).toContainText('Module3.pptx: [3] → [2]');
+  await expect(page.locator('.source-line.is-current')).toContainText('recent[2] <- recent[3]');
+
+  const timeline = await visualizerTimeline(page);
+  await timeline.fill('16');
+  await expect(page.locator('.sequence-linked-panel > footer code')).toContainText('Syllabus.next ← Module3');
+  await expect(page.locator('.source-line.is-current')).toContainText('current.prev.next <- current.next');
+  await timeline.fill('17');
+  await expect(page.locator('[data-linked-node-id="doc:attendance"]')).toHaveClass(/is-detached/);
+  await expect(page.locator('.sequence-detached-break')).toContainText('not reachable from head');
+
+  await timeline.fill('23');
+  await expect(page.locator('.sequence-array-track')).toHaveAttribute('data-array-order', 'Attendance.xlsx, Grades.xlsx, Syllabus.docx, Module3.pptx, Notes.txt');
+  const linkedOrder = await page.locator('.sequence-linked-track [data-linked-node-id]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-linked-node-id')));
+  expect(linkedOrder).toEqual(['doc:attendance', 'doc:grades', 'doc:syllabus', 'doc:module3', 'doc:notes']);
+  await expect(page.locator('.sequence-linked-node').first()).toContainText('HEAD');
+  await expect(page.locator('.sequence-caveat')).toContainText('finding Attendance.xlsx from head still requires O(n) traversal');
+  await expect(page.locator('.sequence-takeaway')).toContainText('POSITION');
+  await expect(page.locator('.sequence-takeaway')).toContainText('RELATIONSHIPS');
+  await expect(page.locator('.sequence-array-panel > header')).toContainText(/6\s*shifts/);
+  await expect(page.locator('.sequence-linked-panel > header')).toContainText(/6\s*pointer writes/);
+  await expect(page.locator('.source-line.is-current')).toContainText('RETURN recent order');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
+});
+
+test('linked foundations companion teaches Recent Documents and the reference progression', async ({ page }) => {
+  await page.goto('/lesson.html?checkpoint=m3-linked-foundations&preview=1');
+  await expect(page.getByRole('heading', { name: 'Linked nodes and traversal' })).toBeVisible();
+  await expect(page.locator('.companion-thesis')).toHaveText('DATA + REFERENCES = STRUCTURE');
+  await expect(page.locator('.companion-code')).toContainText('recent.remove(document)');
+  await expect(page.locator('.companion-code')).toContainText('simple Python-list implementation is probably the sensible choice');
+  await expect(page.locator('.companion-progression li')).toHaveCount(4);
+  for (const structure of ['Array', 'Linked list', 'Tree', 'Graph']) await expect(page.locator('.companion-progression')).toContainText(structure);
+  await expect(page.locator('.companion-progression')).toContainText('folder structure belongs to the tree model');
+  await expect(page.locator('.lesson-sequence')).toContainText('Recent Documents: positions versus relationships');
+  await expect(page.locator('.lesson-sequence a[href*="array-linked-comparison"]')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
+});
+
 test('linked foundation visualizations respect reduced motion', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(() => localStorage.removeItem('itcc47:visualizer-motion:v1'));
@@ -2380,20 +2433,30 @@ test('linked foundations keep the active pointer and comparison readable on a ph
   await expect(page.locator('.integrated-step strong')).toHaveText(stepText);
 
   await page.goto('/visualizer.html?activity=array-linked-comparison');
-  await expect(page.locator('.representation-array')).toBeVisible();
-  await expect(page.locator('.linked-chain')).toBeVisible();
+  await expect(page.locator('.sequence-array-panel')).toBeVisible();
+  await expect(page.locator('.sequence-linked-panel')).toBeVisible();
   const comparisonGeometry = await page.evaluate(() => {
     const canvas = document.querySelector('.visual-canvas').getBoundingClientRect();
-    const array = document.querySelector('.representation-array').getBoundingClientRect();
-    const chain = document.querySelector('.linked-chain').getBoundingClientRect();
-    return { height: canvas.height, arrayVisible: array.top >= canvas.top && array.bottom <= canvas.bottom, chainVisible: chain.top >= canvas.top && chain.bottom <= canvas.bottom, overflow: document.documentElement.scrollWidth - innerWidth };
+    const sequence = document.querySelector('.sequence-comparison');
+    const array = document.querySelector('.sequence-array-panel').getBoundingClientRect();
+    const linked = document.querySelector('.sequence-linked-panel').getBoundingClientRect();
+    return {
+      height: canvas.height,
+      arrayFitsWidth: array.left >= canvas.left && array.right <= canvas.right,
+      linkedFitsWidth: linked.left >= canvas.left && linked.right <= canvas.right,
+      panelsDoNotOverlap: array.bottom <= linked.top,
+      canvasScrollsInternally: sequence.scrollHeight > sequence.clientHeight,
+      overflow: document.documentElement.scrollWidth - innerWidth,
+    };
   });
-  expect(comparisonGeometry.height).toBe(340);
-  expect(comparisonGeometry.arrayVisible).toBe(true);
-  expect(comparisonGeometry.chainVisible).toBe(true);
+  expect(comparisonGeometry.height).toBe(610);
+  expect(comparisonGeometry.arrayFitsWidth).toBe(true);
+  expect(comparisonGeometry.linkedFitsWidth).toBe(true);
+  expect(comparisonGeometry.panelsDoNotOverlap).toBe(true);
+  expect(comparisonGeometry.canvasScrollsInternally).toBe(true);
   expect(comparisonGeometry.overflow).toBe(0);
   await page.getByRole('button', { name: 'Step', exact: true }).click();
-  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 5');
+  await expect(page.locator('.integrated-step strong')).toHaveText('2 / 24');
 });
 
 test('curated linked-list pseudocode opens in the lab and retains trace, output, and diagnostics', async ({ page }, testInfo) => {
@@ -2666,6 +2729,15 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
   await expect(page.getByRole('heading', { name: 'Traverse a singly linked list' })).toBeVisible();
   await expect(page.locator('.source-line.is-current')).toContainText('head <- NULL');
 
+  await page.goto(`file:///${path.resolve(__dirname, '..', 'visualizer.html').replace(/\\/g, '/')}?activity=array-linked-comparison&preview=1`);
+  await expect(page.getByRole('heading', { name: 'Recent Documents: positions versus relationships' })).toBeVisible();
+  await (await visualizerMotion(page)).selectOption('off');
+  await (await visualizerTimeline(page)).fill('23');
+  await expect(page.locator('.sequence-array-track')).toHaveAttribute('data-array-order', 'Attendance.xlsx, Grades.xlsx, Syllabus.docx, Module3.pptx, Notes.txt');
+
+  await page.goto(`file:///${path.resolve(__dirname, '..', 'lesson.html').replace(/\\/g, '/')}?checkpoint=m3-linked-foundations&preview=1`);
+  await expect(page.locator('.companion-thesis')).toHaveText('DATA + REFERENCES = STRUCTURE');
+
   await page.goto(`file:///${path.resolve(__dirname, '..', 'problems.html').replace(/\\/g, '/')}?view=midterm`);
   await expect(page.getByRole('heading', { name: /Move from understanding/ })).toBeVisible();
   await expect(page.locator('[data-midterm-module]')).toHaveCount(4);
@@ -2724,6 +2796,10 @@ test('cached navigation remains available offline', async ({ page, context }, te
   await expect(page.getByRole('heading', { name: 'Check the network from foundations to ARP.' })).toBeVisible();
   await page.goto('/visualizer.html?activity=linked-list-traversal');
   await expect(page.getByRole('heading', { name: 'Traverse a singly linked list' })).toBeVisible();
+  await page.goto('/visualizer.html?activity=array-linked-comparison&preview=1');
+  await expect(page.getByRole('heading', { name: 'Recent Documents: positions versus relationships' })).toBeVisible();
+  await page.goto('/lesson.html?checkpoint=m3-linked-foundations&preview=1');
+  await expect(page.locator('.companion-thesis')).toHaveText('DATA + REFERENCES = STRUCTURE');
   await page.goto('/problems.html?view=midterm');
   await expect(page.locator('[data-midterm-checkpoint]')).toHaveCount(18);
   await page.goto('/visualizer.html?activity=deque-service-lane');

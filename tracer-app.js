@@ -754,7 +754,7 @@ const activityHandoff = (() => {
   const release = ITCC47Curriculum.stateForResource('activity', activityId, ITCC47CurriculumUI.previewOptions());
   if (!['available', 'current'].includes(release.state)) return null;
   const activity = ITCC47Activities.get(activityId);
-  if (!activity || !Array.isArray(activity.source)) return null;
+  if (!activity || activity.traceHandoff === false || !Array.isArray(activity.source)) return null;
   return activity;
 })();
 

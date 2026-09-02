@@ -9,6 +9,7 @@ import { CpuDatapathRenderer, CpuInstructionDecodeRenderer, DecodeFieldsPane, Ma
 import { NetworkCurrentMovement, NetworkPacketInspector, NetworkStepsView, NetworkTablesView, NetworkTopologyRenderer } from './network-topology.jsx';
 import { NetworkFoundationConceptsView, NetworkFoundationEvidenceView, NetworkFoundationsRenderer } from './network-foundations.jsx';
 import { NetworkFloatingPacketInspector } from './network-floating-inspector.jsx';
+import { SequenceComparisonRenderer } from './sequence-comparison-renderer.jsx';
 
 const MAX_VISUAL_VALUES = 18;
 const DEFAULT_SPEED = 6;
@@ -378,6 +379,7 @@ const LinkedListRenderer = memo(function LinkedListRenderer({ frame, event, dura
 });
 
 ITCC47VisualizerRegistry.registerRenderer('linked-list', LinkedListRenderer);
+ITCC47VisualizerRegistry.registerRenderer('sequence-comparison', SequenceComparisonRenderer);
 ITCC47VisualizerRegistry.registerRenderer('concept', ConceptDomainRenderer);
 ITCC47VisualizerRegistry.registerRenderer('linear-adt', LinearADTRenderer);
 
@@ -519,10 +521,12 @@ function ObjectModelSurface({ activity, event, frame, previousFrame, focused, on
 }
 
 function SourcePanel({ activity, event, source, focused = false, onFocus = null }) {
-  const [copyState, setCopyState] = useState('Copy Python');
+  const copyLabel = activity.sourceKind === 'conceptual' ? 'Copy pseudocode' : 'Copy Python';
+  const [copyState, setCopyState] = useState(copyLabel);
   const activeLineRef = useRef(null);
   const activeLine = event?.source?.line || (event?.type === 'complete' ? source.length : Math.min(2, source.length));
   useEffect(() => { activeLineRef.current?.scrollIntoView({ block: 'nearest' }); }, [activeLine, activity.id]);
+  useEffect(() => setCopyState(copyLabel), [activity.id, copyLabel]);
   async function copySource() {
     const text = source.join('\n');
     try {
@@ -532,7 +536,7 @@ function SourcePanel({ activity, event, source, focused = false, onFocus = null 
       textarea.value = text; textarea.style.position = 'fixed'; textarea.style.opacity = '0'; document.body.appendChild(textarea); textarea.select();
       document.execCommand('copy'); textarea.remove();
     }
-    setCopyState('Copied'); window.setTimeout(() => setCopyState('Copy Python'), 1400);
+    setCopyState('Copied'); window.setTimeout(() => setCopyState(copyLabel), 1400);
   }
   return <section className="source-panel" tabIndex="0" aria-label={activity.language === 'python' ? 'Python source' : 'Pseudocode'}>
     {activity.language === 'python' ? <header className="source-language"><strong>Python source</strong><div>{onFocus ? <button type="button" className="source-focus-button" aria-pressed={focused} onClick={onFocus}><Icon name="expand" size={15}/>{focused ? 'Exit source focus' : 'Focus source'}</button> : null}<button type="button" onClick={copySource}><Icon name="code" size={16}/>{copyState}</button></div></header> : null}
@@ -659,7 +663,9 @@ function ArrayDataControls({ activity, inputs, setInputs, onShuffle }) {
     setError(''); setInputs((current) => ({ ...current, values: parts.map(Number) }));
   }
   if (activity.input.editable === false) {
-    const curatedDescription = activity.renderer === 'linear-adt'
+    const curatedDescription = activity.renderer === 'sequence-comparison'
+      ? 'The Recent Documents timeline stays fixed so every indexed shift, reference rewrite, and source line remains synchronized.'
+      : activity.renderer === 'linear-adt'
       ? 'The operations stay fixed so top, front, back, and held values remain synchronized with each source line.'
       : activity.renderer === 'linked-list'
         ? 'Each preset keeps node identities, pointer writes, and source lines synchronized.'
@@ -714,7 +720,7 @@ function workspaceCompositionFor(activity) {
   if (activity.workspaceComposition) return activity.workspaceComposition;
   if (activity.family === 'Stacks') return 'split-vertical';
   if (activity.family === 'Trees') return 'wide-hierarchy';
-  if (activity.renderer === 'array' || activity.renderer === 'linked-list' || activity.renderer === 'linear-adt') return 'stacked-horizontal';
+  if (activity.renderer === 'array' || activity.renderer === 'linked-list' || activity.renderer === 'linear-adt' || activity.renderer === 'sequence-comparison') return 'stacked-horizontal';
   return 'stacked';
 }
 
@@ -938,7 +944,7 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const networkFrame = useSequenceFrame({ enabled: isComputerNetworking, event, frame: event?.frame, duration: networkVisualDuration, onSequenceComplete: onEntityComplete });
   const workspaceComposition = workspaceCompositionFor(activity);
   const isCpuDecode = workspaceComposition === 'cpu-decode';
-  const [Renderer, setRenderer] = useState(() => activity.renderer === 'object-model' ? ObjectModelRenderer : activity.renderer === 'cpu-datapath' ? CpuDatapathRenderer : activity.renderer === 'cpu-instruction-decode' ? CpuInstructionDecodeRenderer : activity.renderer === 'network-topology' ? NetworkTopologyRenderer : activity.renderer === 'network-foundations' ? NetworkFoundationsRenderer : ArrayRenderer);
+  const [Renderer, setRenderer] = useState(() => activity.renderer === 'object-model' ? ObjectModelRenderer : activity.renderer === 'cpu-datapath' ? CpuDatapathRenderer : activity.renderer === 'cpu-instruction-decode' ? CpuInstructionDecodeRenderer : activity.renderer === 'network-topology' ? NetworkTopologyRenderer : activity.renderer === 'network-foundations' ? NetworkFoundationsRenderer : activity.renderer === 'sequence-comparison' ? SequenceComparisonRenderer : ArrayRenderer);
 
   useEffect(() => {
     const mapping = pendingGranularityMap.current;
@@ -1007,14 +1013,16 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const previousExample = exampleIndex > 0 ? topicActivities[exampleIndex - 1] : null;
   const nextExample = exampleIndex < topicActivities.length - 1 ? topicActivities[exampleIndex + 1] : null;
   const exampleHref = (item) => item ? `visualizer.html?course=itcc45&activity=${encodeURIComponent(item.id)}` : null;
-  const itcc47ActionHref = activity.renderer === 'linear-adt'
-    ? ITCC47CurriculumUI.href(`problem-list.html?module=${encodeURIComponent(activity.module)}`)
-    : ITCC47CurriculumUI.href(`tracer.html?activity=${encodeURIComponent(activity.id)}`);
-  const itcc47ActionLabel = activity.renderer === 'linear-adt' ? 'Practice this module' : 'Edit pseudocode';
+  const itcc47ActionHref = activity.traceHandoff === false
+    ? ITCC47CurriculumUI.href(`lesson.html?checkpoint=${encodeURIComponent(activity.checkpointId)}`)
+    : activity.renderer === 'linear-adt'
+      ? ITCC47CurriculumUI.href(`problem-list.html?module=${encodeURIComponent(activity.module)}`)
+      : ITCC47CurriculumUI.href(`tracer.html?activity=${encodeURIComponent(activity.id)}`);
+  const itcc47ActionLabel = activity.traceHandoff === false ? 'Review mental model' : activity.renderer === 'linear-adt' ? 'Practice this module' : 'Edit pseudocode';
   const mobileEvidenceActive = mobileTab === 'trace' || mobileTab === 'steps' || mobileTab === 'more';
   return <LazyMotion features={domMax} strict><MotionConfig reducedMotion={motionPreference.mode === 'on' ? 'never' : 'always'} transition={{ duration }}><div className={`visualizer-workspace course-${courseId} evidence-${workspaceLayout.evidence} motion-${motionPreference.mode} navigation-${playback.navigationSource} composition-${workspaceComposition}`} data-motion-duration={isComputerNetworking ? networkDuration : duration} data-workspace-composition={workspaceComposition}>
     <main className="workspace-main">
-      <div className="activity-heading"><div>{!isComputerArchitecture ? <p><a href={isITCC45 || isComputerNetworking ? backHref : ITCC47CurriculumUI.href(backHref)}><Icon name="back" size={14}/>{backLabel}</a><span>{isITCC45 ? `Topic ${activity.module} / ${activity.topic} / Example ${exampleIndex + 1} of ${topicActivities.length}` : `Module ${activity.module} / ${activity.topic}${activity.exampleKind ? ` / ${activity.exampleKind}` : ''}`}</span></p> : null}<h1>{activity.title}</h1>{isITCC45 ? <span className="activity-learning-goal"><em>{activity.context}</em>{activity.learningGoal}</span> : <span>{activity.subtitle}</span>}</div><div className="activity-action-stack">{isITCC45 ? <nav className="activity-example-nav" aria-label="Examples in this topic">{previousExample ? <a href={exampleHref(previousExample)} aria-label={`Previous example: ${previousExample.title}`}><Icon name="back" size={14}/>Previous</a> : <span aria-disabled="true"><Icon name="back" size={14}/>Previous</span>}{nextExample ? <a href={exampleHref(nextExample)} aria-label={`Next example: ${nextExample.title}`}>Next<Icon name="next" size={14}/></a> : <span aria-disabled="true">Next<Icon name="next" size={14}/></span>}</nav> : null}<div className="activity-actions">{isITCC45 ? <OOPDataControls activity={activity} inputs={inputs} setInputs={setInputs}/> : isComputerArchitecture || isComputerNetworking ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : <a className="edit-code" href={itcc47ActionHref}><Icon name={activity.renderer === 'linear-adt' ? 'grid' : 'code'} size={17}/>{itcc47ActionLabel}</a>}</div></div></div>
+      <div className="activity-heading"><div>{!isComputerArchitecture ? <p><a href={isITCC45 || isComputerNetworking ? backHref : ITCC47CurriculumUI.href(backHref)}><Icon name="back" size={14}/>{backLabel}</a><span>{isITCC45 ? `Topic ${activity.module} / ${activity.topic} / Example ${exampleIndex + 1} of ${topicActivities.length}` : `Module ${activity.module} / ${activity.topic}${activity.exampleKind ? ` / ${activity.exampleKind}` : ''}`}</span></p> : null}<h1>{activity.title}</h1>{isITCC45 ? <span className="activity-learning-goal"><em>{activity.context}</em>{activity.learningGoal}</span> : <span>{activity.subtitle}</span>}</div><div className="activity-action-stack">{isITCC45 ? <nav className="activity-example-nav" aria-label="Examples in this topic">{previousExample ? <a href={exampleHref(previousExample)} aria-label={`Previous example: ${previousExample.title}`}><Icon name="back" size={14}/>Previous</a> : <span aria-disabled="true"><Icon name="back" size={14}/>Previous</span>}{nextExample ? <a href={exampleHref(nextExample)} aria-label={`Next example: ${nextExample.title}`}>Next<Icon name="next" size={14}/></a> : <span aria-disabled="true">Next<Icon name="next" size={14}/></span>}</nav> : null}<div className="activity-actions">{isITCC45 ? <OOPDataControls activity={activity} inputs={inputs} setInputs={setInputs}/> : isComputerArchitecture || isComputerNetworking ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : <a className="edit-code" href={itcc47ActionHref}><Icon name={activity.traceHandoff === false || activity.renderer === 'linear-adt' ? 'grid' : 'code'} size={17}/>{itcc47ActionLabel}</a>}</div></div></div>
       {!isITCC45 && !isComputerArchitecture && !isComputerNetworking ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} onShuffle={shuffle} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : null}
       <div className="mobile-surface-tabs" role="tablist" aria-label="Workspace view">{mobileTabs.map(([id, icon, label]) => <button type="button" role="tab" aria-selected={mobileTab === id} className={mobileTab === id ? 'active' : ''} onClick={() => setMobileTab(id)} key={id}><Icon name={icon}/>{label}</button>)}</div>
       {isITCC45 ? <ITCC45LabStage activity={activity} event={event} previousEvent={previousEvent} index={playback.index} source={source} mobileTab={mobileTab} layout={workspaceLayout} onRatioChange={(sourceRatio) => updateWorkspaceLayout({ sourceRatio })} duration={objectVisualDuration} motionMode={motionPreference.mode}/> : isComputerArchitecture ? <div className="cpu-workbench">

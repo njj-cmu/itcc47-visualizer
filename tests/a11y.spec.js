@@ -25,6 +25,9 @@ test('ITCC45 scenario and expanded-model dialogs have no serious or critical Axe
   await page.goto('/visualizer.html?course=itcc45&activity=itcc45-classes-blueprint');
   for (const buttonName of ['Edit scenario', 'Expand model']) {
     await page.getByRole('button', { name: buttonName }).click();
+    if (buttonName === 'Expand model') {
+      await expect(page.locator('.object-model-dialog .object-empty')).toHaveCSS('opacity', '1');
+    }
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       .analyze();

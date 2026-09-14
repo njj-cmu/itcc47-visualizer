@@ -1744,6 +1744,7 @@ test('visualizer workspaces choose a structure-aware desktop composition', async
   await page.goto('/visualizer.html?activity=queue-fifo-basics&preview=1');
   await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-workspace-composition', 'stacked-horizontal');
   if (testInfo.project.name === 'laptop') {
+    await page.getByRole('button', { name: 'Expand learning evidence' }).click();
     const queuePanels = await page.locator('.itcc47-workbench').evaluate((workbench) => {
       const source = workbench.querySelector('.desktop-source').getBoundingClientRect();
       const visual = workbench.querySelector('.itcc47-visual-shell').getBoundingClientRect();
@@ -2218,9 +2219,10 @@ test('ITCC47 integrates playback and remembers the evidence rail', async ({ page
   await expect(page.locator('.desktop-evidence')).toHaveCount(1);
   await expect(page.locator('.mobile-evidence')).toHaveCount(0);
   expect(await page.locator('.trace-item').count()).toBeLessThanOrEqual(80);
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-collapsed/);
+  await page.getByRole('button', { name: 'Expand learning evidence' }).click();
   await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-expanded/);
   await page.getByRole('button', { name: 'Collapse learning evidence' }).click();
-  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-collapsed/);
   const split = await page.evaluate(() => {
     const code = document.querySelector('.desktop-source').getBoundingClientRect();
     const visual = document.querySelector('.itcc47-visual-shell').getBoundingClientRect();
@@ -2448,10 +2450,18 @@ test('Recent Documents what-if controls keep one selected representation synchro
   await page.goto('/visualizer.html?activity=array-linked-comparison&preview=1');
   await expect(page.getByRole('heading', { name: 'Recent Documents: positions versus relationships' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Review mental model' })).toHaveAttribute('href', /lesson\.html\?checkpoint=m3-linked-foundations/);
-  await expect(page.getByRole('group', { name: 'What if I open this instead?' })).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Representation' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Attendance.xlsx', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('button', { name: 'Indexed Dynamic List', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('Curated pseudocode activity', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.data-controls')).toHaveCount(0);
+  const documentChoice = page.getByLabel('Document', { exact: true });
+  const structureChoice = page.getByLabel('Data structure', { exact: true });
+  await expect(documentChoice).toHaveValue('attendance');
+  await expect(documentChoice.locator('option')).toHaveCount(5);
+  await expect(structureChoice).toHaveValue('array');
+  await expect(structureChoice.locator('option', { hasText: 'Python List (Dynamic Array)' })).toHaveCount(1);
+  await expect(page.getByLabel('Python source')).toContainText('opened = "Attendance.xlsx"');
+  await expect(page.getByLabel('Python source')).toContainText('index = recent.index(opened)');
+  await expect(page.getByLabel('Python source')).toContainText('document = recent.pop(index)');
+  await expect(page.getByLabel('Python source')).toContainText('recent.insert(0, document)');
   await expect(page.locator('.sequence-array-panel [data-record-id]')).toHaveCount(5);
   await expect(page.locator('.sequence-linked-panel')).toHaveCount(0);
   await expect(page.locator('.sequence-array-panel [data-record-id="doc:attendance"]')).toHaveClass(/is-opened/);
@@ -2463,25 +2473,30 @@ test('Recent Documents what-if controls keep one selected representation synchro
   await (await visualizerMotion(page)).selectOption('off');
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
-  const notesChoice = page.getByRole('button', { name: 'Notes.txt', exact: true });
-  await notesChoice.focus();
-  await notesChoice.press('Space');
-  await expect(notesChoice).toBeFocused();
-  await expect(notesChoice).toHaveAttribute('aria-pressed', 'true');
+  await documentChoice.selectOption('notes');
+  await expect(documentChoice).toHaveValue('notes');
   await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
   await expect(await visualizerTimeline(page)).toHaveValue('0');
   await expect(page.locator('.sequence-scenario')).toContainText('Opened: Notes.txt');
+  await expect(page.getByLabel('Python source')).toContainText('opened = "Notes.txt"');
 
   let timeline = await visualizerTimeline(page);
+  await timeline.fill('6');
+  await expect(page.locator('.source-line.is-current')).toContainText('document = recent.pop(index)');
+  await timeline.fill('7');
+  await expect(page.locator('.source-line.is-current')).toContainText('document = recent.pop(index)');
   await timeline.fill(await timeline.getAttribute('max'));
   await expect(page.locator('.sequence-array-track')).toHaveAttribute('data-array-order', 'Notes.txt, Grades.xlsx, Syllabus.docx, Attendance.xlsx, Module3.pptx');
   await expect(page.locator('.sequence-array-panel > header')).toContainText(/4\s*shifts/);
   await expect(page.locator('.sequence-array-panel > header')).toContainText(/1\s*placement/);
 
-  const linkedChoice = page.getByRole('button', { name: 'Doubly Linked List', exact: true });
-  await linkedChoice.click();
-  await expect(linkedChoice).toHaveAttribute('aria-pressed', 'true');
-  await expect(notesChoice).toHaveAttribute('aria-pressed', 'true');
+  await structureChoice.selectOption('linked');
+  await expect(structureChoice).toHaveValue('linked');
+  await expect(documentChoice).toHaveValue('notes');
+  await expect(page.getByLabel('Python source')).toContainText('current = find_node(head, opened)');
+  await expect(page.getByLabel('Python source')).toContainText('if current.next is None:');
+  await expect(page.getByLabel('Python source')).toContainText('tail = current.prev');
+  await expect(page.getByLabel('Python source')).not.toContainText('class Node');
   await expect(page.locator('.sequence-array-panel')).toHaveCount(0);
   await expect(page.locator('.sequence-linked-panel [data-linked-node-id]')).toHaveCount(5);
   await expect(page.locator('.sequence-scenario')).toContainText('Opened: Notes.txt');
@@ -2497,20 +2512,50 @@ test('Recent Documents what-if controls keep one selected representation synchro
   await expect(page.locator('.sequence-caveat')).toContainText('finding Notes.txt from head still requires O(n) traversal');
   await expect(page.locator('.sequence-takeaway')).toContainText('POSITION');
   await expect(page.locator('.sequence-takeaway')).toContainText('RELATIONSHIPS');
-  await expect(page.locator('.source-line.is-current')).toContainText('RETURN recent order');
+  await expect(page.locator('.source-line.is-current')).toContainText('head = current');
 
-  const gradesChoice = page.getByRole('button', { name: 'Grades.xlsx', exact: true });
-  await gradesChoice.click();
+  await documentChoice.selectOption('grades');
   timeline = await visualizerTimeline(page);
   await timeline.fill('5');
   await expect(page.locator('.integrated-step span')).toContainText('No detach, neighbor rewrite, or head update is necessary');
   await expect(page.locator('.sequence-linked-panel > header')).toContainText(/0\s*pointer writes/);
-  await page.getByRole('button', { name: 'Indexed Dynamic List', exact: true }).click();
+  await structureChoice.selectOption('array');
   timeline = await visualizerTimeline(page);
   await timeline.fill('6');
   await expect(page.locator('.integrated-step span')).toContainText('No reordering is necessary');
   await expect(page.locator('.sequence-array-panel > header')).toContainText(/0\s*shifts/);
   await expect(page.locator('.sequence-array-panel > header')).toContainText(/0\s*placements/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
+});
+
+test('Recent Documents keeps source and visualization side by side with evidence collapsed or expanded', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone');
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await page.addInitScript(() => localStorage.removeItem('itcc47.workspace-layout:v1'));
+  await page.goto('/visualizer.html?activity=array-linked-comparison&preview=1');
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-collapsed/);
+
+  async function splitGeometry() {
+    return page.evaluate(() => {
+      const source = document.querySelector('.desktop-source').getBoundingClientRect();
+      const visual = document.querySelector('.itcc47-visual-shell').getBoundingClientRect();
+      return { source: { x: source.x, y: source.y, width: source.width }, visual: { x: visual.x, y: visual.y, width: visual.width } };
+    });
+  }
+
+  let split = await splitGeometry();
+  expect(Math.abs(split.source.y - split.visual.y)).toBeLessThan(2);
+  expect(split.visual.x).toBeGreaterThan(split.source.x + split.source.width);
+  expect(split.source.width / (split.source.width + split.visual.width)).toBeGreaterThan(0.3);
+  expect(split.source.width / (split.source.width + split.visual.width)).toBeLessThan(0.42);
+
+  await page.getByRole('button', { name: 'Expand learning evidence' }).click();
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/evidence-expanded/);
+  split = await splitGeometry();
+  expect(Math.abs(split.source.y - split.visual.y)).toBeLessThan(2);
+  expect(split.visual.x).toBeGreaterThan(split.source.x + split.source.width);
+  expect(split.source.width).toBeGreaterThan(220);
+  expect(split.visual.width).toBeGreaterThan(360);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
 });
 
@@ -2636,7 +2681,7 @@ test('linked foundations keep the active pointer and comparison readable on a ph
   expect(arrayGeometry.arrayFitsWidth).toBe(true);
   expect(arrayGeometry.structureScrollsHorizontally).toBe(true);
   expect(arrayGeometry.overflow).toBe(0);
-  await page.getByRole('button', { name: 'Doubly Linked List', exact: true }).click();
+  await page.getByLabel('Data structure', { exact: true }).selectOption('linked');
   await expect(page.locator('.sequence-array-panel')).toHaveCount(0);
   await expect(page.locator('.sequence-linked-panel')).toBeVisible();
   const linkedGeometry = await page.evaluate(() => {

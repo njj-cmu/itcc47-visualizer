@@ -1,4 +1,4 @@
-/* Executes every displayed ITCC45 Python example against its declared output. */
+/* Executes displayed Python examples against their declared outcomes. */
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -8,6 +8,9 @@ const ROOT = path.join(__dirname, '..');
 const context = vm.createContext({ console, setTimeout, clearTimeout });
 ['course-catalog.js', 'playback.js', 'itcc45-activities.js'].forEach((file) => vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), context));
 const activities = vm.runInContext('ITCC45Activities.list()', context);
+const itcc47Context = vm.createContext({ console, setTimeout, clearTimeout });
+['interpreter.js', 'playback.js', 'complexity.js', 'algorithms.js', 'activity-catalog.js'].forEach((file) => vm.runInContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), itcc47Context));
+const recentDocuments = vm.runInContext("ITCC47Activities.get('array-linked-comparison')", itcc47Context);
 
 function findPython() {
   const configured = process.env.BSIT_PYTHON;
@@ -62,5 +65,48 @@ activities.forEach((activity) => {
   const passed = scenarios.map(([label, options]) => execute(activity, options, label)).every(Boolean);
   console.log(`${passed ? 'PASS' : 'FAIL'} ${activity.id} (${scenarios.length} scenarios)`);
 });
+
+const recentLabels = ['Grades.xlsx', 'Syllabus.docx', 'Attendance.xlsx', 'Module3.pptx', 'Notes.txt'];
+const recentPresets = ['grades', 'syllabus', 'attendance', 'module3', 'notes'];
+let recentSourceChecks = 0;
+recentPresets.forEach((preset, openedIndex) => {
+  ['array', 'linked'].forEach((representation) => {
+    const source = recentDocuments.sourceFor({ preset, representation }).join('\n');
+    const expectedOrder = [recentLabels[openedIndex], ...recentLabels.filter((_, index) => index !== openedIndex)];
+    const linkedPrelude = [
+      'class Node:',
+      '    def __init__(self, name):',
+      '        self.name = name',
+      '        self.prev = None',
+      '        self.next = None',
+      `nodes = [Node(name) for name in ${JSON.stringify(recentLabels)}]`,
+      'for left, right in zip(nodes, nodes[1:]):',
+      '    left.next = right',
+      '    right.prev = left',
+      'head = nodes[0]',
+      'tail = nodes[-1]',
+      'def find_node(node, name):',
+      '    while node is not None and node.name != name:',
+      '        node = node.next',
+      '    return node',
+    ].join('\n');
+    const report = representation === 'array'
+      ? '\nprint("|".join(recent))'
+      : '\norder = []\nnode = head\nwhile node is not None:\n    order.append(node.name)\n    node = node.next\nprint("|".join(order))\nprint(tail.name)';
+    const executable = representation === 'linked' ? `${linkedPrelude}\n${source}${report}` : `${source}${report}`;
+    const grammar = spawnSync(python, [...prefix, '-c', 'import ast, sys; ast.parse(sys.stdin.read(), feature_version=(3, 9))'], { input: source, encoding: 'utf8', timeout: 10000 });
+    const run = spawnSync(python, [...prefix, '-c', executable], { encoding: 'utf8', timeout: 10000 });
+    const output = String(run.stdout || '').replace(/\r\n/g, '\n').trim().split('\n');
+    const expected = representation === 'linked' ? [expectedOrder.join('|'), expectedOrder.at(-1)] : [expectedOrder.join('|')];
+    recentSourceChecks += 1;
+    if (grammar.status !== 0 || run.status !== 0 || JSON.stringify(output) !== JSON.stringify(expected)) {
+      failures += 1;
+      console.error(`FAIL array-linked-comparison (${preset}/${representation})`);
+      console.error(`  expected: ${JSON.stringify(expected)}\n  actual:   ${JSON.stringify(output)}\n  grammar:  ${String(grammar.stderr || '').trim()}\n  stderr:   ${String(run.stderr || '').trim()}`);
+    }
+  });
+});
+console.log(`${recentSourceChecks === 10 ? 'PASS' : 'FAIL'} array-linked-comparison (${recentSourceChecks} Python source variants)`);
 if (failures) process.exit(1);
 console.log(`\n${executions}/${executions} Python 3.9-compatible scenario programs matched their guided timelines.`);
+console.log(`${recentSourceChecks}/${recentSourceChecks} Recent Documents programs parsed and reached their deterministic orders.`);

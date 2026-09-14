@@ -519,7 +519,7 @@ const ITCC47Activities = (() => {
     blurb: 'The predecessor bypasses the target before target.next is cleared. Missing targets return without a pointer write.',
   });
 
-  const RECENT_DOCUMENTS_CONTENT_VERSION = '2026.09-recent-documents-v2';
+  const RECENT_DOCUMENTS_CONTENT_VERSION = '2026.09-recent-documents-v3';
   const RECENT_DOCUMENTS = Object.freeze([
     Object.freeze({ id: 'doc:grades', label: 'Grades.xlsx' }),
     Object.freeze({ id: 'doc:syllabus', label: 'Syllabus.docx' }),
@@ -530,18 +530,18 @@ const ITCC47Activities = (() => {
   const RECENT_INITIAL_ORDER = Object.freeze(RECENT_DOCUMENTS.map((record) => record.id));
   const RECENT_PRESETS = Object.freeze(RECENT_DOCUMENTS.map((record) => Object.freeze({ id: record.id.replace('doc:', ''), label: record.label })));
   const RECENT_REPRESENTATIONS = Object.freeze([
-    Object.freeze({ id: 'array', label: 'Indexed Dynamic List' }),
+    Object.freeze({ id: 'array', label: 'Python List (Dynamic Array)' }),
     Object.freeze({ id: 'linked', label: 'Doubly Linked List' }),
   ]);
   const RECENT_SEGMENTS = Object.freeze({
     scenario: Object.freeze({ id: 'scenario', label: 'Scenario' }),
-    array: Object.freeze({ id: 'array-list', label: 'Indexed list' }),
+    array: Object.freeze({ id: 'array-list', label: 'Python list' }),
     linked: Object.freeze({ id: 'linked-list', label: 'Linked list' }),
     comparison: Object.freeze({ id: 'comparison', label: 'Comparison' }),
   });
   const RECENT_TAKEAWAY = 'Array/list order is tied to POSITION. Linked-list order is defined by RELATIONSHIPS.';
   const RECENT_COMPARISON_ROWS = Object.freeze([
-    Object.freeze({ structure: 'Indexed list', lookup: 'Known index: O(1); filename search: O(n)', mutation: 'Shown remove + insert: O(n) slot shifts' }),
+    Object.freeze({ structure: 'Python list (dynamic array)', lookup: 'Known index: O(1); filename search: O(n)', mutation: 'Shown remove + insert: O(n) slot shifts' }),
     Object.freeze({ structure: 'Doubly linked list', lookup: 'Filename search from head: O(n)', mutation: 'Known node: O(1) local rewrites' }),
     Object.freeze({ structure: 'Hash map + linked list', lookup: 'Average filename lookup: O(1)', mutation: 'Known node: O(1) local rewrites' }),
   ]);
@@ -579,11 +579,44 @@ const ITCC47Activities = (() => {
     };
   }
 
+  function recentPythonSource(scenario) {
+    if (scenario.representation === 'array') {
+      return Object.freeze([
+        'recent = [',
+        '    "Grades.xlsx",',
+        '    "Syllabus.docx",',
+        '    "Attendance.xlsx",',
+        '    "Module3.pptx",',
+        '    "Notes.txt",',
+        ']',
+        `opened = ${JSON.stringify(scenario.openedLabel)}`,
+        'index = recent.index(opened)',
+        'if index != 0:',
+        '    document = recent.pop(index)',
+        '    recent.insert(0, document)',
+      ]);
+    }
+    return Object.freeze([
+      `opened = ${JSON.stringify(scenario.openedLabel)}`,
+      'current = find_node(head, opened)',
+      'if current is not head:',
+      '    if current.next is None:',
+      '        tail = current.prev',
+      '    else:',
+      '        current.next.prev = current.prev',
+      '    current.prev.next = current.next',
+      '    current.prev = None',
+      '    current.next = head',
+      '    head.prev = current',
+      '    head = current',
+    ]);
+  }
+
   function buildRecentScenario(inputs = {}, buildEvents = true) {
     const scenario = recentScenarioInputs(inputs);
     const { representation, openedId, openedIndex, openedLabel, finalOrder } = scenario;
     const openedName = openedLabel.replace(/\.[^.]+$/, '');
-    const source = [];
+    const source = recentPythonSource(scenario);
     const events = [];
     let arraySlots = [...RECENT_INITIAL_ORDER];
     let heldId = null;
@@ -634,93 +667,96 @@ const ITCC47Activities = (() => {
         },
       };
     };
-    const emit = (code, spec) => {
-      source.push(code);
+    const emit = (line, spec) => {
       if (!buildEvents) return;
+      const code = source[line - 1];
       const index = events.length;
       events.push(ITCC47Playback.timelineEvent({
         id: `array-linked-comparison:${index}`, domain: 'sequence-comparison', type: spec.type, message: spec.message,
         frame: frameFor(spec), metrics: { arrayShifts, arrayPlacements, pointerWrites }, transition: spec.transition || null,
-        source: { line: source.length, code }, segment: RECENT_SEGMENTS[spec.segment],
+        source: { line, code }, segment: RECENT_SEGMENTS[spec.segment],
         boundary: !!spec.boundary, terminal: !!spec.terminal,
       }));
     };
-    const moveArrayRecord = (from, to, title, message) => {
+    const moveArrayRecord = (from, to, title, message, line) => {
       const id = arraySlots[from];
       arraySlots[to] = id; arraySlots[from] = null; holeIndex = from; arrayShifts += 1;
-      emit(`recent[${to}] <- recent[${from}]`, {
+      emit(line, {
         type: 'array-shift', segment: 'array', title, message, activeRepresentation: 'array', activeIndices: [from, to],
         lastMove: { id, label: recentRecordLabel(id), from, to, kind: 'shift' },
-        annotations: [{ id: `array:${source.length + 1}`, label: 'shift', value: `${from} → ${to}`, tone: 'secondary', target: { kind: 'array-slot', index: to } }],
+        annotations: [{ id: `array:${events.length + 1}`, label: 'shift', value: `${from} → ${to}`, tone: 'secondary', target: { kind: 'array-slot', index: to } }],
         transition: { kind: 'move', wait: true, moves: [{ entityId: id, from: `array-slot:${from}`, to: `array-slot:${to}` }] },
       });
     };
-    const writeLinked = (nodeId, field, after, title, message, change, stableLinked = true) => {
+    const writeLinked = (nodeId, field, after, line, title, message, change, stableLinked = true) => {
       const node = linkedNodes.find((item) => item.id === nodeId);
       const before = node[field]; node[field] = after; pointerWrites += 1;
-      const code = `${recentRecordLabel(nodeId).replace(/\.[^.]+$/, '')}.${field} ← ${after ? recentRecordLabel(after).replace(/\.[^.]+$/, '') : 'NULL'}`;
-      emit(code, {
+      const code = source[line - 1];
+      emit(line, {
         type: 'pointer-write', segment: 'linked', title, message, activeRepresentation: 'linked', activeNodeIds: [nodeId, ...(after ? [after] : [])],
         lastWrite: { nodeId, field, before, after, code, change }, stableLinked,
-        annotations: [{ id: `linked:${source.length + 1}`, label: 'reference write', value: code, tone: change === 'removed' ? 'danger' : 'primary', target: { kind: 'linked-reference', nodeId, field } }],
+        annotations: [{ id: `linked:${events.length + 1}`, label: 'reference write', value: code, tone: change === 'removed' ? 'danger' : 'primary', target: { kind: 'linked-reference', nodeId, field } }],
       });
     };
-    const writeNamedReference = (field, after, title, message, transition = null) => {
+    const writeNamedReference = (field, after, line, title, message, transition = null, stableLinked = true) => {
       const before = field === 'head' ? headId : tailId;
       if (field === 'head') headId = after; else tailId = after;
       pointerWrites += 1;
-      const code = `${field} ← ${recentRecordLabel(after).replace(/\.[^.]+$/, '')}`;
-      emit(code, {
+      const code = source[line - 1];
+      emit(line, {
         type: 'pointer-write', segment: 'linked', title, message, activeRepresentation: 'linked', activeNodeIds: [after],
         lastWrite: { nodeId: null, field, before, after, code, change: field },
-        annotations: [{ id: `${field}:${source.length + 1}`, label: `${field} reference`, value: openedName, tone: 'primary', target: { kind: 'linked-reference', nodeId: null, field } }],
-        boundary: field === 'head', transition,
+        annotations: [{ id: `${field}:${events.length + 1}`, label: `${field} reference`, value: openedName, tone: 'primary', target: { kind: 'linked-reference', nodeId: null, field } }],
+        boundary: field === 'head', transition, stableLinked,
       });
     };
 
-    emit('recent <- [Grades, Syllabus, Attendance, Module3, Notes]', { type: 'initialize', segment: 'scenario', title: 'Five stable document identities', message: 'The application begins with five recent documents in indexed order.', activeRepresentation: representation });
-    emit(`opened <- ${openedName}`, { type: 'scenario', segment: 'scenario', title: `${openedLabel} is opened`, message: `The existing ${openedName} record becomes the most recent item; no duplicate identity will be created.`, activeRepresentation: representation, activeIndices: [openedIndex], activeNodeIds: [openedId], annotations: [{ id: 'opened', label: 'opened', value: openedLabel, tone: 'primary', target: { kind: 'record', id: openedId } }] });
-    emit(`required <- [${finalOrder.map((id) => recentRecordLabel(id).replace(/\.[^.]+$/, '')).join(', ')}]`, { type: 'scenario', segment: 'scenario', title: 'One required final order', message: `${openedName} moves to the front while every other document keeps its relative order.`, activeRepresentation: representation });
-    emit('ASK "What actually changes inside the collection?"', { type: 'question', segment: 'scenario', title: 'Look beneath the interface', message: 'What actually changes inside the collection?', activeRepresentation: representation, boundary: true });
+    const scenarioLine = representation === 'array' ? 8 : 1;
+    const branchLine = representation === 'array' ? 10 : 3;
+    emit(1, { type: 'initialize', segment: 'scenario', title: 'Five stable document identities', message: 'The application begins with five recent documents in its original order.', activeRepresentation: representation });
+    emit(scenarioLine, { type: 'scenario', segment: 'scenario', title: `${openedLabel} is opened`, message: `The existing ${openedName} record becomes the most recent item; no duplicate identity will be created.`, activeRepresentation: representation, activeIndices: [openedIndex], activeNodeIds: [openedId], annotations: [{ id: 'opened', label: 'opened', value: openedLabel, tone: 'primary', target: { kind: 'record', id: openedId } }] });
+    emit(branchLine, { type: 'scenario', segment: 'scenario', title: 'One required final order', message: `${openedName} moves to the front while every other document keeps its relative order.`, activeRepresentation: representation });
+    emit(branchLine, { type: 'question', segment: 'scenario', title: 'Look beneath the interface', message: 'What actually changes inside the collection?', activeRepresentation: representation, boundary: true });
 
     if (representation === 'array') {
-      emit('# INDEXED DYNAMIC LIST', { type: 'comparison', segment: 'array', title: 'Indexed-list model', message: 'An indexed list defines order through numbered positions.', activeRepresentation: 'array' });
-      emit('index <- FIND(recent, opened)', { type: 'lookup', segment: 'array', title: `Locate ${openedLabel}`, message: `The filename is found at index ${openedIndex}; finding by value is O(n) without another index.`, activeRepresentation: 'array', activeIndices: [openedIndex], annotations: [{ id: 'found-index', label: 'found index', value: openedIndex, tone: 'primary', target: { kind: 'array-slot', index: openedIndex } }] });
+      emit(9, { type: 'comparison', segment: 'array', title: 'Python-list model', message: 'A Python list defines order through numbered positions in a dynamic array.', activeRepresentation: 'array' });
+      emit(9, { type: 'lookup', segment: 'array', title: `Locate ${openedLabel}`, message: `The filename is found at index ${openedIndex}; finding by value is O(n) without another index.`, activeRepresentation: 'array', activeIndices: [openedIndex], annotations: [{ id: 'found-index', label: 'found index', value: openedIndex, tone: 'primary', target: { kind: 'array-slot', index: openedIndex } }] });
       if (openedIndex === 0) {
-        emit('IF index = 0: no reordering is necessary', { type: 'no-op', segment: 'array', title: `${openedLabel} is already the most recent document`, message: `${openedLabel} is already the most recent document. No reordering is necessary.`, activeRepresentation: 'array', activeIndices: [0], boundary: true });
+        emit(10, { type: 'no-op', segment: 'array', title: `${openedLabel} is already the most recent document`, message: `${openedLabel} is already the most recent document. No reordering is necessary.`, activeRepresentation: 'array', activeIndices: [0], boundary: true });
       } else {
         heldId = openedId; arraySlots[openedIndex] = null; holeIndex = openedIndex; logicalSize -= 1;
-        emit('held <- recent[index]', { type: 'array-hold', segment: 'array', title: 'Hold the opened record', message: `${openedName} leaves index ${openedIndex} temporarily, creating a visible hole without changing its identity.`, activeRepresentation: 'array', activeIndices: [openedIndex], annotations: [{ id: 'held-record', label: 'held record', value: openedLabel, tone: 'primary', target: { kind: 'record', id: openedId } }], transition: { kind: 'move', wait: true, moves: [{ entityId: openedId, from: `array-slot:${openedIndex}`, to: 'array-held' }] } });
-        for (let from = openedIndex + 1; from < RECENT_DOCUMENTS.length; from += 1) moveArrayRecord(from, from - 1, 'Close the removal hole', `${recentRecordLabel(arraySlots[from])} shifts from index ${from} to index ${from - 1}.`);
-        emit('size <- size - 1', { type: 'array-size', segment: 'array', title: 'Four live slots plus one hole', message: `Logical size is four while the held ${openedName} record stays outside the indexed sequence.`, activeRepresentation: 'array', activeIndices: [RECENT_DOCUMENTS.length - 1] });
-        for (let from = RECENT_DOCUMENTS.length - 2; from >= 0; from -= 1) moveArrayRecord(from, from + 1, 'Open index 0 from right to left', `${recentRecordLabel(arraySlots[from])} shifts from index ${from} to index ${from + 1}.`);
+        emit(11, { type: 'array-hold', segment: 'array', title: 'Pop the opened record', message: `${openedName} leaves index ${openedIndex} temporarily, creating a visible hole without changing its identity.`, activeRepresentation: 'array', activeIndices: [openedIndex], annotations: [{ id: 'held-record', label: 'held record', value: openedLabel, tone: 'primary', target: { kind: 'record', id: openedId } }], transition: { kind: 'move', wait: true, moves: [{ entityId: openedId, from: `array-slot:${openedIndex}`, to: 'array-held' }] } });
+        for (let from = openedIndex + 1; from < RECENT_DOCUMENTS.length; from += 1) moveArrayRecord(from, from - 1, 'Close the removal hole', `${recentRecordLabel(arraySlots[from])} shifts from index ${from} to index ${from - 1}.`, 11);
+        emit(11, { type: 'array-size', segment: 'array', title: 'Four live slots plus one hole', message: `Logical size is four while the held ${openedName} record stays outside the indexed sequence.`, activeRepresentation: 'array', activeIndices: [RECENT_DOCUMENTS.length - 1] });
+        for (let from = RECENT_DOCUMENTS.length - 2; from >= 0; from -= 1) moveArrayRecord(from, from + 1, 'Open index 0 from right to left', `${recentRecordLabel(arraySlots[from])} shifts from index ${from} to index ${from + 1}.`, 12);
         arraySlots[0] = heldId; heldId = null; holeIndex = null; logicalSize += 1; arrayPlacements = 1;
-        emit('recent[0] <- held', { type: 'array-place', segment: 'array', title: `Place ${openedName} at index 0`, message: `The indexed list reaches the required order after ${arrayShifts} shifts and one placement.`, activeRepresentation: 'array', activeIndices: [0], annotations: [{ id: 'array-final', label: 'placed', value: 'index 0', tone: 'primary', target: { kind: 'array-slot', index: 0 } }], boundary: true, transition: { kind: 'move', wait: true, moves: [{ entityId: openedId, from: 'array-held', to: 'array-slot:0' }] } });
+        emit(12, { type: 'array-place', segment: 'array', title: `Insert ${openedName} at index 0`, message: `The Python list reaches the required order after ${arrayShifts} shifts and one placement.`, activeRepresentation: 'array', activeIndices: [0], annotations: [{ id: 'array-final', label: 'placed', value: 'index 0', tone: 'primary', target: { kind: 'array-slot', index: 0 } }], boundary: true, transition: { kind: 'move', wait: true, moves: [{ entityId: openedId, from: 'array-held', to: 'array-slot:0' }] } });
       }
     } else {
-      emit(`# DOUBLY LINKED LIST — current is ${openedName}`, { type: 'comparison', segment: 'linked', title: 'Rebuild the stable linked nodes', message: `The linked demonstration starts from the original order and assumes current already refers to ${openedName}.`, activeRepresentation: 'linked', activeNodeIds: [openedId], annotations: [{ id: 'known-node', label: 'current', value: openedName, tone: 'primary', target: { kind: 'linked-node', id: openedId } }] });
+      emit(2, { type: 'comparison', segment: 'linked', title: 'Find the existing linked node', message: `The linked demonstration starts from the original order and finds the node for ${openedName}.`, activeRepresentation: 'linked', activeNodeIds: [openedId], annotations: [{ id: 'known-node', label: 'current', value: openedName, tone: 'primary', target: { kind: 'linked-node', id: openedId } }] });
       if (openedIndex === 0) {
-        emit('IF current = head: no pointer writes are necessary', { type: 'no-op', segment: 'linked', title: `${openedLabel} is already first`, message: `${openedLabel} is already the most recent document. No detach, neighbor rewrite, or head update is necessary.`, activeRepresentation: 'linked', activeNodeIds: [openedId], boundary: true });
+        emit(3, { type: 'no-op', segment: 'linked', title: `${openedLabel} is already first`, message: `${openedLabel} is already the most recent document. No detach, neighbor rewrite, or head update is necessary.`, activeRepresentation: 'linked', activeNodeIds: [openedId], boundary: true });
       } else {
         const current = linkedNodes.find((node) => node.id === openedId);
         const predecessorId = current.prev;
         const successorId = current.next;
         if (successorId) {
-          writeLinked(predecessorId, 'next', successorId, `Bypass ${openedName} from the left`, `${recentRecordLabel(predecessorId).replace(/\.[^.]+$/, '')}.next now skips ${openedName}.`, 'rewritten', false);
-          writeLinked(successorId, 'prev', predecessorId, 'Repair the reciprocal neighbor', `${recentRecordLabel(successorId).replace(/\.[^.]+$/, '')}.prev now agrees with its predecessor.`, 'rewritten');
+          writeLinked(successorId, 'prev', predecessorId, 7, 'Repair the reciprocal neighbor', `${recentRecordLabel(successorId).replace(/\.[^.]+$/, '')}.prev now agrees with its predecessor.`, 'rewritten', false);
+          writeLinked(predecessorId, 'next', successorId, 8, `Bypass ${openedName} from the left`, `${recentRecordLabel(predecessorId).replace(/\.[^.]+$/, '')}.next now skips ${openedName}.`, 'rewritten');
         } else {
-          writeLinked(predecessorId, 'next', null, `Detach tail ${openedName}`, `${recentRecordLabel(predecessorId).replace(/\.[^.]+$/, '')}.next becomes NULL without dereferencing current.next.`, 'removed', false);
-          writeNamedReference('tail', predecessorId, 'Move tail to the predecessor', `${recentRecordLabel(predecessorId)} becomes the tail after ${openedLabel} is detached.`);
+          writeNamedReference('tail', predecessorId, 5, 'Move tail to the predecessor', `${recentRecordLabel(predecessorId)} becomes the tail before ${openedLabel} is detached.`, null, false);
+          writeLinked(predecessorId, 'next', null, 8, `Detach tail ${openedName}`, `${recentRecordLabel(predecessorId).replace(/\.[^.]+$/, '')}.next becomes None without dereferencing current.next.`, 'removed');
         }
-        writeLinked(openedId, 'prev', null, 'Clear the old previous reference', `${openedName}.prev becomes NULL while the same node identity remains detached.`, 'removed');
-        writeLinked(openedId, 'next', headId, `Point ${openedName} toward the old head`, `${openedName}.next now refers to ${recentRecordLabel(headId).replace(/\.[^.]+$/, '')}.`, 'added');
-        writeLinked(headId, 'prev', openedId, 'Point the old head back', `${recentRecordLabel(headId).replace(/\.[^.]+$/, '')}.prev now refers to ${openedName}; the head reference still needs its final update.`, 'added', false);
-        writeNamedReference('head', openedId, `Move head to ${openedName}`, `head now refers to ${openedName}, making the final five-node order reachable.`, { kind: 'move', wait: true, moves: [{ entityId: openedId, from: 'linked-detached', to: 'linked-head' }] });
+        writeLinked(openedId, 'prev', null, 9, 'Clear the old previous reference', `${openedName}.prev becomes None while the same node identity remains detached.`, 'removed');
+        writeLinked(openedId, 'next', headId, 10, `Point ${openedName} toward the old head`, `${openedName}.next now refers to ${recentRecordLabel(headId).replace(/\.[^.]+$/, '')}.`, 'added');
+        writeLinked(headId, 'prev', openedId, 11, 'Point the old head back', `${recentRecordLabel(headId).replace(/\.[^.]+$/, '')}.prev now refers to ${openedName}; the head reference still needs its final update.`, 'added', false);
+        writeNamedReference('head', openedId, 12, `Move head to ${openedName}`, `head now refers to ${openedName}, making the final five-node order reachable.`, { kind: 'move', wait: true, moves: [{ entityId: openedId, from: 'linked-detached', to: 'linked-head' }] });
       }
     }
 
-    emit('COMPARE lookup cost with local mutation cost', { type: 'comparison', segment: 'comparison', title: 'Separate lookup from mutation', message: `A known linked node can move with constant local rewrites, but finding ${openedLabel} by filename is still O(n) without a lookup map.`, activeRepresentation: representation, showComparison: true, boundary: true });
-    emit('RETURN recent order', { type: 'return', segment: 'comparison', title: 'Choose the representation for the real workload', message: 'Both representations reach the same order; they pay for it through different structural work.', activeRepresentation: representation, showComparison: true, takeaway: RECENT_TAKEAWAY, terminal: true });
+    const finalLine = openedIndex === 0 ? branchLine : 12;
+    emit(finalLine, { type: 'comparison', segment: 'comparison', title: 'Separate lookup from mutation', message: `A known linked node can move with constant local rewrites, but finding ${openedLabel} by filename is still O(n) without a lookup map.`, activeRepresentation: representation, showComparison: true, boundary: true });
+    emit(finalLine, { type: 'return', segment: 'comparison', title: 'Choose the representation for the real workload', message: 'Both representations reach the same order; they pay for it through different structural work.', activeRepresentation: representation, showComparison: true, takeaway: RECENT_TAKEAWAY, terminal: true });
 
     const reachable = recentReachableIds(headId, linkedNodes);
     const result = {
@@ -729,19 +765,19 @@ const ITCC47Activities = (() => {
       linkedOrder: representation === 'linked' ? reachable : null,
       headId, tailId, arrayShifts, arrayPlacements, pointerWrites,
     };
-    return { source: Object.freeze(source), runResult: buildEvents ? ITCC47Playback.runResult({ events, result }) : null };
+    return { source, runResult: buildEvents ? ITCC47Playback.runResult({ events, result }) : null };
   }
 
   const arrayLinkedComparison = Object.freeze({
     id: 'array-linked-comparison', contentVersion: RECENT_DOCUMENTS_CONTENT_VERSION, module: 3, topic: 'Linked Lists', family: 'Linked Lists',
     title: 'Recent Documents: positions versus relationships', subtitle: 'Move one opened document to the front and compare indexed shifts with neighbor rewrites.',
     engine: 'curated-sequence-comparison', renderer: 'sequence-comparison', teachingVariant: 'recent-documents-reordering',
-    workspaceComposition: 'stacked-horizontal', sourceKind: 'conceptual', traceHandoff: false,
+    workspaceComposition: 'recent-documents-split', language: 'python', sourceKind: 'python', traceHandoff: false,
     source: buildRecentScenario({ preset: 'attendance', representation: 'array' }, false).source, views: Object.freeze(['visualize', 'code', 'trace', 'variables', 'operations', 'output']),
     input: Object.freeze({
       kind: 'sequence-comparison', editable: false, defaultValues: Object.freeze(RECENT_DOCUMENTS.map((record) => record.label)),
-      presets: RECENT_PRESETS, presetLabel: 'What if I open this instead?', presetDisplay: 'segmented', defaultPreset: 'attendance',
-      representation: 'array', representations: RECENT_REPRESENTATIONS,
+      presets: RECENT_PRESETS, presetLabel: 'Document', defaultPreset: 'attendance',
+      representation: 'array', representationLabel: 'Data structure', representations: RECENT_REPRESENTATIONS, presentation: 'contextual-toolbar',
     }),
     metrics: Object.freeze([{ key: 'arrayShifts', short: 'Shift', label: 'Array shifts' }, { key: 'pointerWrites', short: 'Ptr', label: 'Pointer writes' }]),
     complexity: Object.freeze({ best: 'Known linked node: O(1) local re-linking', avg: 'Find by value plus move: O(n)', worst: 'Indexed shifts or linked traversal: O(n)', space: 'O(n) records; an added lookup map also uses O(n)' }),

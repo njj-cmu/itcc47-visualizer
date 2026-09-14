@@ -2,7 +2,7 @@ import React, { memo, useMemo } from 'react';
 import { LayoutGroup, m } from 'motion/react';
 
 const REPRESENTATION_LABELS = Object.freeze({
-  scenario: 'Scenario', array: 'Indexed list', linked: 'Doubly linked list', comparison: 'Honest comparison',
+  scenario: 'Scenario', array: 'Python list', linked: 'Doubly linked list', comparison: 'Honest comparison',
 });
 
 function referenceLabel(id, recordsById) {
@@ -92,8 +92,8 @@ export const SequenceComparisonRenderer = memo(function SequenceComparisonRender
 
     <div className="sequence-representation">
       {selectedRepresentation === 'array' ? <section className="sequence-panel sequence-array-panel is-active" aria-labelledby="sequence-array-title">
-        <header><div><span>POSITION</span><h3 id="sequence-array-title">Indexed dynamic list</h3></div><p><strong>{arrayState.shifts || 0}</strong> shifts <span aria-hidden="true">·</span> <strong>{arrayState.placements || 0}</strong> {arrayState.placements === 1 ? 'placement' : 'placements'}</p></header>
-        <div className="sequence-array-scroll" role="region" aria-label="Indexed Recent Documents slots" tabIndex="0">
+        <header><div><span>POSITION</span><h3 id="sequence-array-title">Python List (Dynamic Array)</h3></div><p><strong>{arrayState.shifts || 0}</strong> shifts <span aria-hidden="true">·</span> <strong>{arrayState.placements || 0}</strong> {arrayState.placements === 1 ? 'placement' : 'placements'}</p></header>
+        <div className="sequence-array-scroll" role="region" aria-label="Python list Recent Documents slots" tabIndex="0">
           <LayoutGroup id="recent-array">
             <div className="sequence-array-track" data-array-order={finalArrayOrder}>
               <span className="sequence-slot-heading">held</span>

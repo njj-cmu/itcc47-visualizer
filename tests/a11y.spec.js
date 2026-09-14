@@ -21,20 +21,20 @@ for (const entry of ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.
   });
 }
 
-test('Recent Documents segmented what-if controls are keyboard operable and Axe-clean', async ({ page }) => {
+test('Recent Documents compact scenario controls are keyboard operable and Axe-clean', async ({ page }) => {
   await page.goto('/visualizer.html?activity=array-linked-comparison&preview=1');
-  await expect(page.getByRole('group', { name: 'What if I open this instead?' })).toBeVisible();
-  await expect(page.getByRole('group', { name: 'Representation' })).toBeVisible();
-  const notes = page.getByRole('button', { name: 'Notes.txt', exact: true });
-  await notes.focus();
-  await notes.press('Space');
-  await expect(notes).toBeFocused();
-  await expect(notes).toHaveAttribute('aria-pressed', 'true');
-  const linked = page.getByRole('button', { name: 'Doubly Linked List', exact: true });
-  await linked.focus();
-  await linked.press('Enter');
-  await expect(linked).toBeFocused();
-  await expect(linked).toHaveAttribute('aria-pressed', 'true');
+  const documentChoice = page.getByLabel('Document', { exact: true });
+  const structureChoice = page.getByLabel('Data structure', { exact: true });
+  await expect(documentChoice).toBeVisible();
+  await expect(structureChoice).toBeVisible();
+  await documentChoice.focus();
+  await documentChoice.press('End');
+  await expect(documentChoice).toBeFocused();
+  await expect(documentChoice).toHaveValue('notes');
+  await structureChoice.focus();
+  await structureChoice.press('End');
+  await expect(structureChoice).toBeFocused();
+  await expect(structureChoice).toHaveValue('linked');
   await expect(page.locator('.sequence-scenario')).toContainText('Opened: Notes.txt');
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
   const important = results.violations.filter((violation) => ['serious', 'critical'].includes(violation.impact));

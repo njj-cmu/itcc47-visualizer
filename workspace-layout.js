@@ -74,7 +74,7 @@
 
   const ITCC47_STORAGE_KEY = 'itcc47.workspace-layout:v1';
   function itcc47Defaults() {
-    return { version: VERSION, evidence: 'expanded' };
+    return { version: VERSION, evidence: 'collapsed' };
   }
   function normalizeITCC47(value) {
     const fallback = itcc47Defaults();

@@ -653,7 +653,8 @@ function recentStageIsValid(frame) {
 const recentInitialIds = ['doc:grades','doc:syllabus','doc:attendance','doc:module3','doc:notes'];
 const recentPresetIds = ['grades','syllabus','attendance','module3','notes'];
 ok('Recent Documents keeps its Module 3 placement, activity ID, and dedicated renderer', recentComparisonActivity.id === 'array-linked-comparison' && recentComparisonActivity.module === 3 && recentComparisonActivity.checkpointId === 'm3-linked-foundations' && recentComparisonActivity.renderer === 'sequence-comparison' && recentComparisonActivity.contentVersion !== traversalActivity.contentVersion);
-ok('Recent Documents exposes five what-if presets with Attendance and array defaults', recentComparisonActivity.input.presets.map((preset) => preset.id).join(',') === recentPresetIds.join(',') && recentComparisonActivity.input.defaultPreset === 'attendance' && recentComparisonActivity.input.representation === 'array' && recentComparisonActivity.input.representations.map((item) => item.id).join(',') === 'array,linked');
+ok('Recent Documents exposes five compact choices with Attendance and Python-list defaults', recentComparisonActivity.input.presets.map((preset) => preset.id).join(',') === recentPresetIds.join(',') && recentComparisonActivity.input.defaultPreset === 'attendance' && recentComparisonActivity.input.representation === 'array' && recentComparisonActivity.input.representations.map((item) => item.id).join(',') === 'array,linked' && recentComparisonActivity.input.presentation === 'contextual-toolbar' && recentComparisonActivity.input.representations[0].label === 'Python List (Dynamic Array)');
+ok('Recent Documents uses Python source metadata and a persistent desktop split', recentComparisonActivity.language === 'python' && recentComparisonActivity.sourceKind === 'python' && recentComparisonActivity.workspaceComposition === 'recent-documents-split');
 const recentRuns = new Map();
 recentPresetIds.forEach((preset) => {
   const openedId = `doc:${preset}`;
@@ -666,7 +667,7 @@ recentPresetIds.forEach((preset) => {
     const final = run.events.at(-1);
     recentRuns.set(`${preset}:${representation}`, run);
     ok(`Recent Documents ${preset}/${representation} is deterministic and terminal`, JSON.stringify(run) === JSON.stringify(again) && run.events[0].type === 'initialize' && final.terminal && final.type === 'return');
-    ok(`Recent Documents ${preset}/${representation} source stays synchronized`, run.events.length === source.length && run.events.every((event) => event.source?.line >= 1 && event.source.line <= source.length && event.source.code === source[event.source.line - 1]));
+    ok(`Recent Documents ${preset}/${representation} source stays synchronized`, run.events.every((event) => event.source?.line >= 1 && event.source.line <= source.length && event.source.code === source[event.source.line - 1]) && new Set(run.events.map((event) => event.source.line)).size < run.events.length);
     ok(`Recent Documents ${preset}/${representation} preserves opened identity in every frame`, run.events.every((event) => event.frame.openedId === openedId && event.frame.requiredOrder.join(',') === expectedOrder.join(',') && event.frame.records.map((record) => record.id).join(',') === recentInitialIds.join(',') && new Set(event.frame.records.map((record) => record.id)).size === 5));
     ok(`Recent Documents ${preset}/${representation} reaches the exact final order`, run.result.openedId === openedId && run.result.finalOrder.join(',') === expectedOrder.join(','));
     if (representation === 'linked') {
@@ -678,6 +679,11 @@ recentPresetIds.forEach((preset) => {
   });
   ok(`Recent Documents ${preset} array and linked modes agree`, recentRuns.get(`${preset}:array`).result.finalOrder.join(',') === recentRuns.get(`${preset}:linked`).result.finalOrder.join(','));
 });
+const recentArraySource = recentComparisonActivity.sourceFor({ preset: 'notes', representation: 'array' });
+const recentLinkedSource = recentComparisonActivity.sourceFor({ preset: 'notes', representation: 'linked' });
+ok('Recent Documents Python-list source uses normal list operations without teaching pseudocode', recentArraySource.includes('index = recent.index(opened)') && recentArraySource.includes('    document = recent.pop(index)') && recentArraySource.includes('    recent.insert(0, document)') && !recentArraySource.some((line) => /<-|←|ASK |COMPARE |RETURN /.test(line)));
+ok('Recent Documents linked source is concise valid-looking Python without Node boilerplate', recentLinkedSource.includes('current = find_node(head, opened)') && recentLinkedSource.includes('    if current.next is None:') && recentLinkedSource.includes('        tail = current.prev') && recentLinkedSource.includes('    current.prev.next = current.next') && recentLinkedSource.includes('    head = current') && !recentLinkedSource.some((line) => /class Node|<-|←|NULL/.test(line)));
+ok('Recent Documents source changes with the selected document and representation', recentComparisonActivity.sourceFor({ preset: 'grades', representation: 'array' }).includes('opened = "Grades.xlsx"') && recentArraySource.includes('opened = "Notes.txt"') && recentArraySource.join('\n') !== recentLinkedSource.join('\n'));
 const recentArrayAttendance = recentRuns.get('attendance:array');
 const recentLinkedAttendance = recentRuns.get('attendance:linked');
 ok('Recent Documents Attendance retains six shown shifts and six pointer writes', recentArrayAttendance.result.arrayShifts === 6 && recentArrayAttendance.result.arrayPlacements === 1 && recentLinkedAttendance.result.pointerWrites === 6);
@@ -795,11 +801,11 @@ WorkspaceLayout.write(layoutStorage, { evidence: 'expanded', sourceRatio: 0.52 }
 ok('ITCC45 workspace layout persists only its versioned contract', JSON.stringify(WorkspaceLayout.read(layoutStorage, 1280)) === JSON.stringify({ version: 1, evidence: 'expanded', sourceRatio: 0.52 }));
 savedLayout.set(WorkspaceLayout.STORAGE_KEY, '{broken');
 ok('ITCC45 workspace layout safely ignores malformed storage', WorkspaceLayout.read(layoutStorage, 1600).evidence === 'expanded' && WorkspaceLayout.read(layoutStorage, 1600).sourceRatio === 0.4);
-ok('ITCC47 evidence starts expanded for first-time learners', ITCC47Layout.defaults().evidence === 'expanded');
-ITCC47Layout.write(layoutStorage, { evidence: 'collapsed' });
-ok('ITCC47 evidence choice persists under a separate versioned key', ITCC47Layout.STORAGE_KEY !== WorkspaceLayout.STORAGE_KEY && ITCC47Layout.read(layoutStorage).evidence === 'collapsed');
-savedLayout.set(ITCC47Layout.STORAGE_KEY, JSON.stringify({ version: 0, evidence: 'collapsed' }));
-ok('ITCC47 ignores outdated layout storage', ITCC47Layout.read(layoutStorage).evidence === 'expanded');
+ok('ITCC47 evidence starts collapsed for first-time learners', ITCC47Layout.defaults().evidence === 'collapsed');
+ITCC47Layout.write(layoutStorage, { evidence: 'expanded' });
+ok('ITCC47 evidence choice persists under a separate versioned key', ITCC47Layout.STORAGE_KEY !== WorkspaceLayout.STORAGE_KEY && ITCC47Layout.read(layoutStorage).evidence === 'expanded');
+savedLayout.set(ITCC47Layout.STORAGE_KEY, JSON.stringify({ version: 0, evidence: 'expanded' }));
+ok('ITCC47 ignores outdated layout storage', ITCC47Layout.read(layoutStorage).evidence === 'collapsed');
 
 section('computer architecture teaching machine');
 const computerArchitectureEngine = load([

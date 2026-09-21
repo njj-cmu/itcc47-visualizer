@@ -21,6 +21,24 @@ for (const entry of ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.
   });
 }
 
+test('stack phase controls are keyboard operable and transitional states are Axe-clean', async ({ page }) => {
+  await page.goto('/visualizer.html?activity=stack-lifo-basics');
+  await expect(page.getByRole('heading', { name: 'Push, peek, and pop' })).toBeVisible();
+  const step = page.getByRole('button', { name: 'Step', exact: true });
+  await step.focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.stack-execution-workbench')).toHaveAttribute('data-line', '3');
+  await expect(page.locator('.stack-execution-workbench')).toHaveAttribute('data-phase', '1');
+  for (const target of [2, 4, 11, 15, 18]) {
+    await page.getByLabel('Playback settings', { exact: true }).click();
+    await page.getByLabel('Timeline step', { exact: true }).fill(String(target));
+    await page.getByLabel('Playback settings', { exact: true }).click();
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+    expect(results.violations.filter(item => ['serious', 'critical'].includes(item.impact))).toEqual([]);
+  }
+});
+
 test('Recent Documents compact scenario controls are keyboard operable and Axe-clean', async ({ page }) => {
   await page.goto('/visualizer.html?activity=array-linked-comparison&preview=1');
   const documentChoice = page.getByLabel('Document', { exact: true });

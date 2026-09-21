@@ -173,6 +173,19 @@ introducing activity-specific renderer branches. The curriculum catalog, direct
 route resolver, canonical visualization catalog, and source panel all consume the same registered
 activity metadata.
 
+Stack foundations (`stack-lifo-basics`) uses the `stack-execution` workspace.
+Its seven source operations expand into nineteen immutable phase snapshots via
+`operationSteps` in `linear-adt-activities.js`. Each frame includes an `execution`
+record with operation identity, zero-based phase index, labels, working value,
+pending metadata, and variable destination. Source progression and phase
+progression are distinct: the shared playback controller advances one snapshot
+at a time, so Previous and seek restore both structure and runtime values.
+PUSH commits at phase three; POP removes at phase two and assigns at phase three;
+PEEK never mutates the stack. Only RETURN populates program output. The focused
+components in `visualizer-src/stack-execution.jsx` render this model without
+introducing a second playback controller. Other linear ADT lessons retain the
+shared renderer and may adopt phase definitions independently.
+
 ## Functions, calls, and recurrences
 
 The parser root is `Program { functions, body }`. Top-level function definitions

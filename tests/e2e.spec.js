@@ -1715,8 +1715,8 @@ test('public release exposes ten line-by-line Module 4 examples', async ({ page 
   await expect(page.locator('.visualization-group', { hasText: 'Deques' }).locator('.visualization-card')).toHaveCount(3);
   for (const activity of activities) {
     await page.goto(`/visualizer.html?activity=${activity}`);
-    await expect(page.locator('.linear-adt')).toBeVisible();
-    await expect(page.locator('.linear-teaching')).toBeVisible();
+    await expect(page.locator(activity === 'stack-lifo-basics' ? '.stack-execution-workbench' : '.linear-adt')).toBeVisible();
+    await expect(page.locator(activity === 'stack-lifo-basics' ? '.stack-execution-header' : '.linear-teaching')).toBeVisible();
     await expect(page.locator('.source-line.is-current')).toHaveCount(1);
     await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
   }
@@ -1724,18 +1724,20 @@ test('public release exposes ten line-by-line Module 4 examples', async ({ page 
 
 test('visualizer workspaces choose a structure-aware desktop composition', async ({ page }, testInfo) => {
   await page.goto('/visualizer.html?activity=stack-lifo-basics&preview=1');
-  await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-workspace-composition', 'split-vertical');
+  await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-workspace-composition', 'stack-execution');
   if (testInfo.project.name === 'laptop') {
-    const stackPanels = await page.locator('.itcc47-workbench').evaluate((workbench) => {
-      const source = workbench.querySelector('.desktop-source').getBoundingClientRect();
-      const visual = workbench.querySelector('.itcc47-visual-shell').getBoundingClientRect();
-      return { sourceTop: source.top, visualTop: visual.top, sourceRight: source.right, visualLeft: visual.left };
+    const stackPanels = await page.locator('.stack-execution-workbench').evaluate((workbench) => {
+      const source = workbench.querySelector('.stack-source-panel').getBoundingClientRect();
+      const visual = workbench.querySelector('.stack-execution-right').getBoundingClientRect();
+      return { sourceTop: source.top, visualTop: visual.top, sourceRight: source.right, visualLeft: visual.left, ratio: source.width / (source.width + visual.width) };
     });
     expect(Math.abs(stackPanels.sourceTop - stackPanels.visualTop)).toBeLessThan(3);
     expect(stackPanels.visualLeft).toBeGreaterThan(stackPanels.sourceRight);
-    const stackSections = await page.locator('.linear-adt-stack').evaluate((renderer) => {
-      const operation = renderer.querySelector('.linear-operation').getBoundingClientRect();
-      const lane = renderer.querySelector('.linear-lane').getBoundingClientRect();
+    expect(stackPanels.ratio).toBeGreaterThanOrEqual(.32);
+    expect(stackPanels.ratio).toBeLessThanOrEqual(.36);
+    const stackSections = await page.locator('.stack-execution-surface').evaluate((renderer) => {
+      const operation = renderer.querySelector('.stack-execution-header').getBoundingClientRect();
+      const lane = renderer.querySelector('.stack-visual').getBoundingClientRect();
       return { operationBottom: operation.bottom, laneTop: lane.top };
     });
     expect(stackSections.laneTop).toBeGreaterThanOrEqual(stackSections.operationBottom);
@@ -1756,6 +1758,82 @@ test('visualizer workspaces choose a structure-aware desktop composition', async
   await page.goto('/visualizer.html?activity=tree-traversals&preview=1');
   await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-workspace-composition', 'wide-hierarchy');
   await expect(page.locator('.concept-domain-trees')).toBeVisible();
+});
+
+test('stack execution phases stage, commit, observe, remove, assign, and return with reversible playback', async ({ page }) => {
+  test.setTimeout(60000);
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/visualizer.html?activity=stack-lifo-basics');
+  const workbench = page.locator('.stack-execution-workbench');
+  const step = page.getByRole('button', { name: 'Step', exact: true });
+  const items = page.locator('.stack-tower').getByRole('listitem');
+  const runtime = page.getByRole('region', { name: 'Runtime Values', exact: true });
+  const output = page.getByRole('region', { name: 'Program Output', exact: true });
+  const expected = [
+    [1,1,[],false,false], [2,1,[],false,false],
+    [3,1,[],false,false], [3,2,[],false,false], [3,3,['A'],false,false], [3,4,['A'],false,false],
+    [4,1,['A'],false,false], [4,2,['A'],false,false], [4,3,['A','B'],false,false], [4,4,['A','B'],false,false],
+    [5,1,['A','B'],false,false], [5,2,['A','B'],false,false], [5,3,['A','B'],true,false], [5,4,['A','B'],true,false],
+    [6,1,['A','B'],true,false], [6,2,['A'],true,false], [6,3,['A'],true,true], [6,4,['A'],true,true], [7,1,['A'],true,true],
+  ];
+  for (let index = 0; index < expected.length; index++) {
+    const [line, phase, values, hasPeek, hasPop] = expected[index];
+    if (index) await step.click();
+    await expect(workbench).toHaveAttribute('data-line', String(line));
+    await expect(workbench).toHaveAttribute('data-phase', String(phase));
+    await expect(page.locator('.stack-source-panel .source-line.is-current > span')).toHaveText(String(line));
+    await expect(page.locator('.stack-phase-stepper [aria-current="step"]')).toHaveCount(1);
+    await expect(items).toHaveCount(values.length);
+    for (let item = 0; item < values.length; item++) await expect(items.nth(item)).toContainText(`"${values[item]}"`);
+    await expect(runtime.locator('.stack-runtime-variable').filter({ has: page.locator('code', { hasText: /^topValue$/ }) }).locator('.stack-value')).toHaveCount(hasPeek ? 1 : 0);
+    await expect(runtime.locator('.stack-runtime-variable').filter({ has: page.locator('code', { hasText: /^popped$/ }) }).locator('.stack-value')).toHaveCount(hasPop ? 1 : 0);
+    if (line < 7) await expect(output).toContainText('No output yet.');
+    if ((line === 3 || line === 4) && phase < 3) await expect(page.locator('.stack-working-area .stack-value')).toHaveText(new RegExp(line === 3 ? 'A' : 'B'));
+    if ((line === 3 || line === 4) && phase === 4) await expect(page.locator('.stack-working-area .stack-value')).toHaveCount(0);
+    if (line === 6 && phase === 2) {
+      await expect(page.locator('.stack-working-area')).toContainText('"B"');
+      await expect(runtime).toContainText('receiving "B"');
+      await expect(page.locator('.stack-new-top')).toHaveText('New top: A');
+      const evidence = page.locator('.stack-evidence-details');
+      await evidence.locator('summary').click();
+      await evidence.getByRole('tab', { name: 'Output', exact: true }).click();
+      await expect(evidence.getByLabel('Program output', { exact: true })).toHaveText('No output yet — advance to RETURN.');
+      await evidence.locator('summary').click();
+    }
+  }
+  await expect(output).toContainText('RETURN popped');
+  await expect(output.locator('strong')).toHaveText('B');
+  await expect(step).toBeDisabled();
+  for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(workbench).toHaveAttribute('data-line', '6');
+  await expect(workbench).toHaveAttribute('data-phase', '1');
+  await expect(items).toHaveCount(2);
+  await expect(runtime).not.toContainText('popped');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByRole('button', { name: 'Restart', exact: true }).click();
+  await page.getByLabel('Speed', { exact: true }).selectOption('9');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await expect(workbench).toHaveAttribute('data-line', '1');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await expect(workbench).toHaveAttribute('data-line', '7', { timeout: 15000 });
+  await expect(output.locator('strong')).toHaveText('B');
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('stack phase workspace runs in offline file mode', async ({ page }) => {
+  const { pathToFileURL } = require('url');
+  await page.context().setOffline(true);
+  await page.goto(`${pathToFileURL(path.resolve(__dirname, '..', 'visualizer.html')).href}?activity=stack-lifo-basics`);
+  await expect(page.locator('.stack-execution-workbench')).toHaveAttribute('data-line', '1');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Timeline step', { exact: true }).fill('15');
+  await expect(page.locator('.stack-execution-workbench')).toHaveAttribute('data-phase', '2');
+  await expect(page.getByRole('region', { name: 'Runtime Values', exact: true })).toContainText('receiving "B"');
+  await expect(page.getByRole('region', { name: 'Program Output', exact: true })).toContainText('No output yet.');
 });
 
 test('deque foundation names both ends and changes state line by line', async ({ page }) => {

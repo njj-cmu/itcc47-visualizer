@@ -13,6 +13,84 @@ const ITCC47LinearADTActivities = (() => {
     }) : null;
   }
 
+  // Each operation owns a source line; each phase owns a complete, reversible
+  // snapshot. Playback traverses the flattened phases without owning ADT logic.
+  function operationSteps(operations) {
+    return operations.flatMap((operation) => operation.phases.map((phase, phaseIndex) => ({
+      ...phase,
+      line: operation.line,
+      execution: {
+        operationId: `line-${operation.line}`, kind: operation.kind,
+        description: operation.description,
+        phaseIndex, phaseCount: operation.phases.length,
+        phaseLabels: operation.phases.map((item) => item.title),
+        ...phase.execution,
+      },
+      boundary: phaseIndex === operation.phases.length - 1,
+    })));
+  }
+
+  function stackFoundationsSteps() {
+    const lane = (order) => [{ id: 'main', label: 'Stack', kind: 'stack', order }];
+    const snapshot = (order, runtime = {}, operations = 0) => ({
+      lanes: lane(order), variables: { ...runtime, size: order.length, top: order.at(-1)?.slice(-1).toUpperCase() || 'none' },
+      held: Object.entries(runtime).map(([label, value]) => ({ id: `runtime-${label}`, label, value })),
+      operations, comparisons: 1,
+    });
+    const push = (line, value, before) => ({
+      line, kind: 'push', description: `Push ${value} onto the stack.`,
+      phases: ['Prepare value', 'Move to stack', 'Commit', 'Update state'].map((title, index) => ({
+        ...snapshot(index >= 2 ? [...before, `plate-${value.toLowerCase()}`] : before, {}, before.length + (index >= 2 ? 1 : 0)),
+        title, operation: { label: `PUSH ${value}`, end: 'top' },
+        message: [
+          `Get the value "${value}" ready to be pushed onto the stack.`,
+          `Move "${value}" from the staging area toward the top slot.`,
+          `Place "${value}" on top of the stack. The push happens now.`,
+          `"${value}" has been pushed onto the stack. Confirm the new top and size.`,
+        ][index],
+        execution: { value, beforeSize: before.length, afterSize: before.length + 1, nextTop: value,
+          workingValue: index < 2 ? value : null, transfer: index === 1 || index === 2 ? 'to-stack' : null,
+          pendingMetadata: index === 2, complete: index === 3 },
+      })),
+    });
+    return operationSteps([
+      { line: 1, kind: 'initialize', description: 'Create an empty stack.', phases: [{
+        ...snapshot([], {}, 0), comparisons: 0, title: 'Initialize stack', message: 'The stack starts empty: size 0 and no top item.', operation: { label: 'initialize' },
+      }] },
+      { line: 2, kind: 'guard', description: 'Check the empty stack before reading its top.', phases: [{
+        ...snapshot([], {}, 0), title: 'Guard the empty case', type: 'comparison',
+        message: 'The stack is empty. POP would underflow, so no value is read or removed.',
+        operation: { label: 'UNDERFLOW guard' }, comparison: { text: 'POP allowed when size = 0', outcome: false },
+      }] },
+      push(3, 'A', []), push(4, 'B', ['plate-a']),
+      { line: 5, kind: 'peek', description: 'Observe the top item and copy its value into topValue.',
+        phases: ['Identify top', 'Observe value', 'Assign variable', 'Confirm no structural change'].map((title, index) => ({
+          ...snapshot(['plate-a', 'plate-b'], index >= 2 ? { topValue: 'B' } : {}, index >= 2 ? 3 : 2),
+          comparisons: index === 3 ? 2 : 1,
+          title, type: 'comparison', operation: { label: 'PEEK', end: 'top' },
+          message: ['B is the top item. PEEK will read it without removing it.', 'Observe B while it stays in its stack slot.', 'Copy B into topValue. This is a runtime value, not program output.', 'The stack still contains A and B. Its size remains 2.'][index],
+          execution: { value: 'B', destination: 'topValue', receiving: index === 1, complete: index === 3, beforeSize: 2, afterSize: 2, nextTop: 'B' },
+        })),
+      },
+      { line: 6, kind: 'pop', description: 'Remove the top item and store it in popped.',
+        phases: ['Identify top', 'Remove from stack', 'Assign variable', 'Update state'].map((title, index) => ({
+          ...snapshot(index === 0 ? ['plate-a', 'plate-b'] : ['plate-a'], index >= 2 ? { topValue: 'B', popped: 'B' } : { topValue: 'B' }, index >= 1 ? 4 : 3),
+          comparisons: 2,
+          title, operation: { label: 'POP', end: 'top' },
+          message: ['B was pushed last, so it is the item POP will remove.', 'Take B off the stack. A becomes the new top; popped is receiving B.', 'Assign the removed value B to popped.', 'POP is complete. A remains on the stack and the size is 1.'][index],
+          execution: { value: 'B', destination: 'popped', receiving: index === 1,
+            workingValue: index === 1 ? 'B' : null, transfer: index === 1 ? 'from-stack' : null,
+            beforeSize: 2, afterSize: 1, nextTop: 'A', pendingMetadata: index === 1, complete: index === 3 },
+        })),
+      },
+      { line: 7, kind: 'return', description: 'Return the value stored in popped.', phases: [{
+        ...snapshot(['plate-a'], { topValue: 'B', popped: 'B' }, 4), title: 'Return popped', type: 'return',
+        comparisons: 2,
+        operation: { label: 'RETURN B' }, message: 'RETURN sends popped (B) to Program Output. A remains on the stack.', output: ['B'], execution: { complete: true },
+      }] },
+    ]);
+  }
+
   function buildActivity(spec) {
     const source = Object.freeze([...spec.source]);
     const structure = spec.structure || spec.steps[0]?.lanes?.[0]?.kind;
@@ -75,6 +153,7 @@ const ITCC47LinearADTActivities = (() => {
           held,
           output: Object.freeze([...(step.output || [])]),
           operation: step.operation ? Object.freeze({ ...step.operation }) : null,
+          execution: step.execution || null,
           invariants: invariant,
           markers: Object.freeze({ teaching, variables: Object.freeze({ ...(step.variables || {}) }) }),
         },
@@ -87,9 +166,10 @@ const ITCC47LinearADTActivities = (() => {
     });
 
     return Object.freeze({
-      id: spec.id, contentVersion: CONTENT_VERSION, module: 4, topic: spec.topic, family: spec.family,
+      id: spec.id, contentVersion: spec.contentVersion || CONTENT_VERSION, module: 4, topic: spec.topic, family: spec.family,
       title: spec.title, subtitle: spec.subtitle, exampleKind: spec.exampleKind,
       engine: 'curated-linear-adt', renderer: 'linear-adt', teachingVariant: spec.variant,
+      workspaceComposition: spec.workspaceComposition,
       checkpointId: spec.checkpointId, cloIds: CLO_IDS, reviewStatus: 'reviewed',
       source, views: Object.freeze(['visualize', 'code', 'trace', 'variables', 'operations', 'output']),
       evidenceViews: Object.freeze(['trace', 'variables', 'operations', 'output']),
@@ -106,20 +186,12 @@ const ITCC47LinearADTActivities = (() => {
   }
 
   const stackBasics = buildActivity({
-    id: 'stack-lifo-basics', topic: 'Stacks', family: 'Stacks', exampleKind: 'Foundations', checkpointId: 'm4-stack',
-    title: 'Push, peek, and pop', subtitle: 'Build the LIFO rule one operation at a time.', variant: 'stack-foundations',
+    id: 'stack-lifo-basics', contentVersion: '2026.09-stack-phases', topic: 'Stacks', family: 'Stacks', exampleKind: 'Foundations', checkpointId: 'm4-stack',
+    title: 'Push, peek, and pop', subtitle: 'Build the LIFO rule one operation at a time.', variant: 'stack-foundations', workspaceComposition: 'stack-execution',
     entities: [entity('plate-a', 'A', 'first pushed'), entity('plate-b', 'B', 'last pushed')],
     source: ['stack <- empty', 'IF stack is empty THEN POP is UNDERFLOW', 'PUSH stack, "A"', 'PUSH stack, "B"', 'topValue <- PEEK stack', 'popped <- POP stack', 'RETURN popped'],
     complexity: { best: 'O(1)', avg: 'O(1)', worst: 'O(1)', space: 'O(n)' },
-    steps: [
-      { line:1, title:'Start with no top item', message:'Initialize an empty stack.', lanes:[{id:'main',label:'Stack',kind:'stack',order:[]}], operation:{label:'initialize'}, status:[{label:'size',value:0,tone:'muted'}], variables:{size:0}, operations:0 },
-      { line:2, title:'Guard the empty case', message:'POP is unavailable while size is 0; detecting underflow happens before reading a top item.', type:'comparison', lanes:[{id:'main',label:'Stack',kind:'stack',order:[]}], comparison:{text:'POP allowed when size = 0',outcome:false}, operation:{label:'UNDERFLOW guard'}, status:[{label:'top',value:'none',tone:'danger'}], variables:{size:0}, operations:0, comparisons:1, boundary:true },
-      { line:3, title:'Push A onto the top', message:'PUSH adds A at the only legal insertion end: the top.', lanes:[{id:'main',label:'Stack',kind:'stack',order:['plate-a']}], focus:[{id:'plate-a',label:'new top'}], operation:{label:'PUSH A',end:'top'}, status:[{label:'size',value:1,tone:'success'}], variables:{top:'A',size:1}, operations:1, comparisons:1 },
-      { line:4, title:'Push B above A', message:'B becomes the top; A stays underneath it.', lanes:[{id:'main',label:'Stack',kind:'stack',order:['plate-a','plate-b']}], focus:[{id:'plate-b',label:'top'}], operation:{label:'PUSH B',end:'top'}, status:[{label:'LIFO next',value:'B',tone:'minimum'}], variables:{top:'B',size:2}, operations:2, comparisons:1 },
-      { line:5, title:'Peek without removing', message:'PEEK reads B while the stack remains unchanged.', type:'comparison', lanes:[{id:'main',label:'Stack',kind:'stack',order:['plate-a','plate-b']}], focus:[{id:'plate-b',label:'peeked top',tone:'minimum'}], comparison:{text:'size before = size after',outcome:true}, operation:{label:'PEEK',end:'top'}, held:[{id:'peek-b',label:'topValue',value:'B',tone:'minimum'}], variables:{topValue:'B',size:2}, operations:3, comparisons:2, boundary:true },
-      { line:6, title:'Pop the most recent item', message:'POP removes B first because B was pushed last.', lanes:[{id:'main',label:'Stack',kind:'stack',order:['plate-a']}], focus:[{id:'pop-b',label:'popped',where:'held',value:'B',tone:'danger'}], operation:{label:'POP',end:'top'}, held:[{id:'pop-b',label:'popped',value:'B',tone:'danger'}], status:[{label:'new top',value:'A',tone:'success'}], output:['B'], variables:{popped:'B',top:'A',size:1}, operations:4, comparisons:2 },
-      { line:7, title:'Return the popped value', message:'The result is B; A remains on the stack.', type:'return', lanes:[{id:'main',label:'Stack',kind:'stack',order:['plate-a']}], focus:[{id:'plate-a',label:'remaining top',tone:'secondary'}], operation:{label:'RETURN B'}, output:['B'], status:[{label:'rule',value:'last in, first out',tone:'success'}], variables:{popped:'B',size:1}, operations:4, comparisons:2 },
-    ], result:{ popped:'B' },
+    steps: stackFoundationsSteps(), result:{ popped:'B' },
   });
 
   const postfix = buildActivity({

@@ -1721,6 +1721,26 @@ module4Activities.forEach((activity) => {
   }));
 });
 ok('stack basics visibly enforce LIFO', Activities.get('stack-lifo-basics').run().result.popped === 'B');
+const stackPhases = Activities.get('stack-lifo-basics').run().events;
+const stackLine = (line) => stackPhases.filter((event) => event.source.line === line);
+ok('stack foundations expands seven lines into nineteen reversible phases', stackPhases.length === 19 && stackPhases.every((event) => Object.isFrozen(event.frame.execution)));
+ok('stack source lines own ordered phase groups', [3, 4, 5, 6].every((line) => stackLine(line).length === 4 && stackLine(line).every((event, index) => event.frame.execution.phaseIndex === index && event.frame.execution.phaseCount === 4)));
+[3, 4].forEach((line) => {
+  const phases = stackLine(line);
+  const before = line - 3;
+  ok(`stack line ${line} stages before commit and updates metadata last`, phases[0].frame.execution.workingValue === (line === 3 ? 'A' : 'B') && phases[0].frame.array.length === before && phases[1].frame.array.length === before && phases[2].frame.array.length === before + 1 && phases[2].frame.execution.pendingMetadata && phases[3].frame.execution.complete && !phases[3].frame.execution.workingValue);
+});
+ok('PEEK retains both items in every phase and assigns only at phase three', stackLine(5).every((event) => event.frame.array.join(',') === 'A,B') && stackLine(5)[1].frame.markers.variables.topValue === undefined && stackLine(5)[2].frame.markers.variables.topValue === 'B');
+ok('POP separates identification, removal, assignment, and confirmation', stackLine(6)[0].frame.array.join(',') === 'A,B' && stackLine(6)[1].frame.array.join(',') === 'A' && stackLine(6)[1].frame.execution.workingValue === 'B' && stackLine(6)[1].frame.markers.variables.popped === undefined && stackLine(6)[2].frame.markers.variables.popped === 'B' && stackLine(6)[3].frame.execution.complete);
+ok('runtime values persist and output is emitted only by RETURN', stackPhases.filter((event) => event.source.line < 7).every((event) => event.frame.output.length === 0) && stackPhases.at(-1).frame.output.join(',') === 'B' && stackPhases.at(-1).frame.markers.variables.topValue === 'B' && stackPhases.at(-1).frame.markers.variables.popped === 'B');
+const stackController = Playback.createController();
+stackController.load(stackPhases, 2);
+stackController.step(1);
+ok('Step advances a phase before advancing source', stackController.getState().currentEvent.source.line === 3 && stackController.getState().currentEvent.frame.execution.phaseIndex === 1);
+stackController.seek(15);
+stackController.step(-1);
+ok('Previous restores the pre-removal stack and runtime snapshot', stackController.getState().currentEvent.frame.array.join(',') === 'A,B' && stackController.getState().currentEvent.frame.markers.variables.popped === undefined);
+stackController.dispose();
 ok('stack basics guards underflow before any empty pop', Activities.get('stack-lifo-basics').run().events.some((event)=>event.frame.operation?.label === 'UNDERFLOW guard' && event.frame.markers.teaching.comparison?.outcome === false));
 ok('postfix resolver returns 21', Activities.get('stack-postfix-evaluator').run().result.value === 21);
 ok('postfix resolver pops right before left', Activities.get('stack-postfix-evaluator').run().events.findIndex((event)=>event.frame.operation?.label === 'POP right') < Activities.get('stack-postfix-evaluator').run().events.findIndex((event)=>event.frame.operation?.label === 'POP left'));

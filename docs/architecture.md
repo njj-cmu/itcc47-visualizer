@@ -202,6 +202,20 @@ seek and restart restore complete snapshots without replaying side effects.
 The generator also supports subtraction and division for future curated examples,
 but the public route intentionally retains its original fixed teaching scenario.
 
+Nested-delimiter parsing (`stack-delimiter-audit`) uses the
+`delimiter-execution` workspace. `delimiterProgram` generates immutable parser
+snapshots from delimiter characters rather than storing pre-computed finished
+stack states. Each snapshot independently records its pseudocode line,
+source-character cursor and semantic character states, and the current
+operation-specific phase. Opening delimiters read, classify, move, and commit;
+closing delimiters inspect and compare without mutation before a separate
+four-phase POP can remove a confirmed match. A final line-12 operation evaluates
+the empty-stack condition before publishing VALID or the unclosed-opener error.
+Mismatch, empty-stack closer, and final unmatched-opener failures remain distinct
+and are available as curated source cases on the same activity route. The
+workspace reuses the shared phase playback controller and Motion layout identity,
+so Previous, seek, restart, and scenario changes restore deterministic snapshots.
+
 ## Functions, calls, and recurrences
 
 The parser root is `Program { functions, body }`. Top-level function definitions

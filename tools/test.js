@@ -1778,7 +1778,35 @@ for (const invalid of [[], ['5', '+'], ['5', '2'], ['bad'], ['2', '0', '÷']]) {
   ok(`postfix generator rejects invalid expression ${JSON.stringify(invalid)}`, rejected);
 }
 ok('postfix resolver pops right before left', Activities.get('stack-postfix-evaluator').run().events.findIndex((event)=>event.frame.operation?.label === 'POP right') < Activities.get('stack-postfix-evaluator').run().events.findIndex((event)=>event.frame.operation?.label === 'POP left'));
-ok('delimiter audit accepts only after the stack empties', Activities.get('stack-delimiter-audit').run().events.at(-1).frame.array.length === 0 && Activities.get('stack-delimiter-audit').run().result.valid);
+const delimiterEvents = Activities.get('stack-delimiter-audit').run().events;
+const delimiterPhases = (character, line, kind) => delimiterEvents.filter((event) => event.frame.iteration.index === character && event.source.line === line && (!kind || event.frame.execution.kind === kind));
+ok('delimiter audit exposes independent immutable source, character, and phase progression', delimiterEvents.length === 41 && delimiterEvents.every((event) => Object.isFrozen(event.frame.iteration) && Object.isFrozen(event.frame.execution) && Object.isFrozen(event.frame.sourceCharacters) && event.frame.execution.operationId));
+for (const [character, value, before] of [[0, '(', 0], [1, '[', 1], [2, '{', 2]]) {
+  const phases = delimiterPhases(character, 4, 'push-opener');
+  ok(`delimiter opener ${value} reads, classifies, moves, then commits`, phases.length === 4 && phases[0].frame.array.length === before && phases[1].frame.array.length === before && phases[1].frame.auxiliary.kind === 'incoming' && phases[2].frame.execution.pendingPush && phases[2].frame.array.length === before && phases[3].frame.array.length === before + 1 && phases[3].frame.iteration.processed === character + 1);
+}
+for (const [character, opener, closer, before, after] of [[3, '{', '}', 3, 2], [4, '[', ']', 2, 1], [5, '(', ')', 1, 0]]) {
+  const check = delimiterPhases(character, 6, 'check-closer');
+  const pop = delimiterPhases(character, 9, 'pop-matched');
+  ok(`delimiter ${opener} ${closer} comparison completes before POP begins`, check.length === 4 && check.every((event) => event.frame.array.length === before) && check[1].frame.matching.match === null && check[2].frame.matching.match === true && pop.length === 4 && pop[0].frame.array.length === before && pop[1].frame.array.length === after && pop[1].frame.auxiliary.status === 'Popped (matched)');
+  ok(`delimiter ${opener} ${closer} resolves both source characters before advancing`, pop[2].frame.sourceCharacters.filter((item) => item.state === 'resolved').length === (character - 2) * 2 && pop[3].frame.iteration.processed === character + 1);
+}
+const delimiterFinal = delimiterEvents.filter((event) => event.source.line === 12);
+ok('delimiter reports VALID only after final empty-stack evaluation', delimiterEvents.slice(0, -1).every((event) => event.frame.parser.status === 'RUNNING' && event.frame.output.length === 0) && delimiterFinal.length === 4 && delimiterFinal[2].frame.execution.emptyEvaluation === true && delimiterFinal[2].frame.parser.status === 'RUNNING' && delimiterFinal[3].frame.parser.status === 'VALID' && delimiterFinal[3].frame.output.join() === 'VALID');
+const makeDelimiter = workspaceEngine.get('ITCC47LinearADTActivities').delimiterProgram;
+const mismatchDelimiter = makeDelimiter(['(', '[', '}', ']', ')']).steps;
+const mismatchCheck = mismatchDelimiter.filter((step) => step.line === 6);
+ok('delimiter mismatch returns invalid without popping the unmatched opener', mismatchCheck.at(-1).matching.state === 'mismatch' && mismatchCheck.every((step) => step.lanes[0].order.length === 2) && mismatchDelimiter.at(-1).line === 7 && mismatchDelimiter.at(-1).lanes[0].order.length === 2 && mismatchDelimiter.at(-1).parser.failureKind === 'mismatch');
+const emptyCloserDelimiter = makeDelimiter([')']).steps;
+ok('delimiter empty-stack closer is distinct from a top mismatch', emptyCloserDelimiter.some((step) => step.matching?.kind === 'empty-stack' && step.matching.state === 'empty-stack') && emptyCloserDelimiter.at(-1).parser.failureKind === 'empty-stack');
+const unclosedDelimiter = makeDelimiter(['(', '[', '{', '}']).steps;
+ok('delimiter unmatched openers fail only during final validation', unclosedDelimiter.slice(0, -1).every((step) => step.parser.status === 'RUNNING') && unclosedDelimiter.at(-1).line === 12 && unclosedDelimiter.at(-1).parser.status === 'INVALID' && unclosedDelimiter.at(-1).parser.emptyEvaluation === false && unclosedDelimiter.at(-1).lanes[0].order.length === 2);
+for (const invalid of [['x'], ['()'], ['<'], ['']]) {
+  let rejected = false;
+  try { makeDelimiter(invalid); } catch { rejected = true; }
+  ok(`delimiter generator rejects invalid source ${JSON.stringify(invalid)}`, rejected);
+}
+ok('delimiter audit accepts only after the stack empties', delimiterEvents.at(-1).frame.array.length === 0 && Activities.get('stack-delimiter-audit').run().result.valid);
 ok('queue basics visibly enforce FIFO', Activities.get('queue-fifo-basics').run().result.served === 'A');
 ok('queue basics demonstrates circular wraparound', Activities.get('queue-fifo-basics').run().events.some((event)=>event.message.toLowerCase().includes('wrap')));
 ok('deque foundation uses both removal ends', Activities.get('deque-end-operations').run().result.remaining.join(',') === 'A');

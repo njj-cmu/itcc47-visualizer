@@ -143,6 +143,235 @@ const ITCC47LinearADTActivities = (() => {
     };
   }
 
+  const DELIMITER_PAIRS = Object.freeze({ '(': ')', '[': ']', '{': '}' });
+  const DELIMITER_OPENERS = new Set(Object.keys(DELIMITER_PAIRS));
+  const DELIMITER_CLOSERS = new Set(Object.values(DELIMITER_PAIRS));
+  const DELIMITER_SOURCE = Object.freeze([
+    'stack <- empty',
+    'FOR each token IN source DO',
+    '  IF token is an opener THEN',
+    '    PUSH stack, token',
+    '  ELSE',
+    '    IF stack is empty OR top does not match token THEN',
+    '      RETURN INVALID',
+    '    ENDIF',
+    '    POP stack',
+    '  ENDIF',
+    'ENDFOR',
+    'RETURN stack is empty',
+  ]);
+
+  // Generate a parser trace from source characters. Source line, character
+  // iteration, and operation phase are independent in every snapshot.
+  function delimiterProgram(tokens = ['(', '[', '{', '}', ']', ')']) {
+    tokens = tokens.map(String);
+    if (tokens.some((token) => token.length !== 1 || (!DELIMITER_OPENERS.has(token) && !DELIMITER_CLOSERS.has(token)))) {
+      throw new Error('Delimiter source accepts only single-character (), [], and {} tokens');
+    }
+
+    const entities = tokens.flatMap((token, index) => DELIMITER_OPENERS.has(token)
+      ? [entity(`opener-${index}`, token, `expects ${DELIMITER_PAIRS[token]}`)] : []);
+    const entityAt = new Map(entities.map((item) => [Number(item.id.split('-')[1]), item]));
+    const operations = [], stack = [], states = tokens.map(() => 'pending'), pairIndexes = tokens.map(() => null);
+    let tokenIndex = -1, processed = 0, operationCount = 0, comparisons = 0, currentType = null;
+    let parser = { status: 'RUNNING', message: 'Processing source characters...', reason: null, emptyEvaluation: null };
+
+    const characters = () => Object.freeze(tokens.map((value, index) => Object.freeze({
+      index, value,
+      state: states[index] === 'pending' && index === tokenIndex ? 'current' : states[index],
+      pairIndex: pairIndexes[index],
+    })));
+    const snapshot = (execution = {}, { matching = null, auxiliary = null, output = [] } = {}) => ({
+      lanes: [{ id: 'main', label: 'Unmatched Openers Stack', kind: 'stack', order: stack.map((entry) => entry.item.id) }],
+      input: { label: 'Source characters', tokens, active: tokenIndex },
+      iteration: {
+        index: tokenIndex, count: tokens.length, processed, value: tokens[tokenIndex] ?? null,
+        type: currentType,
+      },
+      sourceCharacters: characters(),
+      parser: Object.freeze({ ...parser, processed, unmatched: stack.length }),
+      matching: matching ? Object.freeze({ ...matching }) : null,
+      auxiliary: auxiliary ? Object.freeze({ ...auxiliary }) : null,
+      variables: { token: tokens[tokenIndex] ?? 'none', size: stack.length, top: stack.at(-1)?.item.value ?? 'none' },
+      operations: operationCount,
+      comparisons,
+      execution,
+      output,
+    });
+    const addOperation = (line, kind, title, labels, messages, makePhase) => {
+      operations.push({
+        id: `delimiter-${tokenIndex}-${kind}-${operations.length}`,
+        line, kind, title, description: title,
+        phases: labels.map((label, phaseIndex) => ({
+          title: label,
+          message: messages[phaseIndex],
+          operation: { label: title, end: 'top' },
+          ...makePhase(phaseIndex),
+        })),
+      });
+    };
+
+    addOperation(1, 'initialize', 'Initialize the unmatched-openers stack', ['Initialize stack'],
+      ['Start with an empty stack and a running parser.'], () => snapshot({ complete: true }));
+
+    for (let index = 0; index < tokens.length; index++) {
+      tokenIndex = index;
+      currentType = null;
+      const token = tokens[index];
+      if (DELIMITER_OPENERS.has(token)) {
+        const item = entityAt.get(index), expected = DELIMITER_PAIRS[token], beforeSize = stack.length;
+        addOperation(4, 'push-opener', `PUSH ${token} onto the stack`,
+          ['Read current token', 'Classify as opener', 'Move to stack', 'Commit push'],
+          [`Read ${token} at character ${index + 1}. The stack is unchanged.`,
+            `${token} is an opener. It starts a group and expects ${expected}.`,
+            `Move ${token} toward the pending top slot without changing the stack yet.`,
+            `Commit ${token} as the new TOP. It now waits for ${expected}.`],
+          (phase) => {
+            currentType = phase === 0 ? null : 'Opener';
+            if (phase === 3) {
+              stack.push({ item, index, expected });
+              states[index] = 'processed';
+              processed = index + 1;
+              operationCount++;
+            }
+            return snapshot({
+              item, expected, beforeSize,
+              staged: phase === 1,
+              pendingPush: phase === 2,
+              transfer: phase === 2 ? 'push' : null,
+              complete: phase === 3,
+            }, {
+              auxiliary: phase === 1
+                ? { kind: 'incoming', item, status: `Expects closer ${expected}` }
+                : phase === 2 ? { kind: 'incoming', item: null, status: 'Moving to stack' } : null,
+            });
+          });
+        continue;
+      }
+
+      currentType = 'Closer';
+      const top = stack.at(-1) || null;
+      const expected = top?.expected || null;
+      const matches = !!top && expected === token;
+      const failureKind = top ? 'mismatch' : 'empty-stack';
+      const reason = top
+        ? 'Current closer does not match the most recent unmatched opener.'
+        : 'No unmatched opener exists for the current closer.';
+      addOperation(6, 'check-closer', `Check closer ${token} against the stack TOP`,
+        ['Read closer', 'Inspect stack top', top ? 'Compare pair' : 'Check for an opener', 'Decide'],
+        [`Read closer ${token}. Do not pop anything yet.`,
+          top ? `Inspect TOP ${top.item.value}, which expects ${expected}.` : 'The unmatched-openers stack has no TOP item.',
+          top ? `Compare ${top.item.value} with ${token}.` : `No opener is available to match ${token}.`,
+          matches ? `Confirmed: ${top.item.value} matches ${token}. POP is now allowed as a separate operation.` : reason],
+        (phase) => {
+          currentType = 'Closer';
+          if (phase === 2) {
+            comparisons++;
+            if (!matches) states[index] = 'failed';
+          }
+          const matchingState = phase < 1 ? 'pending' : phase < 2 ? 'inspecting'
+            : matches ? 'match' : failureKind;
+          return snapshot({
+            item: top?.item || null,
+            expected,
+            received: token,
+            match: phase >= 2 ? matches : null,
+            failureKind: phase >= 2 && !matches ? failureKind : null,
+            complete: phase === 3,
+          }, {
+            matching: {
+              kind: top ? 'pair' : 'empty-stack', state: matchingState,
+              top: top?.item.value || null, expected, received: token,
+              match: phase >= 2 ? matches : null,
+            },
+          });
+        });
+
+      if (!matches) {
+        parser = { status: 'INVALID', message: 'Delimiter audit stopped.', reason, emptyEvaluation: null, failureKind };
+        addOperation(7, 'return-invalid', 'RETURN INVALID', ['Return invalid'],
+          [`Stop immediately. ${reason}`], () => snapshot({
+            received: token, expected, failureKind, complete: true,
+          }, {
+            matching: { kind: top ? 'pair' : 'empty-stack', state: failureKind, top: top?.item.value || null, expected, received: token, match: false },
+            auxiliary: { kind: 'failure', item: null, status: reason },
+            output: ['INVALID'],
+          }));
+        return {
+          entities, steps: operationSteps(operations),
+          result: { valid: false, reason, failureKind },
+          scenario: { source: tokens.join(''), label: 'Invalid delimiter source' },
+          source: DELIMITER_SOURCE,
+        };
+      }
+
+      const matched = top;
+      addOperation(9, 'pop-matched', `POP matched opener ${matched.item.value}`,
+        ['Match confirmed', 'Remove opener', 'Resolve pair', 'Update stack state'],
+        [`The comparison succeeded. Select ${matched.item.value}, but keep it on the stack until removal begins.`,
+          `Remove ${matched.item.value} from the stack. The outgoing value is temporary teaching state.`,
+          `Resolve source pair ${matched.item.value} ↔ ${token}.`,
+          `POP complete. ${stack.length > 1 ? `${stack.at(-2).item.value} becomes TOP.` : 'The stack is now empty.'}`],
+        (phase) => {
+          currentType = 'Closer';
+          if (phase === 1) {
+            stack.pop();
+            operationCount++;
+          }
+          if (phase === 2) {
+            states[matched.index] = 'resolved';
+            states[index] = 'resolved';
+            pairIndexes[matched.index] = index;
+            pairIndexes[index] = matched.index;
+          }
+          if (phase === 3) processed = index + 1;
+          return snapshot({
+            item: matched.item, expected, received: token,
+            beforeSize: phase === 0 ? stack.length : stack.length + 1,
+            transfer: phase === 1 ? 'pop' : null,
+            complete: phase === 3,
+          }, {
+            matching: { kind: 'pair', state: 'match', top: matched.item.value, expected, received: token, match: true },
+            auxiliary: phase === 0
+              ? { kind: 'outgoing', item: matched.item, status: 'Matched; ready to pop' }
+              : phase < 3 ? { kind: 'outgoing', item: matched.item, status: 'Popped (matched)' } : null,
+          });
+        });
+    }
+
+    tokenIndex = -1;
+    currentType = null;
+    const isEmpty = stack.length === 0;
+    const finalReason = isEmpty ? null : 'One or more opening delimiters were never closed.';
+    addOperation(12, 'final-check', 'RETURN stack is empty',
+      ['Finish source scan', 'Inspect stack', 'Evaluate empty', 'Return result'],
+      ['Every source character has been processed.',
+        `Inspect the unmatched-openers stack: ${stack.length} item${stack.length === 1 ? '' : 's'} remain${stack.length === 1 ? 's' : ''}.`,
+        `stack is empty evaluates to ${isEmpty ? 'TRUE' : 'FALSE'}.`,
+        isEmpty ? 'Return VALID only now, after final empty-stack validation.' : `Return INVALID. ${finalReason}`],
+      (phase) => {
+        if (phase === 2) comparisons++;
+        if (phase === 3) parser = {
+          status: isEmpty ? 'VALID' : 'INVALID',
+          message: isEmpty ? 'All delimiter pairs are balanced.' : 'Delimiter audit finished with unmatched openers.',
+          reason: finalReason,
+          emptyEvaluation: isEmpty,
+          failureKind: isEmpty ? null : 'unclosed-opener',
+        };
+        return snapshot({ emptyEvaluation: phase >= 2 ? isEmpty : null, complete: phase === 3 }, {
+          auxiliary: phase >= 1 ? { kind: 'validation', item: null, status: `${stack.length} unmatched opener${stack.length === 1 ? '' : 's'}` } : null,
+          output: phase === 3 ? [isEmpty ? 'VALID' : 'INVALID'] : [],
+        });
+      });
+
+    return {
+      entities, steps: operationSteps(operations),
+      result: { valid: isEmpty, reason: finalReason, failureKind: isEmpty ? null : 'unclosed-opener' },
+      scenario: { source: tokens.join(''), label: isEmpty ? 'Balanced delimiter source' : 'Unclosed opener source' },
+      source: DELIMITER_SOURCE,
+    };
+  }
+
   function stackFoundationsSteps() {
     const lane = (order) => [{ id: 'main', label: 'Stack', kind: 'stack', order }];
     const snapshot = (order, runtime = {}, operations = 0) => ({
@@ -269,6 +498,10 @@ const ITCC47LinearADTActivities = (() => {
           execution: step.execution || null,
           iteration: step.iteration || null,
           runtime: step.runtime || null,
+          sourceCharacters: step.sourceCharacters || null,
+          parser: step.parser || null,
+          matching: step.matching || null,
+          auxiliary: step.auxiliary || null,
           invariants: invariant,
           markers: Object.freeze({ teaching, variables: Object.freeze({ ...(step.variables || {}) }) }),
         },
@@ -319,26 +552,39 @@ const ITCC47LinearADTActivities = (() => {
     ...postfixProgram(),
   });
 
-  const delimiterAudit = buildActivity({
-    id:'stack-delimiter-audit',topic:'Stacks',family:'Stacks',exampleKind:'Parser application',checkpointId:'m4-stack',
-    title:'Audit nested delimiters',subtitle:'Match ([{}]) by comparing every closer with the stack top.',variant:'stack-audit',
-    entities:[entity('open-paren','('),entity('open-bracket','['),entity('open-brace','{')],
-    input:{label:'Source characters',tokens:['(', '[', '{', '}', ']', ')'],active:0},
-    source:['stack <- empty','FOR each token IN source DO','  IF token is an opener THEN','    PUSH stack, token','  ELSE','    IF stack is empty OR top does not match token THEN','      RETURN INVALID','    ENDIF','    POP stack','  ENDIF','ENDFOR','RETURN stack is empty'],
-    complexity:{best:'O(1)',avg:'O(n)',worst:'O(n)',space:'O(n)'},
-    steps:[
-      {line:1,title:'Begin with an empty parser stack',message:'No opening delimiter is waiting for a match.',lanes:[{id:'main',label:'Unmatched openers',kind:'stack',order:[]}],operation:{label:'initialize'},variables:{size:0},operations:0},
-      {line:4,title:'Push (',message:'An opener cannot be resolved yet, so save it.',lanes:[{id:'main',label:'Unmatched openers',kind:'stack',order:['open-paren']}],input:{label:'Source characters',tokens:['(','[','{','}',']',')'],active:0},focus:[{id:'open-paren',label:'waiting opener'}],operation:{label:'PUSH (',end:'top'},variables:{token:'(',size:1},operations:1},
-      {line:4,title:'Push [',message:'The nested [ must close before the earlier ( can close.',lanes:[{id:'main',label:'Unmatched openers',kind:'stack',order:['open-paren','open-bracket']}],input:{label:'Source characters',tokens:['(','[','{','}',']',')'],active:1},focus:[{id:'open-bracket',label:'top'}],operation:{label:'PUSH [',end:'top'},variables:{token:'[',size:2},operations:2},
-      {line:4,title:'Push {',message:'The innermost { becomes the next required match.',lanes:[{id:'main',label:'Unmatched openers',kind:'stack',order:['open-paren','open-bracket','open-brace']}],input:{label:'Source characters',tokens:['(','[','{','}',']',')'],active:2},focus:[{id:'open-brace',label:'top'}],operation:{label:'PUSH {',end:'top'},variables:{token:'{',size:3},operations:3},
-      {line:6,title:'Compare } with the top',message:'} matches the most recent unmatched opener {.',type:'comparison',lanes:[{id:'main',label:'Unmatched openers',kind:'stack',order:['open-paren','open-bracket','open-brace']}],input:{label:'Source characters',tokens:['(','[','{','}',']',')'],active:3},focus:[{id:'open-brace',label:'top = {'}],comparison:{text:'MATCH({, })',outcome:true},operation:{label:'PEEK top'},variables:{token:'}',top:'{'},operations:4,comparisons:1,boundary:true},
-      {line:9,title:'Pop the matched {',message:'Remove { because its closing } has been consumed.',lanes:[{id:'main',label:'Unmatched openers',kind:'stack',order:['open-paren','open-bracket']}],input:{label:'Source characters',tokens:['(','[','{','}',']',')'],active:3},focus:[{id:'open-bracket',label:'new top'}],operation:{label:'POP {',end:'top'},variables:{size:2},operations:5,comparisons:1},
-      {line:6,title:'Compare ] with the top',message:'] matches [ at the top; the older ( remains protected below.',type:'comparison',lanes:[{id:'main',label:'Unmatched openers',kind:'stack',order:['open-paren','open-bracket']}],input:{label:'Source characters',tokens:['(','[','{','}',']',')'],active:4},focus:[{id:'open-bracket',label:'top = ['}],comparison:{text:'MATCH([, ])',outcome:true},operation:{label:'PEEK top'},variables:{token:']',top:'['},operations:6,comparisons:2,boundary:true},
-      {line:9,title:'Pop the matched [',message:'Remove [ after consuming ].',lanes:[{id:'main',label:'Unmatched openers',kind:'stack',order:['open-paren']}],input:{label:'Source characters',tokens:['(','[','{','}',']',')'],active:4},focus:[{id:'open-paren',label:'new top'}],operation:{label:'POP [',end:'top'},variables:{size:1},operations:7,comparisons:2},
-      {line:6,title:'Compare ) with the top',message:') matches the oldest opener (, now exposed at the top.',type:'comparison',lanes:[{id:'main',label:'Unmatched openers',kind:'stack',order:['open-paren']}],input:{label:'Source characters',tokens:['(','[','{','}',']',')'],active:5},focus:[{id:'open-paren',label:'top = ('}],comparison:{text:'MATCH((, ))',outcome:true},operation:{label:'PEEK top'},variables:{token:')',top:'('},operations:8,comparisons:3,boundary:true},
-      {line:9,title:'Pop the matched (',message:'The final pair closes, leaving no unmatched opener.',lanes:[{id:'main',label:'Unmatched openers',kind:'stack',order:[]}],input:{label:'Source characters',tokens:['(','[','{','}',']',')'],active:5},operation:{label:'POP (',end:'top'},variables:{size:0},operations:9,comparisons:3},
-      {line:12,title:'Accept only an empty final stack',message:'Every closer matched in the correct nesting order, so the source is VALID.',type:'return',lanes:[{id:'main',label:'Unmatched openers',kind:'stack',order:[]}],input:{label:'Source characters',tokens:['(','[','{','}',']',')'],active:-1},comparison:{text:'stack is empty',outcome:true},operation:{label:'RETURN VALID'},status:[{label:'result',value:'VALID',tone:'success'}],output:['VALID'],variables:{size:0},operations:9,comparisons:4},
-    ],result:{valid:true},
+  const delimiterScenarios = Object.freeze([
+    Object.freeze({ id: 'balanced', label: 'Balanced · ([{}])', tokens: Object.freeze(['(', '[', '{', '}', ']', ')']) }),
+    Object.freeze({ id: 'mismatch', label: 'Mismatch · ([}])', tokens: Object.freeze(['(', '[', '}', ']', ')']) }),
+    Object.freeze({ id: 'extra-closer', label: 'Extra closer · ())', tokens: Object.freeze(['(', ')', ')']) }),
+    Object.freeze({ id: 'unclosed', label: 'Unclosed openers · ([{}', tokens: Object.freeze(['(', '[', '{', '}']) }),
+  ]);
+  const delimiterMetadata = Object.freeze({
+    id: 'stack-delimiter-audit', contentVersion: '2026.09-delimiter-phases',
+    topic: 'Stacks', family: 'Stacks', exampleKind: 'Parser application', checkpointId: 'm4-stack',
+    title: 'Audit nested delimiters',
+    subtitle: 'Match nested grouping delimiters by comparing every closer with the stack top.',
+    variant: 'stack-audit', workspaceComposition: 'delimiter-execution',
+    complexity: Object.freeze({ best: 'O(1)', avg: 'O(n)', worst: 'O(n)', space: 'O(n)' }),
+  });
+  const delimiterActivities = new Map(delimiterScenarios.map((scenario) => {
+    const program = delimiterProgram(scenario.tokens);
+    return [scenario.id, buildActivity({ ...delimiterMetadata, ...program })];
+  }));
+  const delimiterDefault = delimiterActivities.get('balanced');
+  const delimiterAudit = Object.freeze({
+    ...delimiterDefault,
+    input: Object.freeze({
+      ...delimiterDefault.input,
+      defaultValues: delimiterScenarios[0].tokens,
+      defaultPreset: 'balanced',
+      presets: Object.freeze(delimiterScenarios.map(({ id, label }) => Object.freeze({ id, label }))),
+    }),
+    run(options = {}) {
+      return (delimiterActivities.get(options.preset) || delimiterDefault).run();
+    },
+    sourceFor(options = {}) {
+      return (delimiterActivities.get(options.preset) || delimiterDefault).source;
+    },
   });
 
   const editorUndo = buildActivity({
@@ -480,7 +726,7 @@ const ITCC47LinearADTActivities = (() => {
     return activities.map((activity) => catalog.register(activity));
   }
 
-  return Object.freeze({ activities, register, postfixProgram });
+  return Object.freeze({ activities, register, postfixProgram, delimiterProgram });
 })();
 
 if (typeof ITCC47Activities !== 'undefined') ITCC47LinearADTActivities.register(ITCC47Activities);

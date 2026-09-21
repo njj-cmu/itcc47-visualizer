@@ -1715,11 +1715,138 @@ test('public release exposes ten line-by-line Module 4 examples', async ({ page 
   await expect(page.locator('.visualization-group', { hasText: 'Deques' }).locator('.visualization-card')).toHaveCount(3);
   for (const activity of activities) {
     await page.goto(`/visualizer.html?activity=${activity}`);
-    await expect(page.locator(activity === 'stack-lifo-basics' ? '.stack-execution-workbench' : activity === 'stack-postfix-evaluator' ? '.postfix-workbench' : '.linear-adt')).toBeVisible();
-    await expect(page.locator(activity === 'stack-lifo-basics' ? '.stack-execution-header' : activity === 'stack-postfix-evaluator' ? '.postfix-operation' : '.linear-teaching')).toBeVisible();
+    const workbench = activity === 'stack-lifo-basics' ? '.stack-execution-workbench' : activity === 'stack-postfix-evaluator' ? '.postfix-workbench' : activity === 'stack-delimiter-audit' ? '.delimiter-workbench' : '.linear-adt';
+    const teaching = activity === 'stack-lifo-basics' ? '.stack-execution-header' : activity === 'stack-postfix-evaluator' ? '.postfix-operation' : activity === 'stack-delimiter-audit' ? '.delimiter-current-token' : '.linear-teaching';
+    await expect(page.locator(workbench)).toBeVisible();
+    await expect(page.locator(teaching)).toBeVisible();
     await expect(page.locator('.source-line.is-current')).toHaveCount(1);
     await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
   }
+});
+
+test('delimiter debugger separates source character, comparison, POP, and final validation', async ({ page }, testInfo) => {
+  test.setTimeout(90000);
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.goto('/visualizer.html?activity=stack-delimiter-audit');
+  const workbench = page.locator('.delimiter-workbench');
+  const step = page.getByRole('button', { name: 'Step', exact: true });
+  const stackItems = page.getByRole('region', { name: 'Unmatched Openers Stack' }).getByRole('listitem');
+  const parserStatus = page.getByRole('region', { name: 'Parser Status' });
+  const expected = [[1,0,1]];
+  for (let character = 1; character <= 6; character++) {
+    if (character <= 3) expected.push(...Array.from({ length: 4 }, (_, phase) => [4,character,phase + 1]));
+    else {
+      expected.push(...Array.from({ length: 4 }, (_, phase) => [6,character,phase + 1]));
+      expected.push(...Array.from({ length: 4 }, (_, phase) => [9,character,phase + 1]));
+    }
+  }
+  expected.push(...Array.from({ length: 4 }, (_, phase) => [12,0,phase + 1]));
+  const mutations = { 0:[], 4:['('], 8:['(','['], 12:['(','[','{'], 18:['(','['], 26:['('], 34:[] };
+  let values = [];
+  for (let index = 0; index < expected.length; index++) {
+    if (index) await step.click();
+    const [line, character, phase] = expected[index];
+    await expect(workbench).toHaveAttribute('data-line', String(line));
+    await expect(workbench).toHaveAttribute('data-character', String(character));
+    await expect(workbench).toHaveAttribute('data-phase', String(phase));
+    await expect(page.locator('.delimiter-source .source-line.is-current > span')).toHaveText(String(line));
+    await expect(page.locator('.delimiter-steps [aria-current="step"]')).toHaveCount(1);
+    if (mutations[index]) values = mutations[index];
+    await expect(stackItems).toHaveCount(values.length);
+    for (let item = 0; item < values.length; item++) await expect(stackItems.nth(item)).toContainText(values[item]);
+    if (index < expected.length - 1) await expect(parserStatus).toContainText('RUNNING');
+    if (line === 6 && phase < 3) await expect(page.locator('.delimiter-matching')).not.toHaveClass(/is-success/);
+    if (line === 6 && phase >= 3) await expect(page.locator('.delimiter-matching')).toHaveClass(/is-success/);
+    if (index === 17) await expect(stackItems).toHaveCount(3);
+    if (index === 18) await expect(page.getByRole('region', { name: 'Outgoing Value' })).toContainText('Popped (matched)');
+    if (index === 19) await expect(page.locator('.delimiter-stream li.is-resolved')).toHaveCount(2);
+    if (index === 39) await expect(parserStatus).toContainText('RUNNING');
+  }
+  await expect(step).toBeDisabled();
+  await expect(parserStatus).toContainText('VALID');
+  await expect(page.getByRole('region', { name: 'Final Stack Validation' })).toContainText('TRUE');
+  await expect(page.locator('.delimiter-stream li.is-resolved')).toHaveCount(6);
+  for (let count = 0; count < 2; count++) await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(parserStatus).toContainText('RUNNING');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Timeline step', { exact: true }).fill('16');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await expect(workbench).toHaveAttribute('data-line', '6');
+  await expect(stackItems).toHaveCount(3);
+  await expect(page.locator('.delimiter-matching')).toContainText('Match found');
+
+  const seekEnd = async () => {
+    await page.getByLabel('Playback settings', { exact: true }).click();
+    const slider = page.getByLabel('Timeline step', { exact: true });
+    await slider.fill(await slider.getAttribute('max'));
+    await page.getByLabel('Playback settings', { exact: true }).click();
+  };
+  await page.getByLabel('Delimiter example').selectOption('mismatch');
+  await expect(workbench).toHaveAttribute('data-operation', 'initialize');
+  await seekEnd();
+  await expect(parserStatus).toContainText('INVALID');
+  await expect(page.getByRole('region', { name: 'Matching Information' })).toContainText('Mismatch');
+  await expect(stackItems).toHaveCount(2);
+  await page.getByLabel('Delimiter example').selectOption('extra-closer');
+  await seekEnd();
+  await expect(parserStatus).toContainText('No unmatched opener exists');
+  await expect(page.getByRole('region', { name: 'Matching Information' })).toContainText('No opener is available');
+  await expect(stackItems).toHaveCount(0);
+  await page.getByLabel('Delimiter example').selectOption('unclosed');
+  await seekEnd();
+  await expect(parserStatus).toContainText('One or more opening delimiters were never closed');
+  await expect(page.getByRole('region', { name: 'Final Stack Validation' })).toContainText('FALSE');
+  await expect(stackItems).toHaveCount(2);
+  await page.getByLabel('Delimiter example').selectOption('balanced');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Speed', { exact: true }).selectOption('9');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  const pausedPhase = await workbench.getAttribute('data-phase');
+  const pausedOperation = await workbench.getAttribute('data-operation');
+  await page.waitForTimeout(350);
+  await expect(workbench).toHaveAttribute('data-phase', pausedPhase);
+  await expect(workbench).toHaveAttribute('data-operation', pausedOperation);
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(step).toBeDisabled({ timeout: 20000 });
+  await expect(parserStatus).toContainText('VALID');
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  if (testInfo.project.name === 'laptop') {
+    const left = await page.locator('.delimiter-left').boundingBox(), right = await page.locator('.delimiter-right').boundingBox();
+    expect(left.width / (left.width + right.width)).toBeGreaterThanOrEqual(.30);
+    expect(left.width / (left.width + right.width)).toBeLessThanOrEqual(.34);
+    expect(right.x).toBeGreaterThan(left.x + left.width);
+  }
+});
+
+test('delimiter opener and matched POP animate stable values from offline file URLs', async ({ page }) => {
+  const { pathToFileURL } = require('url');
+  await page.context().setOffline(true);
+  await page.goto(`${pathToFileURL(path.resolve(__dirname, '..', 'visualizer.html')).href}?activity=stack-delimiter-audit`);
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Motion preference', { exact: true }).selectOption('on');
+  await page.getByLabel('Speed', { exact: true }).selectOption('3');
+  await page.getByLabel('Timeline step', { exact: true }).fill('2');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  const opener = page.locator('[data-value-id="opener-0"]');
+  const before = await opener.boundingBox();
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('.delimiter-pending')).toBeVisible();
+  await expect.poll(() => opener.evaluate(element => getComputedStyle(element).transform)).not.toBe('none');
+  await expect.poll(async () => Math.abs((await opener.boundingBox()).x - before.x), { timeout: 2500 }).toBeGreaterThan(40);
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Timeline step', { exact: true }).fill('17');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  const outgoing = page.getByRole('region', { name: 'Outgoing Value' }).locator('[data-value-id="opener-2"]');
+  await expect(outgoing).toHaveCount(1);
+  await expect.poll(() => outgoing.evaluate(element => getComputedStyle(element).transform)).not.toBe('none');
+  await expect.poll(() => outgoing.evaluate(element => getComputedStyle(element).transform)).toBe('none');
 });
 
 test('visualizer workspaces choose a structure-aware desktop composition', async ({ page }, testInfo) => {

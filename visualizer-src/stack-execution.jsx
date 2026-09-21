@@ -4,7 +4,7 @@ import './stack-execution.css';
 
 const displaySource = (line) => line.replaceAll('<-', '←');
 
-function PhaseIndicators({ execution, compact = false }) {
+export function PhaseIndicators({ execution, compact = false }) {
   return <ol className={compact ? 'stack-phase-dots' : 'stack-phase-stepper'} aria-label="Operation phases">
     {execution.phaseLabels.map((label, index) => <li key={label} aria-current={index === execution.phaseIndex ? 'step' : undefined}>
       <span aria-hidden="true">{compact ? '' : index + 1}</span>{!compact ? <small>{label}</small> : <span className="sr-only">{label}</span>}
@@ -119,9 +119,10 @@ function TransferConnector({ execution }) {
   </svg>;
 }
 
-function PhasePlayback({ state, controller, event, execution, source, Icon, motionPreference }) {
+export function PhasePlayback({ state, controller, event, execution, source, Icon, motionPreference, iteration }) {
   return <section className="stack-playback" aria-label="Playback controls">
     <div className="stack-progress"><span>Line {event.source.line} / {source.length}</span><progress aria-label="Source line progress" value={event.source.line} max={source.length}/></div>
+    {iteration ? <div className="stack-progress"><span>Token {iteration.index < 0 ? iteration.processed : iteration.index + 1} / {iteration.count}</span><progress aria-label="Token progress" value={iteration.processed} max={iteration.count}/></div> : null}
     <div className="stack-progress"><span>Operation phase {execution.phaseIndex + 1} / {execution.phaseCount}</span><progress aria-label="Operation phase progress" value={execution.phaseIndex + 1} max={execution.phaseCount}/></div>
     <div className="transport"><button type="button" aria-label="Previous" disabled={state.index === 0} onClick={() => controller.step(-1)}><Icon name="previous" size={18}/><span>Previous</span></button><button type="button" className="primary" aria-label={state.status === 'playing' ? 'Pause' : 'Play'} disabled={state.atEnd} onClick={controller.toggle}><Icon name={state.status === 'playing' ? 'pause' : 'play'} size={18}/><span>{state.status === 'playing' ? 'Pause' : 'Play'}</span></button><button type="button" id="btn-step" aria-label="Step" disabled={state.atEnd} onClick={() => controller.step(1)}><Icon name="next" size={18}/><span>Step</span></button></div>
     <details className="stack-playback-settings"><summary aria-label="Playback settings"><Icon name="settings" size={18}/><span>{state.speed === 3 ? '0.5' : state.speed === 9 ? '2' : '1'}×</span></summary><div>

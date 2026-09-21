@@ -186,6 +186,22 @@ components in `visualizer-src/stack-execution.jsx` render this model without
 introducing a second playback controller. Other linear ADT lessons retain the
 shared renderer and may adopt phase definitions independently.
 
+Postfix evaluation (`stack-postfix-evaluator`) uses the `postfix-execution`
+workspace. `postfixProgram` generates operation definitions from tokens, then
+`operationSteps` expands them into 71 immutable phase snapshots for the shipped
+`5 2 + 3 ×` expression. Event `source` identifies the real pseudocode line;
+`frame.iteration` identifies the token cursor and processed prefix; `frame.execution`
+identifies the operation and its phase. These are independent: line 4 repeats
+for numbers, and line 8 hosts separate APPLY and PUSH operations per operator.
+Both operators pop right first and left second. Runtime entries transition from
+unassigned through receiving to assigned; only the return-to-output phase emits
+program output. Stable entity IDs move between staging, pending slots, stack,
+variables and output using Motion shared layouts. The workspace reuses the
+phase stepper, playback controls and controller from stack foundations; Previous,
+seek and restart restore complete snapshots without replaying side effects.
+The generator also supports subtraction and division for future curated examples,
+but the public route intentionally retains its original fixed teaching scenario.
+
 ## Functions, calls, and recurrences
 
 The parser root is `Program { functions, body }`. Top-level function definitions

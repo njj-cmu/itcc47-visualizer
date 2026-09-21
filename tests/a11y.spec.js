@@ -39,6 +39,22 @@ test('stack phase controls are keyboard operable and transitional states are Axe
   }
 });
 
+test('postfix phase, token, runtime and output states are keyboard operable and Axe-clean', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/visualizer.html?activity=stack-postfix-evaluator');
+  await page.getByRole('button', { name: 'Step', exact: true }).focus();
+  for (let i = 0; i < 3; i++) await page.keyboard.press('Enter');
+  await expect(page.locator('.postfix-workbench')).toHaveAttribute('data-line', '4');
+  await expect(page.locator('.postfix-workbench')).toHaveAttribute('data-token', '1');
+  for (const target of [3,4,5,21,25,29,31,34,50,54,60,68,69]) {
+    await page.getByLabel('Playback settings', { exact: true }).click();
+    await page.getByLabel('Timeline step', { exact: true }).fill(String(target));
+    await page.getByLabel('Playback settings', { exact: true }).click();
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+    expect(results.violations.filter(item => ['serious', 'critical'].includes(item.impact))).toEqual([]);
+  }
+});
+
 test('Recent Documents compact scenario controls are keyboard operable and Axe-clean', async ({ page }) => {
   await page.goto('/visualizer.html?activity=array-linked-comparison&preview=1');
   const documentChoice = page.getByLabel('Document', { exact: true });

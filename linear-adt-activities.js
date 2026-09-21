@@ -20,7 +20,8 @@ const ITCC47LinearADTActivities = (() => {
       ...phase,
       line: operation.line,
       execution: {
-        operationId: `line-${operation.line}`, kind: operation.kind,
+        operationId: operation.id || `line-${operation.line}`, kind: operation.kind,
+        title: operation.title,
         description: operation.description,
         phaseIndex, phaseCount: operation.phases.length,
         phaseLabels: operation.phases.map((item) => item.title),
@@ -28,6 +29,118 @@ const ITCC47LinearADTActivities = (() => {
       },
       boundary: phaseIndex === operation.phases.length - 1,
     })));
+  }
+
+  // Generate operations from tokens, not pre-computed screen contents. Source,
+  // iteration and phase remain separate even when line 8 executes twice.
+  function postfixProgram(tokens = ['5', '2', '+', '3', '×']) {
+    tokens = tokens.map(String);
+    const operators = { '+': (a, b) => a + b, '−': (a, b) => a - b, '-': (a, b) => a - b, '×': (a, b) => a * b, '÷': (a, b) => a / b };
+    const entities = [], operations = [], stack = [], infix = new Map();
+    let runtime = {}, tokenIndex = -1, processed = 0, count = 0, comparisons = 0;
+    let classified = false;
+    const snapshot = (execution = {}, output = []) => ({
+      lanes: [{ id: 'main', label: 'Operand Stack', kind: 'stack', order: stack.map(item => item.id) }],
+      input: { label: 'Postfix tokens', tokens, active: tokenIndex },
+      iteration: { index: tokenIndex, count: tokens.length, processed, value: tokens[tokenIndex] ?? null,
+        type: classified ? (Object.hasOwn(operators, tokens[tokenIndex]) ? 'Operator' : 'Number') : null },
+      runtime: Object.fromEntries(Object.entries(runtime).map(([key, value]) => [key, { ...value }])),
+      held: Object.entries(runtime).filter(([, item]) => item.status === 'assigned').map(([label, item]) => ({ id: `runtime-${label}`, label, value: item.value })),
+      variables: { token: tokens[tokenIndex] ?? 'none', ...Object.fromEntries(Object.entries(runtime).filter(([, item]) => item.status === 'assigned').map(([label, item]) => [label, item.value])), size: stack.length },
+      operations: count, comparisons, execution, output,
+    });
+    const operation = (line, kind, title, labels, describe, phase) => {
+      operations.push({ id: `token-${tokenIndex}-${kind}-${operations.length}`, line, kind, title, description: title,
+        phases: labels.map((label, index) => ({ title: label, message: describe[index],
+          operation: { label: kind === 'pop' ? `POP ${line === 6 ? 'right' : 'left'}` : title, end: 'top' },
+          ...phase(index),
+        })) });
+    };
+    const flow = (line, kind, title, message) => operation(line, kind, title, [title], [message], () => snapshot());
+    const push = (item, isResult) => {
+      const beforeSize = stack.length;
+      operation(isResult ? 8 : 4, 'push', isResult ? `Push result ${item.value} onto the stack` : `PUSH ${item.value} onto the stack`,
+        [isResult ? 'Read result' : 'Read token', 'Move to stack', 'Commit push', 'Update state'],
+        [isResult ? `The computed result ${item.value} is ready to push.` : `${item.value} is a number. Stage it from the token stream.`,
+          `Move ${item.value} toward the pending top slot. It is not committed yet.`,
+          `Commit ${item.value} as the new top item.`, `PUSH complete. Confirm the stack size and mark token ${tokenIndex + 1} as processed.`],
+        index => {
+          if (index === 2) { stack.push(item); count++; }
+          if (index === 3) processed = tokenIndex + 1;
+          return snapshot({ item, beforeSize, pendingPush: index === 1, staged: index === 0,
+            transfer: index === 1 ? 'push' : null, pendingMetadata: index === 2, complete: index === 3, origin: isResult ? 'computed result' : 'from token stream' });
+        });
+    };
+    const pop = (destination) => {
+      const item = stack.at(-1), beforeSize = stack.length;
+      operation(destination === 'right' ? 6 : 7, 'pop', `Pop the ${destination} operand ${destination === 'right' ? 'first' : 'second'}`,
+        ['Identify top', 'Remove value', 'Assign variable', 'Update stack'],
+        [`The top value ${item.value} is the ${destination} operand. ${destination === 'right' ? 'First pop = right.' : 'Second pop = left.'}`,
+          `Remove ${item.value} from the stack. ${destination} is receiving it.`,
+          `Assign ${item.value} to ${destination}. This is a runtime value, not output.`,
+          `${destination} = ${item.value}. ${stack.length > 1 ? 'The next item becomes the top.' : 'The operand stack is now empty.'}`],
+        index => {
+          if (index === 1) { stack.pop(); count++; runtime[destination] = { ...item, status: 'receiving' }; }
+          if (index === 2) runtime[destination] = { ...item, status: 'assigned' };
+          return snapshot({ item, destination, beforeSize, transfer: index === 1 ? 'pop' : null, complete: index === 3 });
+        });
+      return item;
+    };
+    flow(1, 'initialize', 'Initialize the operand stack', 'Start with an empty stack, no runtime values, and no output.');
+    tokens.forEach((token, index) => {
+      tokenIndex = index; classified = false; runtime = {};
+      flow(2, 'iterate', `Read token ${index + 1} of ${tokens.length}`, `The loop cursor moves to ${token}. The stack is unchanged.`);
+      classified = true; comparisons++;
+      const isOperator = Object.hasOwn(operators, token);
+      operation(3, 'classify', `Is ${token} a number?`, ['Classify token'],
+        [isOperator ? `${token} is an operator: take ELSE, then POP right → POP left → APPLY → PUSH.` : `${token} is a number: take the PUSH branch.`],
+        () => ({ ...snapshot(), type: 'comparison', comparison: { text: 'token is a number', outcome: !isOperator } }));
+      if (!isOperator) {
+        if (!token.trim() || !Number.isFinite(Number(token))) throw new Error(`Invalid postfix token: ${token}`);
+        const item = entity(`token-${index}`, token);
+        infix.set(item.id, token);
+        entities.push(item); push(item, false);
+      } else {
+        if (stack.length < 2) throw new Error(`Postfix ${token}: two operands are required`);
+        runtime = { right: { status: 'unassigned' }, left: { status: 'unassigned' } };
+        flow(5, 'branch', 'Resolve the operator', 'First pop = right operand. Second pop = left operand. Keep this order for subtraction and division too.');
+        const right = pop('right'), left = pop('left');
+        const value = operators[token](Number(left.value), Number(right.value));
+        if (!Number.isFinite(value)) throw new Error('Postfix result must be finite');
+        const expression = `${left.value} ${token} ${right.value}`;
+        const item = entity(`result-${index}`, String(value), expression);
+        infix.set(item.id, `(${infix.get(left.id)} ${token} ${infix.get(right.id)})`);
+        entities.push(item);
+        operation(8, 'apply', `Apply ${token} to left and right`, ['Load operands', 'Apply operator', 'Produce result', 'Stage result'],
+          [`Load left = ${left.value} and right = ${right.value}, in that order.`, `Apply ${expression}. Neither operand is on the stack now.`,
+            `${expression} = ${value}. This is an intermediate runtime result, not program output.`, `Stage ${value} before pushing it back onto the operand stack.`],
+          phase => {
+            runtime.result = phase < 2 ? { status: 'unassigned' } : { ...item, status: 'assigned' };
+            return snapshot({ item, expression, staged: phase === 3, complete: phase === 3 });
+          });
+        push(item, true);
+      }
+      flow(9, 'branch', 'Finish this token’s branch', `Token ${index + 1} is processed. Its value or computed result is on the stack.`);
+      flow(10, 'iterate', index < tokens.length - 1 ? 'Continue the token loop' : 'Token loop complete', index < tokens.length - 1 ? 'Advance to the next token.' : 'All tokens are processed. Return the single remaining value.');
+    });
+    if (stack.length !== 1) throw new Error('Postfix evaluation must leave exactly one result');
+    tokenIndex = -1; classified = false;
+    const answer = stack[0];
+    operation(11, 'return', 'Return final result', ['Identify final value', 'Pop result', 'Move to output', 'Complete evaluation'],
+      [`${answer.value} is the only value left on the stack.`, `Pop ${answer.value}. The stack is now empty.`,
+        `RETURN sends ${answer.value} to Program Output.`, `Evaluation complete: ${answer.value}.`],
+      phase => {
+        if (phase === 1) { stack.pop(); count++; }
+        return { ...snapshot({ item: answer, beforeSize: 1, staged: phase === 1, transfer: phase === 1 ? 'return-pop' : phase === 2 ? 'output' : null, complete: phase === 3 }, phase >= 2 ? [answer.value] : []), type: 'return' };
+      });
+    const calculation = infix.get(answer.id);
+    return {
+      entities, steps: operationSteps(operations), result: { value: Number(answer.value) },
+      scenario: { calculation: `${calculation.startsWith('(') ? calculation.slice(1, -1) : calculation} = ${answer.value}` },
+      source: ['stack <- empty', `FOR each token IN [${tokens.join(', ')}] DO`, '  IF token is a number THEN',
+        '    PUSH stack, token', '  ELSE', '    right <- POP stack', '    left <- POP stack',
+        '    PUSH stack, APPLY(token, left, right)', '  ENDIF', 'ENDFOR', 'RETURN POP stack'],
+    };
   }
 
   function stackFoundationsSteps() {
@@ -154,6 +267,8 @@ const ITCC47LinearADTActivities = (() => {
           output: Object.freeze([...(step.output || [])]),
           operation: step.operation ? Object.freeze({ ...step.operation }) : null,
           execution: step.execution || null,
+          iteration: step.iteration || null,
+          runtime: step.runtime || null,
           invariants: invariant,
           markers: Object.freeze({ teaching, variables: Object.freeze({ ...(step.variables || {}) }) }),
         },
@@ -170,6 +285,7 @@ const ITCC47LinearADTActivities = (() => {
       title: spec.title, subtitle: spec.subtitle, exampleKind: spec.exampleKind,
       engine: 'curated-linear-adt', renderer: 'linear-adt', teachingVariant: spec.variant,
       workspaceComposition: spec.workspaceComposition,
+      scenario: spec.scenario ? Object.freeze({ ...spec.scenario }) : null,
       checkpointId: spec.checkpointId, cloIds: CLO_IDS, reviewStatus: 'reviewed',
       source, views: Object.freeze(['visualize', 'code', 'trace', 'variables', 'operations', 'output']),
       evidenceViews: Object.freeze(['trace', 'variables', 'operations', 'output']),
@@ -195,25 +311,12 @@ const ITCC47LinearADTActivities = (() => {
   });
 
   const postfix = buildActivity({
-    id: 'stack-postfix-evaluator', topic: 'Stacks', family: 'Stacks', exampleKind: 'Math resolver', checkpointId: 'm4-stack',
-    title: 'Evaluate a postfix expression', subtitle: 'Resolve 5 2 + 3 × by stacking operands and applying operators.', variant: 'stack-postfix',
-    entities: [entity('n5','5'),entity('n2','2'),entity('sum7','7','5 + 2'),entity('n3','3'),entity('product21','21','7 × 3')],
-    input:{label:'Postfix tokens',tokens:['5','2','+','3','×'],active:0},
-    source:['stack <- empty','FOR each token IN [5, 2, +, 3, ×] DO','  IF token is a number THEN','    PUSH stack, token','  ELSE','    right <- POP stack','    left <- POP stack','    PUSH stack, APPLY(token, left, right)','  ENDIF','ENDFOR','RETURN POP stack'],
-    complexity:{best:'O(n)',avg:'O(n)',worst:'O(n)',space:'O(n)'},
-    steps:[
-      {line:1,title:'Prepare an operand stack',message:'The operand stack starts empty.',lanes:[{id:'main',label:'Operand stack',kind:'stack',order:[]}],input:{label:'Postfix tokens',tokens:['5','2','+','3','×'],active:0},operation:{label:'initialize'},variables:{size:0},operations:0},
-      {line:4,title:'Number: push 5',message:'5 is an operand, so push it.',lanes:[{id:'main',label:'Operand stack',kind:'stack',order:['n5']}],input:{label:'Postfix tokens',tokens:['5','2','+','3','×'],active:0},focus:[{id:'n5',label:'operand'}],operation:{label:'PUSH 5',end:'top'},variables:{token:5,size:1},operations:1},
-      {line:4,title:'Number: push 2',message:'2 is also an operand; it becomes the new top.',lanes:[{id:'main',label:'Operand stack',kind:'stack',order:['n5','n2']}],input:{label:'Postfix tokens',tokens:['5','2','+','3','×'],active:1},focus:[{id:'n2',label:'top / right'}],operation:{label:'PUSH 2',end:'top'},variables:{token:2,size:2},operations:2},
-      {line:5,title:'Operator: resolve +',message:'+ needs two operands, so switch from pushing to popping.',type:'comparison',lanes:[{id:'main',label:'Operand stack',kind:'stack',order:['n5','n2']}],input:{label:'Postfix tokens',tokens:['5','2','+','3','×'],active:2},focus:[{id:'n2',label:'top'}],comparison:{text:'token is a number',outcome:false},operation:{label:'operator +'},variables:{token:'+',size:2},operations:2,comparisons:1,boundary:true},
-      {line:6,title:'Pop the right operand first',message:'POP gives right = 2. Operand order matters for subtraction and division.',lanes:[{id:'main',label:'Operand stack',kind:'stack',order:['n5']}],input:{label:'Postfix tokens',tokens:['5','2','+','3','×'],active:2},focus:[{id:'right2',label:'right',where:'held',value:2}],held:[{id:'right2',label:'right operand',value:2,tone:'primary'}],operation:{label:'POP right',end:'top'},variables:{right:2,size:1},operations:3,comparisons:1},
-      {line:7,title:'Pop the left operand second',message:'The next POP gives left = 5.',lanes:[{id:'main',label:'Operand stack',kind:'stack',order:[]}],input:{label:'Postfix tokens',tokens:['5','2','+','3','×'],active:2},focus:[{id:'left5',label:'left',where:'held',value:5},{id:'right2',label:'right',where:'held',value:2}],held:[{id:'left5',label:'left operand',value:5,tone:'secondary'},{id:'right2',label:'right operand',value:2,tone:'primary'}],operation:{label:'POP left',end:'top'},variables:{left:5,right:2,size:0},operations:4,comparisons:1},
-      {line:8,title:'Compute and push 7',message:'Apply 5 + 2, then push the intermediate result 7.',lanes:[{id:'main',label:'Operand stack',kind:'stack',order:['sum7']}],input:{label:'Postfix tokens',tokens:['5','2','+','3','×'],active:2},focus:[{id:'sum7',label:'5 + 2',tone:'minimum'}],operation:{label:'PUSH result',end:'top'},variables:{result:7,size:1},operations:5,comparisons:1},
-      {line:4,title:'Number: push 3',message:'Advance to 3 and push it above 7.',lanes:[{id:'main',label:'Operand stack',kind:'stack',order:['sum7','n3']}],input:{label:'Postfix tokens',tokens:['5','2','+','3','×'],active:3},focus:[{id:'n3',label:'top / right'}],operation:{label:'PUSH 3',end:'top'},variables:{token:3,size:2},operations:6,comparisons:1},
-      {line:5,title:'Operator: resolve ×',message:'× again consumes the top two operands.',type:'comparison',lanes:[{id:'main',label:'Operand stack',kind:'stack',order:['sum7','n3']}],input:{label:'Postfix tokens',tokens:['5','2','+','3','×'],active:4},focus:[{id:'n3',label:'right'},{id:'sum7',label:'left',tone:'secondary'}],comparison:{text:'enough operands (size ≥ 2)',outcome:true},operation:{label:'APPLY ×'},variables:{left:7,right:3,size:2},operations:6,comparisons:2,boundary:true},
-      {line:8,title:'Replace operands with 21',message:'POP 3 and 7, compute 7 × 3, and push 21.',lanes:[{id:'main',label:'Operand stack',kind:'stack',order:['product21']}],input:{label:'Postfix tokens',tokens:['5','2','+','3','×'],active:4},focus:[{id:'product21',label:'7 × 3',tone:'minimum'}],operation:{label:'PUSH result',end:'top'},variables:{result:21,size:1},operations:9,comparisons:2},
-      {line:11,title:'One value is the answer',message:'After every token, exactly one value remains. POP and return 21.',type:'return',lanes:[{id:'main',label:'Operand stack',kind:'stack',order:[]}],input:{label:'Postfix tokens',tokens:['5','2','+','3','×'],active:-1},focus:[{id:'answer21',label:'answer',where:'held',value:21,tone:'minimum'}],held:[{id:'answer21',label:'answer',value:21,tone:'minimum'}],operation:{label:'RETURN 21'},comparison:{text:'final stack size = 1',outcome:true},output:['21'],variables:{answer:21,size:0},operations:10,comparisons:3},
-    ], result:{ value:21 },
+    id: 'stack-postfix-evaluator', contentVersion: '2026.09-postfix-phases',
+    topic: 'Stacks', family: 'Stacks', exampleKind: 'Math resolver', checkpointId: 'm4-stack',
+    title: 'Evaluate a postfix expression', subtitle: 'Resolve 5 2 + 3 × by stacking operands and applying operators.',
+    variant: 'stack-postfix', workspaceComposition: 'postfix-execution',
+    complexity: { best: 'O(n)', avg: 'O(n)', worst: 'O(n)', space: 'O(n)' },
+    ...postfixProgram(),
   });
 
   const delimiterAudit = buildActivity({
@@ -377,7 +480,7 @@ const ITCC47LinearADTActivities = (() => {
     return activities.map((activity) => catalog.register(activity));
   }
 
-  return Object.freeze({ activities, register });
+  return Object.freeze({ activities, register, postfixProgram });
 })();
 
 if (typeof ITCC47Activities !== 'undefined') ITCC47LinearADTActivities.register(ITCC47Activities);

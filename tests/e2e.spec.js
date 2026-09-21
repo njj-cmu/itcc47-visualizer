@@ -1715,8 +1715,8 @@ test('public release exposes ten line-by-line Module 4 examples', async ({ page 
   await expect(page.locator('.visualization-group', { hasText: 'Deques' }).locator('.visualization-card')).toHaveCount(3);
   for (const activity of activities) {
     await page.goto(`/visualizer.html?activity=${activity}`);
-    await expect(page.locator(activity === 'stack-lifo-basics' ? '.stack-execution-workbench' : '.linear-adt')).toBeVisible();
-    await expect(page.locator(activity === 'stack-lifo-basics' ? '.stack-execution-header' : '.linear-teaching')).toBeVisible();
+    await expect(page.locator(activity === 'stack-lifo-basics' ? '.stack-execution-workbench' : activity === 'stack-postfix-evaluator' ? '.postfix-workbench' : '.linear-adt')).toBeVisible();
+    await expect(page.locator(activity === 'stack-lifo-basics' ? '.stack-execution-header' : activity === 'stack-postfix-evaluator' ? '.postfix-operation' : '.linear-teaching')).toBeVisible();
     await expect(page.locator('.source-line.is-current')).toHaveCount(1);
     await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
   }
@@ -1834,6 +1834,115 @@ test('stack phase workspace runs in offline file mode', async ({ page }) => {
   await expect(page.locator('.stack-execution-workbench')).toHaveAttribute('data-phase', '2');
   await expect(page.getByRole('region', { name: 'Runtime Values', exact: true })).toContainText('receiving "B"');
   await expect(page.getByRole('region', { name: 'Program Output', exact: true })).toContainText('No output yet.');
+});
+
+test('postfix separates source, tokens, and phases through both operators and final return', async ({ page }, testInfo) => {
+  test.setTimeout(90000);
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/visualizer.html?activity=stack-postfix-evaluator');
+  const workbench = page.locator('.postfix-workbench');
+  const step = page.getByRole('button', { name: 'Step', exact: true });
+  const items = page.locator('.postfix-stack').getByRole('listitem');
+  const output = page.getByRole('region', { name: 'Program Output', exact: true });
+  const runtime = page.getByRole('region', { name: 'Runtime Values', exact: true });
+  // Independent classroom trace: source/token groups and actual mutations.
+  const groups = [[1,0,1]];
+  for (const token of [1,2,3,4,5]) {
+    groups.push([2,token,1], [3,token,1]);
+    if (token === 3 || token === 5) groups.push([5,token,1], [6,token,4], [7,token,4], [8,token,4], [8,token,4]);
+    else groups.push([4,token,4]);
+    groups.push([9,token,1], [10,token,1]);
+  }
+  groups.push([11,0,4]);
+  const expected = groups.flatMap(([line, token, count]) => Array.from({ length: count }, (_, phase) => [line,token,phase + 1]));
+  const mutations = { 0:[], 5:['5'], 13:['5','2'], 21:['5'], 25:[], 34:['7'], 42:['7','3'], 50:['7'], 54:[], 63:['21'], 68:[] };
+  const assignments = { 21:['right','2','receiving'], 22:['right','2','assigned'], 25:['left','5','receiving'], 26:['left','5','assigned'], 30:['result','7','assigned'], 50:['right','3','receiving'], 51:['right','3','assigned'], 54:['left','7','receiving'], 55:['left','7','assigned'], 59:['result','21','assigned'] };
+  let values = [];
+  for (let index = 0; index < expected.length; index++) {
+    if (index) await step.click();
+    const [line, token, phase] = expected[index];
+    await expect(workbench).toHaveAttribute('data-line', String(line));
+    await expect(workbench).toHaveAttribute('data-token', String(token));
+    await expect(workbench).toHaveAttribute('data-phase', String(phase));
+    await expect(page.locator('.postfix-source .source-line.is-current > span')).toHaveText(String(line));
+    await expect(page.locator('.postfix-operation [aria-current="step"]')).toHaveCount(1);
+    if (mutations[index]) values = mutations[index];
+    await expect(items).toHaveCount(values.length);
+    for (let item = 0; item < values.length; item++) await expect(items.nth(item)).toHaveText(values[item]);
+    if (index < 69) await expect(output).toHaveText(/No output yet/);
+    else await expect(output.locator('.postfix-value')).toHaveText('21');
+    if (assignments[index]) {
+      const [variable,value,status] = assignments[index];
+      await expect(runtime.locator(`[data-runtime="${variable}"]`)).toHaveClass(`is-${status}`);
+      await expect(runtime.locator(`[data-runtime="${variable}"] .postfix-value`)).toHaveText(value);
+    }
+    if ([3,11,40].includes(index)) await expect(page.locator('.postfix-staging .postfix-value')).toHaveCount(1);
+    if ([4,12,33,41,62].includes(index)) await expect(page.locator('.postfix-pending')).toHaveCount(1);
+    if ([6,14,35,43,64].includes(index)) await expect(page.locator('.postfix-tokens li.is-processed')).toHaveCount(token);
+    if (line === 6) await expect(page.locator('.postfix-operation')).toContainText('right operand first');
+    if (line === 7) await expect(page.locator('.postfix-operation')).toContainText('left operand second');
+  }
+  await expect(step).toBeDisabled();
+  for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(items).toHaveText(['21']);
+  await expect(output).toContainText('No output yet');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Timeline step', { exact: true }).fill('20');
+  await expect(items).toHaveText(['5','2']);
+  await expect(runtime.locator('[data-runtime="right"]')).toHaveClass('is-unassigned');
+  await page.getByRole('button', { name: 'Restart', exact: true }).click();
+  await page.getByLabel('Speed', { exact: true }).selectOption('9');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  const paused = await workbench.getAttribute('data-operation');
+  await page.waitForTimeout(350);
+  await expect(workbench).toHaveAttribute('data-operation', paused);
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(step).toBeDisabled({ timeout: 35000 });
+  await expect(output.locator('.postfix-value')).toHaveText('21');
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  if (testInfo.project.name === 'laptop') {
+    const left = await page.locator('.postfix-left').boundingBox(), right = await page.locator('.postfix-right').boundingBox();
+    expect(left.width / (left.width + right.width)).toBeGreaterThanOrEqual(.35);
+    expect(left.width / (left.width + right.width)).toBeLessThanOrEqual(.38);
+    expect(right.x).toBeGreaterThan(left.x + left.width);
+  }
+});
+
+test('postfix phases animate real values and run from offline file URLs', async ({ page }) => {
+  const { pathToFileURL } = require('url');
+  await page.context().setOffline(true);
+  await page.goto(`${pathToFileURL(path.resolve(__dirname, '..', 'visualizer.html')).href}?activity=stack-postfix-evaluator`);
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Motion preference', { exact: true }).selectOption('on');
+  await page.getByLabel('Speed', { exact: true }).selectOption('3');
+  await page.getByLabel('Timeline step', { exact: true }).fill('3');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  const value = page.locator('[data-value-id="token-0"]');
+  const before = await value.boundingBox();
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('.postfix-pending')).toBeVisible();
+  await expect.poll(async () => value.evaluate(element => getComputedStyle(element).transform)).not.toBe('none');
+  await expect.poll(async () => Math.abs((await value.boundingBox()).x - before.x), { timeout: 2500 }).toBeGreaterThan(50);
+  for (const [index, selector] of [[20, '[data-runtime="right"] .postfix-value'], [67, '.postfix-staging .postfix-value'], [68, '.postfix-output .postfix-value']]) {
+    await page.getByLabel('Playback settings', { exact: true }).click();
+    await page.getByLabel('Timeline step', { exact: true }).fill(String(index));
+    await page.getByLabel('Playback settings', { exact: true }).click();
+    await page.getByRole('button', { name: 'Step', exact: true }).click();
+    const moving = page.locator(selector);
+    await expect(moving).toHaveCount(1);
+    await expect.poll(() => moving.evaluate(element => getComputedStyle(element).transform)).not.toBe('none');
+    await expect.poll(() => moving.evaluate(element => getComputedStyle(element).transform)).toBe('none');
+  }
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Motion preference', { exact: true }).selectOption('off');
+  await page.getByLabel('Timeline step', { exact: true }).fill('70');
+  await expect(page.getByRole('region', { name: 'Program Output', exact: true }).locator('.postfix-value')).toHaveText('21');
 });
 
 test('deque foundation names both ends and changes state line by line', async ({ page }) => {

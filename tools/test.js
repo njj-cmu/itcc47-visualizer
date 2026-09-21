@@ -1743,6 +1743,40 @@ ok('Previous restores the pre-removal stack and runtime snapshot', stackControll
 stackController.dispose();
 ok('stack basics guards underflow before any empty pop', Activities.get('stack-lifo-basics').run().events.some((event)=>event.frame.operation?.label === 'UNDERFLOW guard' && event.frame.markers.teaching.comparison?.outcome === false));
 ok('postfix resolver returns 21', Activities.get('stack-postfix-evaluator').run().result.value === 21);
+const postfixEvents = Activities.get('stack-postfix-evaluator').run().events;
+const postfixPhases = (token, line, kind) => postfixEvents.filter(event => event.frame.iteration.index === token && event.source.line === line && (!kind || event.frame.execution.kind === kind));
+ok('postfix exposes independent immutable source, token, and phase progression', postfixEvents.length === 71 && postfixEvents.every(event => Object.isFrozen(event.frame.iteration) && Object.isFrozen(event.frame.execution) && event.frame.execution.operationId) && new Set(postfixEvents.map(event => event.source.line)).size === 11);
+const postfixExpectedPushes = [[0, '5', 0], [1, '2', 1], [3, '3', 1]];
+postfixExpectedPushes.forEach(([token, value, before]) => {
+  const phases = postfixPhases(token, 4);
+  ok(`postfix token ${token + 1} stages, moves, commits, then marks processed`, phases.length === 4 && phases[0].frame.execution.staged && phases[0].frame.execution.item.value === value && phases[1].frame.execution.pendingPush && phases[1].frame.array.length === before && phases[2].frame.array.length === before + 1 && phases[2].frame.iteration.processed === token && phases[3].frame.iteration.processed === token + 1);
+});
+[[2, '2', '5', '7'], [4, '3', '7', '21']].forEach(([token, right, left, result]) => {
+  for (const [line, destination, value, size] of [[6, 'right', right, 1], [7, 'left', left, 0]]) {
+    const phases = postfixPhases(token, line);
+    ok(`postfix token ${token + 1} ${destination} pop has distinct remove and assign phases`, phases.length === 4 && phases[0].frame.array.length === size + 1 && phases[0].frame.runtime[destination].status === 'unassigned' && phases[1].frame.array.length === size && phases[1].frame.runtime[destination].status === 'receiving' && phases[1].frame.markers.variables[destination] === undefined && phases[2].frame.runtime[destination].status === 'assigned' && phases[2].frame.runtime[destination].value === value);
+  }
+  const apply = postfixPhases(token, 8, 'apply'), push = postfixPhases(token, 8, 'push');
+  ok(`postfix token ${token + 1} applies before a separate push on the same source line`, apply.length === 4 && push.length === 4 && apply[0].frame.execution.operationId !== push[0].frame.execution.operationId && apply.every(event => event.frame.array.length === 0) && apply[1].frame.runtime.result.status === 'unassigned' && apply[2].frame.runtime.result.value === result && apply[3].frame.execution.staged && push[1].frame.array.length === 0 && push[2].frame.array.join() === result);
+  ok(`postfix token ${token + 1} preserves right-first operand order`, apply[0].frame.markers.variables.right === right && apply[0].frame.markers.variables.left === left && postfixEvents.indexOf(postfixPhases(token, 6)[0]) < postfixEvents.indexOf(postfixPhases(token, 7)[0]));
+});
+const postfixReturn = postfixEvents.filter(event => event.source.line === 11);
+ok('postfix output is isolated until the return-to-output phase', postfixEvents.filter(event => event.source.line !== 11).every(event => event.frame.output.length === 0) && postfixReturn.length === 4 && postfixReturn[0].frame.array.join() === '21' && postfixReturn[1].frame.array.length === 0 && postfixReturn[1].frame.output.length === 0 && postfixReturn[2].frame.output.join() === '21' && postfixReturn[3].terminal);
+const postfixController = Playback.createController();
+postfixController.load(postfixEvents, 20);
+postfixController.step(1);
+postfixController.step(-1);
+ok('postfix Previous restores the same token and pre-pop structure', postfixController.getState().currentEvent === postfixEvents[20] && postfixController.getState().currentEvent.frame.array.join() === '5,2');
+postfixController.dispose();
+const makePostfix = workspaceEngine.get('ITCC47LinearADTActivities').postfixProgram;
+ok('postfix generator supports noncommutative examples without reversing operands', makePostfix(['9', '3', '-', '2', '÷']).result.value === 3);
+ok('postfix scenario summary and source derive from the same token program', Activities.get('stack-postfix-evaluator').scenario.calculation === '(5 + 2) × 3 = 21' && makePostfix(['9', '3', '-']).source[1] === 'FOR each token IN [9, 3, -] DO' && makePostfix(['9', '3', '-']).scenario.calculation === '9 - 3 = 6');
+ok('postfix duplicate numbers keep distinct entity identities', new Set(makePostfix(['2', '2', '+']).entities.map(item => item.id)).size === 3);
+for (const invalid of [[], ['5', '+'], ['5', '2'], ['bad'], ['2', '0', '÷']]) {
+  let rejected = false;
+  try { makePostfix(invalid); } catch { rejected = true; }
+  ok(`postfix generator rejects invalid expression ${JSON.stringify(invalid)}`, rejected);
+}
 ok('postfix resolver pops right before left', Activities.get('stack-postfix-evaluator').run().events.findIndex((event)=>event.frame.operation?.label === 'POP right') < Activities.get('stack-postfix-evaluator').run().events.findIndex((event)=>event.frame.operation?.label === 'POP left'));
 ok('delimiter audit accepts only after the stack empties', Activities.get('stack-delimiter-audit').run().events.at(-1).frame.array.length === 0 && Activities.get('stack-delimiter-audit').run().result.valid);
 ok('queue basics visibly enforce FIFO', Activities.get('queue-fifo-basics').run().result.served === 'A');

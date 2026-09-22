@@ -372,6 +372,204 @@ const ITCC47LinearADTActivities = (() => {
     };
   }
 
+  const UNDO_REDO_SOURCE = Object.freeze([
+    'undo <- [Type A, Type B]',
+    'redo <- empty',
+    'command <- POP undo',
+    'APPLY inverse(command)',
+    'PUSH redo, command',
+    'command <- POP redo',
+    'APPLY command',
+    'PUSH undo, command',
+    'RETURN document',
+  ]);
+
+  // Model one UNDO followed by one REDO as immutable operation snapshots.
+  // The command owns exactly one location in each snapshot: a history stack,
+  // the transfer lane, or the command register. Document mutation is separate.
+  function undoRedoProgram() {
+    const commandA = entity('cmd-a', 'Type A', 'insert "A"');
+    const commandB = entity('cmd-b', 'Type B', 'insert "B"');
+    const entities = [commandA, commandB];
+    const operations = [];
+    const undo = [commandA, commandB];
+    const redo = [];
+    let command = null;
+    let transit = null;
+    let documentValue = 'AB';
+    let context = 'SETUP';
+    let commandState = 'EMPTY';
+    let transition = null;
+    let documentChange = null;
+    let returnValue = null;
+    let operationCount = 0;
+
+    const frozenCommand = (item) => item ? Object.freeze({ id: item.id, value: item.value, detail: item.detail }) : null;
+    const snapshot = (execution = {}, output = []) => ({
+      lanes: [
+        { id: 'undo', label: 'Undo Stack (History)', kind: 'stack', order: undo.map((item) => item.id) },
+        { id: 'redo', label: 'Redo Stack (History)', kind: 'stack', order: redo.map((item) => item.id) },
+      ],
+      undoRedo: Object.freeze({
+        context,
+        command: frozenCommand(command),
+        transit: frozenCommand(transit),
+        commandState,
+        commandLocation: transit ? 'IN_TRANSIT' : command ? 'COMMAND' : undo.some((item) => item.id === commandB.id) ? 'UNDO' : redo.some((item) => item.id === commandB.id) ? 'REDO' : 'NONE',
+        transition: transition ? Object.freeze({ ...transition }) : null,
+        document: Object.freeze({
+          value: documentValue,
+          length: documentValue.length,
+          change: documentChange ? Object.freeze({ ...documentChange }) : null,
+        }),
+        returnValue,
+        scenario: Object.freeze({ undoComplete: context === 'REDO' || context === 'RETURN' || context === 'COMPLETE', redoComplete: context === 'RETURN' || context === 'COMPLETE' }),
+      }),
+      variables: {
+        document: documentValue,
+        command: command?.value || transit?.value || 'empty',
+        undoSize: undo.length,
+        redoSize: redo.length,
+      },
+      output,
+      operations: operationCount,
+      comparisons: 0,
+      execution,
+    });
+    const addOperation = (line, kind, title, description, labels, messages, makePhase) => {
+      operations.push({
+        id: `undo-redo-${line}-${kind}`,
+        line, kind, title, description,
+        phases: labels.map((label, phaseIndex) => ({
+          title: label,
+          message: messages[phaseIndex],
+          operation: { label: UNDO_REDO_SOURCE[line - 1], end: 'top' },
+          ...makePhase(phaseIndex),
+        })),
+      });
+    };
+    const clearTransientState = () => {
+      transition = null;
+      documentChange = null;
+      transit = null;
+    };
+
+    addOperation(1, 'initialize-undo', 'Load the Undo history', 'Start with Type A followed by Type B in the Undo stack.',
+      ['Load initial history'], ['The document already contains AB, and Type B is the most recent command.'],
+      () => snapshot({ complete: true }));
+    addOperation(2, 'initialize-redo', 'Initialize the Redo history', 'Begin with no commands available to redo.',
+      ['Initialize Redo'], ['Redo starts empty because no command has been undone yet.'],
+      () => snapshot({ complete: true }));
+
+    const popToCommand = ({ line, source, kind, mode }) => {
+      const sourceStack = source === 'undo' ? undo : redo;
+      const item = sourceStack.at(-1);
+      const sourceName = source === 'undo' ? 'Undo' : 'Redo';
+      const route = source === 'undo' ? 'UNDO_TO_COMMAND' : 'REDO_TO_COMMAND';
+      addOperation(line, kind, `Pop the most recent command from ${sourceName}`, `Remove the top command from ${sourceName} and place it into the command register.`,
+        [`Identify ${sourceName} TOP`, 'Remove command', 'Place in command register', `Update ${sourceName} stack`],
+        [`${item.value} is the TOP of ${sourceName}. The document stays ${documentValue}.`,
+          `Remove ${item.value} from ${sourceName}. It is now in transit; the document is unchanged.`,
+          `Place ${item.value} in command. It is held temporarily between POP and PUSH.`,
+          `${sourceName} now contains ${sourceStack.length > 1 ? sourceStack.slice(0, -1).map((entry) => entry.value).join(', ') : 'no commands'}. The document is still ${documentValue}.`],
+        (phase) => {
+          context = mode;
+          clearTransientState();
+          commandState = phase === 0 ? 'EMPTY' : phase === 1 ? (source === 'undo' ? 'RECEIVING' : 'RECEIVING FROM REDO') : 'HELD';
+          if (phase === 1) {
+            sourceStack.pop();
+            transit = item;
+            transition = { kind: route, source, destination: 'command', value: item.value };
+          }
+          if (phase === 2) command = item;
+          if (phase === 3) operationCount++;
+          return snapshot({ item, transfer: phase === 1 ? route : null, source, destination: 'command', complete: phase === 3 });
+        });
+    };
+
+    const applyDocument = ({ line, kind, mode, before, after, mutation, labels, messages, title, description }) => {
+      addOperation(line, kind, title, description, labels, messages, (phase) => {
+        context = mode;
+        clearTransientState();
+        commandState = kind === 'apply-inverse' ? 'APPLYING INVERSE' : 'REAPPLYING';
+        documentChange = {
+          kind: mutation,
+          before,
+          after,
+          character: 'B',
+          status: phase === 0 ? 'INSPECTING' : phase === 1 ? 'RESOLVED' : phase === 2 ? 'APPLYING' : 'COMMITTED',
+        };
+        if (phase === 3) {
+          documentValue = after;
+          operationCount++;
+        }
+        return snapshot({ item: commandB, documentMutation: mutation, pendingDocument: phase === 2, complete: phase === 3 });
+      });
+    };
+
+    const pushFromCommand = ({ line, destination, kind, mode }) => {
+      const destinationStack = destination === 'redo' ? redo : undo;
+      const destinationName = destination === 'redo' ? 'Redo' : 'Undo';
+      const route = destination === 'redo' ? 'COMMAND_TO_REDO' : 'COMMAND_TO_UNDO';
+      addOperation(line, kind, `Store Type B in ${destinationName}`, `Move the held command from command into the ${destinationName} stack.`,
+        ['Prepare command', `Move to ${destinationName}`, 'Commit push', 'Update history state'],
+        [`Prepare Type B for ${destinationName}. The document stays ${documentValue}.`,
+          `Move Type B from command toward ${destinationName}. No document content changes during PUSH.`,
+          `Commit Type B as the TOP of ${destinationName}.`,
+          `${destinationName} now owns Type B, and the command register is empty.`],
+        (phase) => {
+          context = mode;
+          clearTransientState();
+          commandState = phase === 0 ? (destination === 'redo' ? 'READY FOR REDO' : 'READY FOR UNDO') : 'EMPTY';
+          if (phase === 1) {
+            command = null;
+            transit = commandB;
+            transition = { kind: route, source: 'command', destination, value: commandB.value };
+          }
+          if (phase === 2) destinationStack.push(commandB);
+          if (phase === 3) operationCount++;
+          return snapshot({ item: commandB, transfer: phase === 1 ? route : null, source: 'command', destination, complete: phase === 3 });
+        });
+    };
+
+    popToCommand({ line: 3, source: 'undo', kind: 'pop-undo', mode: 'UNDO' });
+    applyDocument({
+      line: 4, kind: 'apply-inverse', mode: 'UNDO', before: 'AB', after: 'A', mutation: 'REMOVE_CHARACTER',
+      title: 'Reverse Type B', description: 'Apply inverse(Type B) to remove B from the document.',
+      labels: ['Inspect command', 'Determine inverse', 'Apply inverse', 'Commit document state'],
+      messages: ['Inspect the held Type B command. The document is still AB.', 'Resolve inverse(Type B) as remove B.', 'Apply the inverse: preview AB → A while command remains held.', 'Commit the document as A. Type B remains in command for the next PUSH.'],
+    });
+    pushFromCommand({ line: 5, destination: 'redo', kind: 'push-redo', mode: 'UNDO' });
+    popToCommand({ line: 6, source: 'redo', kind: 'pop-redo', mode: 'REDO' });
+    applyDocument({
+      line: 7, kind: 'apply-command', mode: 'REDO', before: 'A', after: 'AB', mutation: 'INSERT_CHARACTER',
+      title: 'Reapply Type B', description: 'Apply Type B again to restore B in the document.',
+      labels: ['Inspect command', 'Apply edit', 'Update document', 'Commit document state'],
+      messages: ['Inspect the held Type B command. The document is still A.', 'Resolve Type B as insert B.', 'Apply the command: preview A → AB while command remains held.', 'Commit the document as AB. Type B remains in command for the next PUSH.'],
+    });
+    pushFromCommand({ line: 8, destination: 'undo', kind: 'push-undo', mode: 'REDO' });
+
+    addOperation(9, 'return-document', 'Return document', 'Return AB as program output without confusing it with live document state.',
+      ['Inspect document', 'Prepare return value', 'Return document', 'Complete scenario'],
+      ['Inspect the live document: AB.', 'Prepare AB as the return value. Program output is still empty.', 'RETURN sends AB to Program / Return Output.', 'Scenario complete: document AB, Undo [Type A, Type B], Redo empty, command empty.'],
+      (phase) => {
+        context = phase === 3 ? 'COMPLETE' : 'RETURN';
+        clearTransientState();
+        commandState = 'EMPTY';
+        returnValue = phase >= 1 ? 'AB' : null;
+        if (phase === 3) operationCount++;
+        return { ...snapshot({ returnPrepared: phase >= 1, complete: phase === 3 }, phase >= 2 ? ['AB'] : []), type: 'return' };
+      });
+
+    return {
+      entities,
+      steps: operationSteps(operations),
+      result: { document: 'AB', undo: ['Type A', 'Type B'], redo: [], command: null },
+      scenario: { label: 'Perform one UNDO, then one REDO', initialDocument: 'AB' },
+      source: UNDO_REDO_SOURCE,
+    };
+  }
+
   function stackFoundationsSteps() {
     const lane = (order) => [{ id: 'main', label: 'Stack', kind: 'stack', order }];
     const snapshot = (order, runtime = {}, operations = 0) => ({
@@ -502,6 +700,7 @@ const ITCC47LinearADTActivities = (() => {
           parser: step.parser || null,
           matching: step.matching || null,
           auxiliary: step.auxiliary || null,
+          undoRedo: step.undoRedo || null,
           invariants: invariant,
           markers: Object.freeze({ teaching, variables: Object.freeze({ ...(step.variables || {}) }) }),
         },
@@ -588,21 +787,10 @@ const ITCC47LinearADTActivities = (() => {
   });
 
   const editorUndo = buildActivity({
-    id:'stack-editor-undo',topic:'Stacks',family:'Stacks',exampleKind:'Real world',checkpointId:'m4-stack',
-    title:'Undo and redo an edit',subtitle:'Coordinate two stacks without losing the command being transferred.',variant:'two-stack-history',
-    entities:[entity('cmd-a','Type A'),entity('cmd-b','Type B')],
-    source:['undo <- [Type A, Type B]','redo <- empty','command <- POP undo','APPLY inverse(command)','PUSH redo, command','command <- POP redo','APPLY command','PUSH undo, command','RETURN document'],
+    id:'stack-editor-undo',contentVersion:'2026.09-undo-redo-phases',topic:'Stacks',family:'Stacks',exampleKind:'Real world',checkpointId:'m4-stack',
+    title:'Undo and redo an edit',subtitle:'Coordinate two stacks without losing the command being transferred.',variant:'two-stack-history',workspaceComposition:'undo-redo-execution',
     complexity:{best:'O(1)',avg:'O(1)',worst:'O(1)',space:'O(n)'},
-    steps:[
-      {line:1,title:'History ends with the latest command',message:'Type B is above Type A on the undo stack.',lanes:[{id:'undo',label:'Undo stack',kind:'stack',order:['cmd-a','cmd-b']},{id:'redo',label:'Redo stack',kind:'stack',order:[]}],focus:[{id:'cmd-b',label:'next undo'}],operation:{label:'document = AB'},status:[{label:'document',value:'AB',tone:'secondary'}],variables:{document:'AB'},operations:0},
-      {line:3,title:'Pop the command to undo',message:'Remove Type B from undo, but hold its identity for the redo stack.',lanes:[{id:'undo',label:'Undo stack',kind:'stack',order:['cmd-a']},{id:'redo',label:'Redo stack',kind:'stack',order:[]}],held:[{id:'held-b',label:'command',value:'Type B',tone:'primary'}],focus:[{id:'held-b',label:'transferring',where:'held'}],operation:{label:'POP undo',end:'top'},variables:{command:'Type B',document:'AB'},operations:1},
-      {line:4,title:'Apply the inverse command',message:'Undo Type B, changing the document from AB back to A.',lanes:[{id:'undo',label:'Undo stack',kind:'stack',order:['cmd-a']},{id:'redo',label:'Redo stack',kind:'stack',order:[]}],held:[{id:'held-b',label:'command',value:'Type B',tone:'primary'}],focus:[{id:'held-b',label:'inverse applied',where:'held'}],operation:{label:'DELETE B'},status:[{label:'document',value:'A',tone:'minimum'}],variables:{command:'Type B',document:'A'},operations:2},
-      {line:5,title:'Save the command for redo',message:'Push the same Type B command onto redo; do not create a different command.',lanes:[{id:'undo',label:'Undo stack',kind:'stack',order:['cmd-a']},{id:'redo',label:'Redo stack',kind:'stack',order:['cmd-b']}],focus:[{id:'cmd-b',label:'redo top',tone:'minimum'}],operation:{label:'PUSH redo',end:'top'},status:[{label:'document',value:'A',tone:'secondary'}],variables:{document:'A'},operations:3},
-      {line:6,title:'Redo pops from the other stack',message:'POP Type B from redo and hold it before applying it again.',lanes:[{id:'undo',label:'Undo stack',kind:'stack',order:['cmd-a']},{id:'redo',label:'Redo stack',kind:'stack',order:[]}],held:[{id:'held-b',label:'command',value:'Type B',tone:'primary'}],focus:[{id:'held-b',label:'redo command',where:'held'}],operation:{label:'POP redo',end:'top'},variables:{command:'Type B',document:'A'},operations:4},
-      {line:7,title:'Reapply Type B',message:'The document returns to AB.',lanes:[{id:'undo',label:'Undo stack',kind:'stack',order:['cmd-a']},{id:'redo',label:'Redo stack',kind:'stack',order:[]}],held:[{id:'held-b',label:'command',value:'Type B',tone:'primary'}],focus:[{id:'held-b',label:'reapplied',where:'held'}],operation:{label:'TYPE B'},status:[{label:'document',value:'AB',tone:'success'}],variables:{document:'AB'},operations:5},
-      {line:8,title:'Restore the undo history',message:'Push Type B back onto undo so another undo remains possible.',lanes:[{id:'undo',label:'Undo stack',kind:'stack',order:['cmd-a','cmd-b']},{id:'redo',label:'Redo stack',kind:'stack',order:[]}],focus:[{id:'cmd-b',label:'undo top'}],operation:{label:'PUSH undo',end:'top'},variables:{document:'AB'},operations:6},
-      {line:9,title:'Both histories are consistent',message:'Return AB with Type B once again at the top of undo and redo empty.',type:'return',lanes:[{id:'undo',label:'Undo stack',kind:'stack',order:['cmd-a','cmd-b']},{id:'redo',label:'Redo stack',kind:'stack',order:[]}],focus:[{id:'cmd-b',label:'next undo'}],operation:{label:'RETURN AB'},comparison:{text:'command identity preserved',outcome:true},output:['AB'],variables:{document:'AB'},operations:6,comparisons:1},
-    ],result:{document:'AB'},
+    ...undoRedoProgram(),
   });
 
   const queueBasics = buildActivity({
@@ -726,7 +914,7 @@ const ITCC47LinearADTActivities = (() => {
     return activities.map((activity) => catalog.register(activity));
   }
 
-  return Object.freeze({ activities, register, postfixProgram, delimiterProgram });
+  return Object.freeze({ activities, register, postfixProgram, delimiterProgram, undoRedoProgram });
 })();
 
 if (typeof ITCC47Activities !== 'undefined') ITCC47LinearADTActivities.register(ITCC47Activities);

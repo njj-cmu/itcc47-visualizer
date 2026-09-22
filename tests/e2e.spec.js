@@ -1715,8 +1715,8 @@ test('public release exposes ten line-by-line Module 4 examples', async ({ page 
   await expect(page.locator('.visualization-group', { hasText: 'Deques' }).locator('.visualization-card')).toHaveCount(3);
   for (const activity of activities) {
     await page.goto(`/visualizer.html?activity=${activity}`);
-    const workbench = activity === 'stack-lifo-basics' ? '.stack-execution-workbench' : activity === 'stack-postfix-evaluator' ? '.postfix-workbench' : activity === 'stack-delimiter-audit' ? '.delimiter-workbench' : '.linear-adt';
-    const teaching = activity === 'stack-lifo-basics' ? '.stack-execution-header' : activity === 'stack-postfix-evaluator' ? '.postfix-operation' : activity === 'stack-delimiter-audit' ? '.delimiter-current-token' : '.linear-teaching';
+    const workbench = activity === 'stack-lifo-basics' ? '.stack-execution-workbench' : activity === 'stack-postfix-evaluator' ? '.postfix-workbench' : activity === 'stack-delimiter-audit' ? '.delimiter-workbench' : activity === 'stack-editor-undo' ? '.undo-redo-workbench' : '.linear-adt';
+    const teaching = activity === 'stack-lifo-basics' ? '.stack-execution-header' : activity === 'stack-postfix-evaluator' ? '.postfix-operation' : activity === 'stack-delimiter-audit' ? '.delimiter-current-token' : activity === 'stack-editor-undo' ? '.undo-redo-operation' : '.linear-teaching';
     await expect(page.locator(workbench)).toBeVisible();
     await expect(page.locator(teaching)).toBeVisible();
     await expect(page.locator('.source-line.is-current')).toHaveCount(1);
@@ -1847,6 +1847,156 @@ test('delimiter opener and matched POP animate stable values from offline file U
   await expect(outgoing).toHaveCount(1);
   await expect.poll(() => outgoing.evaluate(element => getComputedStyle(element).transform)).not.toBe('none');
   await expect.poll(() => outgoing.evaluate(element => getComputedStyle(element).transform)).toBe('none');
+});
+
+test('undo redo debugger separates history transfer, command holding, document APPLY, and RETURN output', async ({ page }, testInfo) => {
+  test.setTimeout(90000);
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.goto('/visualizer.html?activity=stack-editor-undo');
+  const workbench = page.locator('.undo-redo-workbench');
+  const step = page.getByRole('button', { name: 'Step', exact: true });
+  const undoItems = page.getByRole('region', { name: 'Undo Stack', exact: true }).getByRole('listitem');
+  const redoItems = page.getByRole('region', { name: 'Redo Stack', exact: true }).getByRole('listitem');
+  const command = page.getByRole('region', { name: 'Command Register', exact: true });
+  const documentState = page.getByRole('region', { name: 'Document State', exact: true });
+  const seek = async (index) => {
+    await page.getByLabel('Playback settings', { exact: true }).click();
+    await page.getByLabel('Timeline step', { exact: true }).fill(String(index));
+    await page.getByLabel('Playback settings', { exact: true }).click();
+  };
+
+  await expect(page.getByRole('heading', { name: 'Undo and redo an edit' })).toBeVisible();
+  await expect(workbench).toHaveAttribute('data-line', '1');
+  await expect(undoItems).toHaveCount(2);
+  await expect(redoItems).toHaveCount(0);
+  await expect(command).toContainText('EMPTY');
+  await expect(documentState.getByLabel('Current document content')).toHaveText('AB');
+
+  await seek(3);
+  await expect(workbench).toHaveAttribute('data-line', '3');
+  await expect(workbench).toHaveAttribute('data-phase', '2');
+  await expect(workbench).toHaveAttribute('data-command-location', 'IN_TRANSIT');
+  await expect(undoItems).toHaveCount(1);
+  await expect(page.locator('.history-transfer-left')).toHaveClass(/is-active/);
+  await expect(documentState.getByLabel('Current document content')).toHaveText('AB');
+
+  await step.click();
+  await expect(workbench).toHaveAttribute('data-phase', '3');
+  await expect(workbench).toHaveAttribute('data-command-location', 'COMMAND');
+  await expect(command).toContainText('Type B');
+  await expect(documentState.getByLabel('Current document content')).toHaveText('AB');
+
+  await seek(8);
+  await expect(workbench).toHaveAttribute('data-line', '4');
+  await expect(workbench).toHaveAttribute('data-phase', '3');
+  await expect(documentState).toContainText('Previewing the change');
+  await expect(documentState.getByLabel('Current document content')).toHaveText('AB');
+  await step.click();
+  await expect(documentState.getByLabel('Current document content')).toHaveText('A');
+  await expect(command).toContainText('Type B');
+
+  await seek(11);
+  await expect(workbench).toHaveAttribute('data-operation', 'push-redo');
+  await expect(workbench).toHaveAttribute('data-command-location', 'IN_TRANSIT');
+  await expect(page.locator('.history-transfer-right')).toHaveClass(/is-active/);
+  await expect(documentState.getByLabel('Current document content')).toHaveText('A');
+  await step.click();
+  await expect(redoItems).toHaveCount(1);
+  await expect(redoItems).toContainText(['Type B']);
+
+  await seek(15);
+  await expect(workbench).toHaveAttribute('data-operation', 'pop-redo');
+  await expect(workbench).toHaveAttribute('data-context', 'REDO');
+  await expect(redoItems).toHaveCount(0);
+  await expect(documentState.getByLabel('Current document content')).toHaveText('A');
+  await step.click();
+  await expect(command).toContainText('Type B');
+
+  await seek(20);
+  await expect(workbench).toHaveAttribute('data-line', '7');
+  await expect(workbench).toHaveAttribute('data-phase', '3');
+  await expect(documentState.getByLabel('Current document content')).toHaveText('A');
+  await step.click();
+  await expect(documentState.getByLabel('Current document content')).toHaveText('AB');
+  await expect(command).toContainText('Type B');
+
+  await seek(23);
+  await expect(workbench).toHaveAttribute('data-operation', 'push-undo');
+  await expect(workbench).toHaveAttribute('data-command-location', 'IN_TRANSIT');
+  await expect(documentState.getByLabel('Current document content')).toHaveText('AB');
+  await step.click();
+  await expect(undoItems).toHaveCount(2);
+  await expect(redoItems).toHaveCount(0);
+  await expect(command).toContainText('EMPTY');
+
+  await seek(27);
+  await expect(workbench).toHaveAttribute('data-line', '9');
+  await expect(workbench).toHaveAttribute('data-phase', '2');
+  await expect(documentState).toContainText('Prepared: AB');
+  await expect(documentState).toContainText('empty');
+  await step.click();
+  await expect(documentState).toContainText('Program / Return output');
+  await expect(documentState).toContainText('AB');
+  await step.click();
+  await expect(step).toBeDisabled();
+  await expect(workbench).toHaveAttribute('data-context', 'COMPLETE');
+  await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(workbench).toHaveAttribute('data-phase', '3');
+
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByRole('button', { name: 'Restart', exact: true }).click();
+  await page.getByLabel('Motion preference', { exact: true }).selectOption('reduced');
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-reduced/);
+  await page.getByLabel('Motion preference', { exact: true }).selectOption('off');
+  await page.getByLabel('Speed', { exact: true }).selectOption('9');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-off/);
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  const pausedLine = await workbench.getAttribute('data-line');
+  const pausedPhase = await workbench.getAttribute('data-phase');
+  await page.waitForTimeout(300);
+  await expect(workbench).toHaveAttribute('data-line', pausedLine);
+  await expect(workbench).toHaveAttribute('data-phase', pausedPhase);
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(step).toBeDisabled({ timeout: 20000 });
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  if (testInfo.project.name === 'laptop') {
+    const left = await page.locator('.undo-redo-left').boundingBox();
+    const right = await page.locator('.undo-redo-right').boundingBox();
+    expect(left.width / (left.width + right.width)).toBeGreaterThanOrEqual(.30);
+    expect(left.width / (left.width + right.width)).toBeLessThanOrEqual(.34);
+    expect(right.x).toBeGreaterThan(left.x + left.width);
+  }
+});
+
+test('undo redo transfers animate the stable Type B identity from offline file URLs', async ({ page }) => {
+  const { pathToFileURL } = require('url');
+  await page.context().setOffline(true);
+  await page.goto(`${pathToFileURL(path.resolve(__dirname, '..', 'visualizer.html')).href}?activity=stack-editor-undo`);
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Motion preference', { exact: true }).selectOption('on');
+  await page.getByLabel('Speed', { exact: true }).selectOption('3');
+  await page.getByLabel('Timeline step', { exact: true }).fill('2');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  const commandB = page.locator('[data-command-id="cmd-b"]');
+  const beforePop = await commandB.boundingBox();
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('.history-transfer-left [data-command-id="cmd-b"]')).toHaveCount(1);
+  await expect.poll(() => commandB.evaluate(element => getComputedStyle(element).transform)).not.toBe('none');
+  await expect.poll(async () => Math.abs((await commandB.boundingBox()).x - beforePop.x), { timeout: 2500 }).toBeGreaterThan(25);
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Timeline step', { exact: true }).fill('10');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  const beforePush = await commandB.boundingBox();
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('.history-transfer-right [data-command-id="cmd-b"]')).toHaveCount(1);
+  await expect.poll(() => commandB.evaluate(element => getComputedStyle(element).transform)).not.toBe('none');
+  await expect.poll(async () => Math.abs((await commandB.boundingBox()).x - beforePush.x), { timeout: 2500 }).toBeGreaterThan(25);
 });
 
 test('visualizer workspaces choose a structure-aware desktop composition', async ({ page }, testInfo) => {

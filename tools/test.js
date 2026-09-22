@@ -1807,6 +1807,38 @@ for (const invalid of [['x'], ['()'], ['<'], ['']]) {
   ok(`delimiter generator rejects invalid source ${JSON.stringify(invalid)}`, rejected);
 }
 ok('delimiter audit accepts only after the stack empties', delimiterEvents.at(-1).frame.array.length === 0 && Activities.get('stack-delimiter-audit').run().result.valid);
+const undoRedoActivity = Activities.get('stack-editor-undo');
+const undoRedoEvents = undoRedoActivity.run().events;
+const undoRedoPhases = (line) => undoRedoEvents.filter((event) => event.source.line === line);
+const historyValues = (event, lane) => event.frame.lanes.find((item) => item.id === lane).items.map((item) => item.value);
+ok('undo redo reuses immutable line and phase snapshots', undoRedoActivity.workspaceComposition === 'undo-redo-execution' && undoRedoEvents.length === 30 && undoRedoEvents.every((event) => Object.isFrozen(event.frame.execution) && Object.isFrozen(event.frame.undoRedo)));
+ok('undo redo owns four phases for every command lifecycle operation', [3,4,5,6,7,8,9].every((line) => undoRedoPhases(line).length === 4 && undoRedoPhases(line).every((event, index) => event.frame.execution.phaseIndex === index && event.frame.execution.phaseCount === 4)));
+const popUndo = undoRedoPhases(3);
+ok('POP Undo removes Type B before placing it in command without touching the document', historyValues(popUndo[0], 'undo').join() === 'Type A,Type B' && popUndo[0].frame.undoRedo.command === null && popUndo[0].frame.undoRedo.document.value === 'AB' && historyValues(popUndo[1], 'undo').join() === 'Type A' && popUndo[1].frame.undoRedo.transit.value === 'Type B' && popUndo[1].frame.undoRedo.commandLocation === 'IN_TRANSIT' && popUndo[2].frame.undoRedo.command.value === 'Type B' && popUndo.every((event) => event.frame.undoRedo.document.value === 'AB'));
+const applyInverse = undoRedoPhases(4);
+ok('APPLY inverse is the only Undo operation that commits AB to A', applyInverse.slice(0, 3).every((event) => event.frame.undoRedo.document.value === 'AB' && event.frame.undoRedo.command.value === 'Type B') && applyInverse[2].frame.undoRedo.document.change.status === 'APPLYING' && applyInverse[3].frame.undoRedo.document.value === 'A' && applyInverse[3].frame.undoRedo.document.change.kind === 'REMOVE_CHARACTER');
+const pushRedo = undoRedoPhases(5);
+ok('PUSH Redo moves the same command identity and never changes document A', pushRedo[0].frame.undoRedo.command.id === 'cmd-b' && pushRedo[1].frame.undoRedo.transit.id === 'cmd-b' && pushRedo[1].frame.undoRedo.commandLocation === 'IN_TRANSIT' && historyValues(pushRedo[2], 'redo').join() === 'Type B' && pushRedo[3].frame.undoRedo.command === null && pushRedo.every((event) => event.frame.undoRedo.document.value === 'A'));
+const popRedo = undoRedoPhases(6);
+ok('POP Redo transfers Type B into command while document stays A', historyValues(popRedo[0], 'redo').join() === 'Type B' && popRedo[1].frame.undoRedo.transit.id === 'cmd-b' && historyValues(popRedo[1], 'redo').length === 0 && popRedo[2].frame.undoRedo.command.id === 'cmd-b' && popRedo.every((event) => event.frame.undoRedo.document.value === 'A'));
+const applyCommand = undoRedoPhases(7);
+ok('APPLY command commits A to AB while Type B remains held', applyCommand.slice(0, 3).every((event) => event.frame.undoRedo.document.value === 'A' && event.frame.undoRedo.command.id === 'cmd-b') && applyCommand[3].frame.undoRedo.document.value === 'AB' && applyCommand[3].frame.undoRedo.document.change.kind === 'INSERT_CHARACTER' && applyCommand[3].frame.undoRedo.command.id === 'cmd-b');
+const pushUndo = undoRedoPhases(8);
+ok('PUSH Undo restores final histories without mutating AB', pushUndo[1].frame.undoRedo.transit.id === 'cmd-b' && pushUndo[2].frame.undoRedo.command === null && historyValues(pushUndo[3], 'undo').join() === 'Type A,Type B' && historyValues(pushUndo[3], 'redo').length === 0 && pushUndo.every((event) => event.frame.undoRedo.document.value === 'AB'));
+const returnDocument = undoRedoPhases(9);
+ok('RETURN keeps live document separate from program output', returnDocument.every((event) => event.frame.undoRedo.document.value === 'AB') && returnDocument.slice(0, 2).every((event) => event.frame.output.length === 0) && returnDocument[1].frame.undoRedo.returnValue === 'AB' && returnDocument[2].frame.output.join() === 'AB' && returnDocument[3].terminal);
+ok('Type B has exactly one modeled location in every undo redo snapshot', undoRedoEvents.every((event) => {
+  const state = event.frame.undoRedo;
+  const locations = [historyValues(event, 'undo').includes('Type B'), historyValues(event, 'redo').includes('Type B'), state.command?.id === 'cmd-b', state.transit?.id === 'cmd-b'];
+  return locations.filter(Boolean).length === 1;
+}));
+ok('only APPLY lines mutate the document', undoRedoEvents.every((event, index) => index === 0 || event.frame.undoRedo.document.value === undoRedoEvents[index - 1].frame.undoRedo.document.value || [4,7].includes(event.source.line)));
+const undoRedoController = Playback.createController();
+undoRedoController.load(undoRedoEvents, 3);
+undoRedoController.step(1);
+undoRedoController.step(-1);
+ok('undo redo Previous restores stack command document and transfer metadata', undoRedoController.getState().currentEvent === undoRedoEvents[3] && historyValues(undoRedoController.getState().currentEvent, 'undo').join() === 'Type A' && undoRedoController.getState().currentEvent.frame.undoRedo.transit.id === 'cmd-b' && undoRedoController.getState().currentEvent.frame.undoRedo.document.value === 'AB');
+undoRedoController.dispose();
 ok('queue basics visibly enforce FIFO', Activities.get('queue-fifo-basics').run().result.served === 'A');
 ok('queue basics demonstrates circular wraparound', Activities.get('queue-fifo-basics').run().events.some((event)=>event.message.toLowerCase().includes('wrap')));
 ok('deque foundation uses both removal ends', Activities.get('deque-end-operations').run().result.remaining.join(',') === 'A');

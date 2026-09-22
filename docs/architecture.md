@@ -216,6 +216,19 @@ and are available as curated source cases on the same activity route. The
 workspace reuses the shared phase playback controller and Motion layout identity,
 so Previous, seek, restart, and scenario changes restore deterministic snapshots.
 
+Undo/redo history (`stack-editor-undo`) uses the `undo-redo-execution`
+workspace on the existing activity route. `undoRedoProgram` expands the fixed
+nine-line scenario into 30 immutable snapshots. Lines 3–9 each own four named
+operation phases, while `frame.undoRedo` records the active UNDO/REDO context,
+the two history stacks, command-register state, one explicit transfer route,
+live document state, pending document mutation, and separate return value.
+Stable `cmd-b` identity moves through Undo, an in-transit lane, command, Redo,
+and back again; no snapshot contains the command in multiple logical locations.
+POP and PUSH mutate history only. The document commits from `AB` to `A` solely
+during `APPLY inverse(command)`, and from `A` to `AB` solely during
+`APPLY command`. The workspace reuses the shared phase indicators, playback
+controller, speed/motion settings, and snapshot-based Previous/seek behavior.
+
 ## Functions, calls, and recurrences
 
 The parser root is `Program { functions, body }`. Top-level function definitions

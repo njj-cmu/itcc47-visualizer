@@ -2166,6 +2166,138 @@ test('queue enqueue and dequeue animate stable value identities from offline fil
   }, { timeout: 2500 }).toBeGreaterThan(35);
 });
 
+test('printer queue visualizer presents all seven FIFO states with semantic front and back', async ({ page }, testInfo) => {
+  test.setTimeout(60000);
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/visualizer.html?activity=queue-printer-jobs');
+  await expect(page).toHaveURL(/visualizer\.html\?activity=queue-printer-jobs$/);
+  await expect(page.getByRole('heading', { name: 'Office printer queue', exact: true })).toBeVisible();
+  await expect(page.locator('.activity-heading p')).toContainText('Module 4 / Queues / Office printer queue');
+  await expect(page.locator('.activity-heading > div > span')).toContainText('See how a queue manages print jobs in FIFO order.');
+  await expect(page.locator('.stack-evidence-details')).toHaveCount(0);
+  if (testInfo.project.name === 'laptop') {
+    const rail = page.locator('.desktop-evidence .evidence-rail');
+    await expect(rail).toBeVisible();
+    await expect(rail.locator('[role="tab"]')).toHaveCount(4);
+    await rail.locator('[role="tab"]').first().click();
+    await expect(page.locator('.desktop-evidence .evidence-drawer')).toBeVisible();
+    await page.getByRole('button', { name: 'Collapse learning evidence' }).click();
+    await expect(rail).toBeVisible();
+  }
+  const workbench = page.locator('.printer-queue-workbench');
+  const queue = page.locator('.printer-queue');
+  const details = page.getByRole('region', { name: 'Queue Details', exact: true });
+  const incoming = page.getByRole('region', { name: 'Incoming Job', exact: true });
+  const current = page.getByRole('region', { name: 'Current Job / Running', exact: true });
+  const completed = page.getByRole('region', { name: 'Completed Jobs', exact: true });
+  const output = page.getByRole('region', { name: 'Program / Return Output', exact: true });
+  const step = page.getByRole('button', { name: 'Step', exact: true });
+  const sourceLine = (number) => page.locator('.printer-source .source-line').nth(number - 1);
+  const advance = async (line, phase, operation) => {
+    await step.click();
+    await expect(workbench).toHaveAttribute('data-line', String(line));
+    await expect(workbench).toHaveAttribute('data-phase', String(phase));
+    await expect(page.locator('.printer-operation h2')).toHaveText(operation);
+    await expect(sourceLine(line)).toHaveAttribute('aria-current', 'step');
+  };
+
+  await expect(workbench).toHaveAttribute('data-line', '1');
+  await expect(queue).toHaveAttribute('data-queue-size', '0');
+  await expect(details).toContainText('Capacity');
+  await expect(details).toContainText('Front job');
+  await expect(details).toContainText('Back job');
+  await expect(page.locator('[data-runtime-jobs]')).toHaveAttribute('data-runtime-jobs', '');
+  await expect(page.locator('[data-runtime-current]')).toHaveAttribute('data-runtime-current', 'none');
+  await expect(page.getByRole('region', { name: 'Printer', exact: true })).toContainText('Idle');
+  await expect(completed).toContainText('0 jobs');
+  await expect(output).toContainText('No output yet.');
+
+  await advance(2, 2, 'ENQUEUE jobs, Report');
+  await expect(incoming.locator('[data-job-id="report"]')).toContainText('8 pages');
+  await expect(queue).toHaveAttribute('data-queue-size', '0');
+  await expect(queue.locator('[data-slot-index="2"]')).toContainText('Empty');
+  await expect(output).toContainText('No output yet.');
+
+  await advance(3, 1, 'ENQUEUE jobs, Form');
+  await expect(incoming.locator('[data-job-id="form"]')).toContainText('1 page');
+  await expect(queue).toHaveAttribute('data-queue-order', 'Report');
+  await expect(queue.locator('[data-slot-index="2"]')).toHaveAttribute('data-slot-job', 'Report');
+  await expect(details).toHaveAttribute('data-front-job', 'Report');
+  await expect(details).toHaveAttribute('data-back-job', 'Report');
+  await expect(details).toContainText('1');
+  await expect(page.locator('[data-runtime-jobs]')).toHaveText('[ Report ]');
+
+  await advance(4, 4, 'ENQUEUE jobs, Slides');
+  await expect(queue).toHaveAttribute('data-queue-order', 'Report,Form,Slides');
+  await expect(queue.locator('[data-slot-index="0"]')).toHaveAttribute('data-slot-job', 'Slides');
+  await expect(queue.locator('[data-slot-index="1"]')).toHaveAttribute('data-slot-job', 'Form');
+  await expect(queue.locator('[data-slot-index="2"]')).toHaveAttribute('data-slot-job', 'Report');
+  await expect(incoming.locator('[data-job-id="slides"]')).toContainText('4 pages');
+  await expect(incoming).toContainText('Latest arrival: Slides is now at the BACK.');
+  await expect(queue.locator('[data-slot-index="0"]')).toContainText('BACK');
+  await expect(queue.locator('[data-slot-index="2"]')).toContainText('FRONT');
+  await expect(details).toHaveAttribute('data-front-job', 'Report');
+  await expect(details).toHaveAttribute('data-back-job', 'Slides');
+  await expect(page.getByRole('region', { name: 'Print Queue (FIFO)', exact: true })).toContainText('shorter Form stays behind Report');
+  await expect(page.locator('[data-runtime-jobs]')).toHaveText('[ Report, Form, Slides ]');
+
+  await advance(5, 4, 'DEQUEUE Report');
+  await expect(queue).toHaveAttribute('data-queue-order', 'Form,Slides');
+  await expect(queue.locator('[data-slot-index="0"]')).toHaveAttribute('data-slot-job', 'empty');
+  await expect(queue.locator('[data-slot-index="1"]')).toHaveAttribute('data-slot-job', 'Slides');
+  await expect(queue.locator('[data-slot-index="2"]')).toHaveAttribute('data-slot-job', 'Form');
+  await expect(queue.locator('[data-slot-index="2"] [data-job-id="form"]')).toContainText('1 page');
+  await expect(queue.locator('[data-slot-index="2"] [data-job-id="form"]')).toHaveCSS('opacity', '1');
+  await expect(workbench).toHaveAttribute('data-printer-status', 'ready');
+  await expect(current).toHaveAttribute('data-current-job', 'Report');
+  await expect(current).toContainText('8 pages');
+  await expect(details).toHaveAttribute('data-front-job', 'Form');
+  await expect(details).toHaveAttribute('data-back-job', 'Slides');
+  await expect(page.locator('[data-runtime-current]')).toHaveAttribute('data-runtime-current', 'Report');
+  await expect(output).toContainText('No output yet.');
+
+  await advance(6, 3, 'PRINT Report');
+  await expect(workbench).toHaveAttribute('data-printer-status', 'printed');
+  await expect(current).toContainText('Print complete');
+  await expect(completed).toContainText('1 job');
+  await expect(completed.locator('[data-job-id="report"]')).toContainText('8 pages');
+  await expect(output).toContainText('Printed Report.');
+  await expect(details).toHaveAttribute('data-front-job', 'Form');
+  await expect(details).toHaveAttribute('data-back-job', 'Slides');
+
+  await advance(7, 3, 'Return remaining queue');
+  await expect(workbench).toHaveAttribute('data-printer-status', 'idle');
+  await expect(current).toHaveAttribute('data-current-job', 'none');
+  await expect(queue).toHaveAttribute('data-queue-order', 'Form,Slides');
+  await expect(queue.locator('[data-slot-index="2"] [data-job-id="form"]')).toContainText('1 page');
+  await expect(queue.locator('[data-slot-index="2"] [data-job-id="form"]')).toHaveCSS('opacity', '1');
+  await expect(completed).toContainText('Report');
+  await expect(output).toContainText('Printed Report.');
+  await expect(output).toContainText('Return: [ Form, Slides ]');
+  await expect(page.locator('[data-runtime-jobs]')).toHaveText('[ Form, Slides ]');
+  await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(workbench).toHaveAttribute('data-line', '6');
+  await expect(output).not.toContainText('Return:');
+  await expect(step).not.toBeDisabled();
+
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByRole('button', { name: 'Restart', exact: true }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(step).toBeDisabled({ timeout: 15000 });
+  await expect(workbench).toHaveAttribute('data-line', '7');
+  await expect(output).toContainText('Return: [ Form, Slides ]');
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  if (testInfo.project.name === 'laptop') {
+    const left = await page.locator('.printer-queue-left').boundingBox();
+    const right = await page.locator('.printer-queue-right').boundingBox();
+    expect(left.width / (left.width + right.width)).toBeGreaterThanOrEqual(.25);
+    expect(left.width / (left.width + right.width)).toBeLessThanOrEqual(.32);
+    expect(right.x).toBeGreaterThan(left.x + left.width);
+  }
+});
+
 test('round robin debugger separates Ready, CPU, Completed, scheduler turns, line 5 assignment, and return output', async ({ page }, testInfo) => {
   test.setTimeout(90000);
   const errors = [];

@@ -5,7 +5,7 @@ const path = require('path');
 
 const instructorAccessToken = fs.readFileSync(path.resolve(__dirname, '..', '.instructor-preview-token'), 'utf8').trim();
 
-for (const entry of ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'computer-architecture.html', 'computer-architecture-modules.html', 'computer-architecture-practice.html', 'computer-networking.html', 'computer-networking-modules.html', 'computer-networking-practice.html', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=linked-list-traversal', 'visualizer.html?activity=array-linked-comparison', 'visualizer.html?activity=linked-list-insert-head', 'visualizer.html?activity=linked-list-sorted-insert', 'visualizer.html?activity=linked-list-find-update', 'visualizer.html?activity=linked-list-delete', 'visualizer.html?activity=stack-lifo-basics', 'visualizer.html?activity=stack-delimiter-audit', 'visualizer.html?activity=stack-editor-undo', 'visualizer.html?activity=queue-fifo-basics', 'visualizer.html?activity=queue-round-robin', 'visualizer.html?activity=deque-sliding-window', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', 'visualizer.html?course=computer-architecture&activity=architecture-decode-instruction', 'visualizer.html?course=computer-architecture&activity=architecture-add-immediate', 'visualizer.html?course=computer-networking&activity=networking-read-classroom-network', 'visualizer.html?course=computer-networking&activity=networking-local-peer-sharing', 'visualizer.html?course=computer-networking&activity=networking-classify-components', 'visualizer.html?course=computer-networking&activity=networking-compare-media', 'visualizer.html?course=computer-networking&activity=networking-read-network-topologies', 'visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery', 'industry-workbench.html', 'industry-workbench.html?scenario=industry-priority-range-recall', 'writer.html', 'tracer.html', 'problems.html', 'problems.html?view=midterm', 'problems.html?view=visualizations', 'problems.html?view=workbenches', 'lesson.html?checkpoint=m2-selection-sort', 'lesson.html?checkpoint=m3-linked-foundations&preview=1', 'student-materials.html', 'problem-list.html?module=1', 'problem-list.html?module=4', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count', 'practice.html?module=3&problem=linked-invariant-audit', 'practice.html?module=4&problem=stack-reverse']) {
+for (const entry of ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'computer-architecture.html', 'computer-architecture-modules.html', 'computer-architecture-practice.html', 'computer-networking.html', 'computer-networking-modules.html', 'computer-networking-practice.html', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=linked-list-traversal', 'visualizer.html?activity=array-linked-comparison', 'visualizer.html?activity=linked-list-insert-head', 'visualizer.html?activity=linked-list-sorted-insert', 'visualizer.html?activity=linked-list-find-update', 'visualizer.html?activity=linked-list-delete', 'visualizer.html?activity=stack-lifo-basics', 'visualizer.html?activity=stack-delimiter-audit', 'visualizer.html?activity=stack-editor-undo', 'visualizer.html?activity=queue-fifo-basics', 'visualizer.html?activity=queue-round-robin', 'visualizer.html?activity=queue-printer-jobs', 'visualizer.html?activity=deque-sliding-window', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', 'visualizer.html?course=computer-architecture&activity=architecture-decode-instruction', 'visualizer.html?course=computer-architecture&activity=architecture-add-immediate', 'visualizer.html?course=computer-networking&activity=networking-read-classroom-network', 'visualizer.html?course=computer-networking&activity=networking-local-peer-sharing', 'visualizer.html?course=computer-networking&activity=networking-classify-components', 'visualizer.html?course=computer-networking&activity=networking-compare-media', 'visualizer.html?course=computer-networking&activity=networking-read-network-topologies', 'visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery', 'industry-workbench.html', 'industry-workbench.html?scenario=industry-priority-range-recall', 'writer.html', 'tracer.html', 'problems.html', 'problems.html?view=midterm', 'problems.html?view=visualizations', 'problems.html?view=workbenches', 'lesson.html?checkpoint=m2-selection-sort', 'lesson.html?checkpoint=m3-linked-foundations&preview=1', 'student-materials.html', 'problem-list.html?module=1', 'problem-list.html?module=4', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count', 'practice.html?module=3&problem=linked-invariant-audit', 'practice.html?module=4&problem=stack-reverse']) {
   test(`${entry} has no serious or critical Axe violations`, async ({ page }) => {
     await page.goto(`/${entry}`);
     if (entry === 'visualizer.html') await expect(page).toHaveURL(/problems\.html\?view=visualizations$/);
@@ -135,6 +135,26 @@ test('round robin Ready, CPU, Completed, branch, return, and playback states are
     const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
     expect(results.violations.filter(item => ['serious', 'critical'].includes(item.impact))).toEqual([]);
   }
+});
+
+test('printer queue follows all seven source states by keyboard and stays Axe-clean', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.goto('/visualizer.html?activity=queue-printer-jobs');
+  const step = page.getByRole('button', { name: 'Step', exact: true });
+  await expect(page.getByRole('heading', { name: 'Office printer queue' })).toBeVisible();
+  await step.focus();
+  for (let line = 1; line <= 7; line++) {
+    await expect(page.locator('.printer-queue-workbench')).toHaveAttribute('data-line', String(line));
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+    expect(results.violations.filter((item) => ['serious', 'critical'].includes(item.impact))).toEqual([]);
+    if (line < 7) {
+      await page.keyboard.press('Enter');
+      await expect(page.locator('.printer-queue-workbench')).toHaveAttribute('data-line', String(line + 1));
+      if (line < 6) await expect(step).toBeFocused();
+      else await expect(step).toBeDisabled();
+    }
+  }
+  await expect(page.locator('.printer-output')).toContainText('Return: [ Form, Slides ]');
 });
 
 test('Recent Documents compact scenario controls are keyboard operable and Axe-clean', async ({ page }) => {

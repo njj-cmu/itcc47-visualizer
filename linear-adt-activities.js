@@ -1147,7 +1147,7 @@ const ITCC47LinearADTActivities = (() => {
 
     return Object.freeze({
       id: spec.id, contentVersion: spec.contentVersion || CONTENT_VERSION, module: 4, topic: spec.topic, family: spec.family,
-      title: spec.title, subtitle: spec.subtitle, exampleKind: spec.exampleKind,
+      title: spec.title, subtitle: spec.subtitle, exampleKind: spec.exampleKind, breadcrumbLabel: spec.breadcrumbLabel || null,
       engine: 'curated-linear-adt', renderer: 'linear-adt', teachingVariant: spec.variant,
       workspaceComposition: spec.workspaceComposition,
       scenario: spec.scenario ? Object.freeze({ ...spec.scenario }) : null,
@@ -1241,19 +1241,19 @@ const ITCC47LinearADTActivities = (() => {
   });
 
   const printerQueue = buildActivity({
-    id:'queue-printer-jobs',topic:'Queues',family:'Queues',exampleKind:'Real world',checkpointId:'m4-queue-deque',
-    title:'Office printer queue',subtitle:'Keep jobs fair even when later documents are shorter.',variant:'queue-printer',
+    id:'queue-printer-jobs',contentVersion:'2026.09-printer-queue-layout',topic:'Queues',family:'Queues',exampleKind:'Real world',breadcrumbLabel:'Office printer queue',checkpointId:'m4-queue-deque',
+    title:'Office printer queue',subtitle:'See how a queue manages print jobs in FIFO order.',variant:'queue-printer',workspaceComposition:'printer-queue-execution',
     entities:[entity('job-report','Report · 8 pages'),entity('job-form','Form · 1 page'),entity('job-slides','Slides · 4 pages')],
     source:['jobs <- empty','ENQUEUE jobs, Report','ENQUEUE jobs, Form','ENQUEUE jobs, Slides','current <- DEQUEUE jobs','PRINT current','RETURN jobs'],
     complexity:{best:'O(1) queue operation',avg:'O(1) queue operation',worst:'O(p) printing',space:'O(n)'},
     steps:[
-      {line:1,title:'Printer starts idle',message:'No job is waiting.',lanes:[{id:'main',label:'Print queue',kind:'queue',order:[]}],operation:{label:'idle'},status:[{label:'printer',value:'idle',tone:'muted'}],variables:{size:0},operations:0},
-      {line:2,title:'Report arrives first',message:'The eight-page report owns the front position.',lanes:[{id:'main',label:'Print queue',kind:'queue',order:['job-report']}],focus:[{id:'job-report',label:'front'}],operation:{label:'ENQUEUE Report',end:'back'},variables:{front:'Report',size:1},operations:1},
-      {line:3,title:'Form waits behind Report',message:'Its shorter length does not let it skip the queue.',lanes:[{id:'main',label:'Print queue',kind:'queue',order:['job-report','job-form']}],focus:[{id:'job-form',label:'new back'}],operation:{label:'ENQUEUE Form',end:'back'},variables:{front:'Report',back:'Form',size:2},operations:2},
-      {line:4,title:'Slides join at the back',message:'Arrival order is Report, Form, Slides.',lanes:[{id:'main',label:'Print queue',kind:'queue',order:['job-report','job-form','job-slides']}],focus:[{id:'job-report',label:'front',tone:'minimum'},{id:'job-slides',label:'back',tone:'secondary'}],operation:{label:'ENQUEUE Slides',end:'back'},variables:{front:'Report',back:'Slides',size:3},operations:3},
+      {line:1,title:'Initialize print queue',message:'Create an empty queue to store print jobs.',lanes:[{id:'main',label:'Print queue',kind:'queue',order:[]}],operation:{label:'initialize'},status:[{label:'printer',value:'idle',tone:'muted'}],variables:{size:0},operations:0},
+      {line:2,title:'Prepare Report for enqueue',message:'The first arriving job enters at the BACK and also becomes the FRONT.',lanes:[{id:'main',label:'Print queue',kind:'queue',order:[]}],held:[{id:'incoming-report',label:'incoming job',value:'Report · 8 pages',tone:'primary'}],focus:[{id:'incoming-report',label:'incoming',where:'held'}],operation:{label:'ENQUEUE jobs, Report',end:'back'},variables:{size:0},operations:1},
+      {line:3,title:'Prepare Form for enqueue',message:'Report stays at the FRONT. The shorter Form waits behind it.',lanes:[{id:'main',label:'Print queue',kind:'queue',order:['job-report']}],held:[{id:'incoming-form',label:'incoming job',value:'Form · 1 page',tone:'primary'}],focus:[{id:'incoming-form',label:'incoming',where:'held'},{id:'job-report',label:'front'}],operation:{label:'ENQUEUE jobs, Form',end:'back'},variables:{front:'Report',back:'Report',size:1},operations:2},
+      {line:4,title:'Slides join at the back',message:'Arrival order is Report, Form, Slides. The shorter Form does not jump ahead of Report.',lanes:[{id:'main',label:'Print queue',kind:'queue',order:['job-report','job-form','job-slides']}],focus:[{id:'job-report',label:'front',tone:'minimum'},{id:'job-slides',label:'back',tone:'secondary'}],operation:{label:'ENQUEUE jobs, Slides',end:'back'},variables:{front:'Report',back:'Slides',size:3},operations:3},
       {line:5,title:'Take the front job',message:'DEQUEUE selects Report even though Form is shorter.',type:'comparison',lanes:[{id:'main',label:'Print queue',kind:'queue',order:['job-form','job-slides']}],held:[{id:'printing-report',label:'current job',value:'Report · 8 pages',tone:'primary'}],focus:[{id:'printing-report',label:'printer',where:'held'},{id:'job-form',label:'next',tone:'minimum'}],comparison:{text:'current = earliest arrival',outcome:true},operation:{label:'DEQUEUE Report',end:'front'},variables:{current:'Report',front:'Form',size:2},operations:4,comparisons:1,boundary:true},
-      {line:6,title:'Print Report completely',message:'The printer finishes the active job before taking another.',lanes:[{id:'main',label:'Print queue',kind:'queue',order:['job-form','job-slides']}],held:[{id:'printed-report',label:'completed',value:'Report',tone:'success'}],focus:[{id:'printed-report',label:'printed',where:'held'}],operation:{label:'PRINT 8 pages'},output:['Printed Report'],variables:{current:'Report',front:'Form'},operations:5,comparisons:1},
-      {line:7,title:'Form is now at the front',message:'Return the remaining jobs in their original relative order.',type:'return',lanes:[{id:'main',label:'Print queue',kind:'queue',order:['job-form','job-slides']}],focus:[{id:'job-form',label:'next job',tone:'minimum'}],operation:{label:'RETURN jobs'},output:['Printed Report'],variables:{front:'Form',back:'Slides',size:2},operations:5,comparisons:1},
+      {line:6,title:'Print Report completely',message:'The printer finishes all eight pages before taking another job.',lanes:[{id:'main',label:'Print queue',kind:'queue',order:['job-form','job-slides']}],held:[{id:'printed-report',label:'completed',value:'Report · 8 pages',tone:'success'}],focus:[{id:'printed-report',label:'printed',where:'held'}],operation:{label:'PRINT current'},output:['Printed Report'],variables:{current:'Report',front:'Form'},operations:5,comparisons:1},
+      {line:7,title:'Return remaining queue',message:'Return the remaining jobs in their original FIFO order.',type:'return',lanes:[{id:'main',label:'Print queue',kind:'queue',order:['job-form','job-slides']}],focus:[{id:'job-form',label:'next job',tone:'minimum'}],operation:{label:'RETURN jobs'},output:['Printed Report'],variables:{front:'Form',back:'Slides',size:2},operations:5,comparisons:1},
     ],result:{printed:'Report',remaining:['Form','Slides']},
   });
 

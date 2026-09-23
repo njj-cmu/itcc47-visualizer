@@ -1715,8 +1715,8 @@ test('public release exposes ten line-by-line Module 4 examples', async ({ page 
   await expect(page.locator('.visualization-group', { hasText: 'Deques' }).locator('.visualization-card')).toHaveCount(3);
   for (const activity of activities) {
     await page.goto(`/visualizer.html?activity=${activity}`);
-    const workbench = activity === 'stack-lifo-basics' ? '.stack-execution-workbench' : activity === 'stack-postfix-evaluator' ? '.postfix-workbench' : activity === 'stack-delimiter-audit' ? '.delimiter-workbench' : activity === 'stack-editor-undo' ? '.undo-redo-workbench' : activity === 'queue-fifo-basics' ? '.queue-workbench' : '.linear-adt';
-    const teaching = activity === 'stack-lifo-basics' ? '.stack-execution-header' : activity === 'stack-postfix-evaluator' ? '.postfix-operation' : activity === 'stack-delimiter-audit' ? '.delimiter-current-token' : activity === 'stack-editor-undo' ? '.undo-redo-operation' : activity === 'queue-fifo-basics' ? '.queue-operation' : '.linear-teaching';
+    const workbench = activity === 'stack-lifo-basics' ? '.stack-execution-workbench' : activity === 'stack-postfix-evaluator' ? '.postfix-workbench' : activity === 'stack-delimiter-audit' ? '.delimiter-workbench' : activity === 'stack-editor-undo' ? '.undo-redo-workbench' : activity === 'queue-fifo-basics' ? '.queue-workbench' : activity === 'queue-round-robin' ? '.rr-workbench' : '.linear-adt';
+    const teaching = activity === 'stack-lifo-basics' ? '.stack-execution-header' : activity === 'stack-postfix-evaluator' ? '.postfix-operation' : activity === 'stack-delimiter-audit' ? '.delimiter-current-token' : activity === 'stack-editor-undo' ? '.undo-redo-operation' : activity === 'queue-fifo-basics' ? '.queue-operation' : activity === 'queue-round-robin' ? '.rr-operation' : '.linear-teaching';
     await expect(page.locator(workbench)).toBeVisible();
     await expect(page.locator(teaching)).toBeVisible();
     await expect(page.locator('.source-line.is-current')).toHaveCount(1);
@@ -2164,6 +2164,182 @@ test('queue enqueue and dequeue animate stable value identities from offline fil
     const after = await ticketA.boundingBox();
     return Math.hypot(after.x - beforeDequeue.x, after.y - beforeDequeue.y);
   }, { timeout: 2500 }).toBeGreaterThan(35);
+});
+
+test('round robin debugger separates Ready, CPU, Completed, scheduler turns, line 5 assignment, and return output', async ({ page }, testInfo) => {
+  test.setTimeout(90000);
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.goto('/visualizer.html?activity=queue-round-robin');
+  const workbench = page.locator('.rr-workbench');
+  const ready = page.getByRole('region', { name: 'Ready Queue', exact: true });
+  const cpu = page.getByRole('region', { name: 'CPU / Running', exact: true });
+  const completed = page.getByRole('region', { name: 'Completed Processes', exact: true });
+  const runtime = page.getByRole('region', { name: 'Runtime State', exact: true });
+  const output = page.getByRole('region', { name: 'Program / Return Output', exact: true });
+  const step = page.getByRole('button', { name: 'Step', exact: true });
+  const seek = async (index) => {
+    await page.getByLabel('Playback settings', { exact: true }).click();
+    await page.getByLabel('Timeline step', { exact: true }).fill(String(index));
+    await page.getByLabel('Playback settings', { exact: true }).click();
+  };
+  await expect(page.getByRole('heading', { name: 'Round-robin CPU scheduling' })).toBeVisible();
+  await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-workspace-composition', 'round-robin-execution');
+  await seek(3);
+  await expect(workbench).toHaveAttribute('data-line', '1');
+  await expect(workbench).toHaveAttribute('data-turn', '0');
+  await expect(workbench).toHaveAttribute('data-ready', 'P1,P2');
+  await expect(ready.locator('[data-location="READY"]')).toHaveCount(2);
+  await expect(ready.locator('[data-process-id="P1"]')).toHaveAttribute('data-remaining', '5');
+  await expect(ready.locator('[data-process-id="P2"]')).toHaveAttribute('data-remaining', '2');
+  await expect(cpu).toContainText('Idle');
+  await expect(completed).toContainText('No completed processes');
+  await expect(output).toContainText('No return value yet');
+  await expect(page.getByRole('region', { name: 'Round-Robin concept reminder' })).toContainText('2 ms');
+
+  await seek(7);
+  await expect(workbench).toHaveAttribute('data-line', '3');
+  await expect(workbench).toHaveAttribute('data-phase', '3');
+  await expect(workbench).toHaveAttribute('data-turn', '1');
+  await expect(workbench).toHaveAttribute('data-ready', 'P2');
+  await expect(workbench).toHaveAttribute('data-cpu', 'P1');
+  await expect(cpu.locator('[data-process-id="P1"]')).toHaveAttribute('data-remaining', '5');
+  await expect(cpu).toContainText('not running yet');
+  await expect(runtime).toContainText('5 ms');
+
+  await seek(11);
+  await expect(workbench).toHaveAttribute('data-line', '4');
+  await expect(cpu).toContainText('RUNNING');
+  await expect(page.getByRole('region', { name: 'Contextual teaching panel' })).toContainText('MIN(2, 5) = 2 ms');
+  await expect(page.getByRole('region', { name: 'Contextual teaching panel' })).toContainText('Predicted remaining: 5 → 3 ms');
+  await expect(runtime).toContainText('5 ms');
+  await expect(cpu.locator('[data-process-id="P1"]')).toHaveAttribute('data-remaining', '5');
+
+  await seek(15);
+  await expect(workbench).toHaveAttribute('data-line', '5');
+  await expect(workbench).toHaveAttribute('data-phase', '3');
+  await expect(runtime).toContainText('5 ms');
+  await step.click();
+  await expect(runtime).toContainText('3 ms');
+  await expect(cpu.locator('[data-process-id="P1"]')).toHaveAttribute('data-remaining', '3');
+
+  await seek(19);
+  await expect(workbench).toHaveAttribute('data-line', '6');
+  await expect(page.getByRole('region', { name: 'Contextual teaching panel' })).toContainText('3 > 0 → TRUE');
+  await expect(page.getByRole('region', { name: 'Contextual teaching panel' })).toContainText('RE-ENQUEUE AT BACK');
+  await expect(workbench).toHaveAttribute('data-ready', 'P2');
+  await expect(workbench).toHaveAttribute('data-cpu', 'P1');
+
+  await seek(22);
+  await expect(workbench).toHaveAttribute('data-line', '7');
+  await expect(workbench).toHaveAttribute('data-moving', 'P1');
+  await expect(workbench).toHaveAttribute('data-ready', 'P2');
+  await expect(page.getByRole('region', { name: 'Contextual teaching panel' })).toContainText('Before: [P2]');
+  await step.click();
+  await expect(workbench).toHaveAttribute('data-ready', 'P2,P1');
+  await expect(workbench).toHaveAttribute('data-cpu', 'idle');
+  await expect(ready.locator('[data-process-id="P1"]')).toHaveAttribute('data-remaining', '3');
+  await expect(ready.locator('[data-process-id="P2"]')).toContainText('2 ms remaining');
+
+  await seek(28);
+  await expect(workbench).toHaveAttribute('data-line', '3');
+  await expect(workbench).toHaveAttribute('data-turn', '2');
+  await expect(workbench).toHaveAttribute('data-ready', 'P1');
+  await expect(workbench).toHaveAttribute('data-cpu', 'P2');
+  await expect(cpu.locator('[data-process-id="P2"]')).toHaveAttribute('data-remaining', '2');
+  await expect(ready.locator('[data-process-id="P1"]')).toHaveAttribute('data-remaining', '3');
+  await expect(cpu).toContainText('not running yet');
+
+  await seek(32);
+  await expect(workbench).toHaveAttribute('data-line', '4');
+  await expect(page.getByRole('region', { name: 'Contextual teaching panel' })).toContainText('MIN(2, 2) = 2 ms');
+  await expect(runtime).toContainText('2 ms');
+  await seek(37);
+  await expect(workbench).toHaveAttribute('data-line', '5');
+  await expect(runtime).toContainText('0 ms');
+  await expect(cpu.locator('[data-process-id="P2"]')).toHaveAttribute('data-remaining', '0');
+
+  await seek(40);
+  await expect(workbench).toHaveAttribute('data-line', '6');
+  await expect(page.getByRole('region', { name: 'Contextual teaching panel' })).toContainText('0 > 0 → FALSE');
+  await expect(page.getByRole('region', { name: 'Contextual teaching panel' })).toContainText('DO NOT RE-ENQUEUE');
+  await expect(workbench).toHaveAttribute('data-cpu', 'P2');
+  await expect(workbench).toHaveAttribute('data-completed', '');
+  await step.click();
+  await expect(workbench).toHaveAttribute('data-cpu', 'idle');
+  await expect(workbench).toHaveAttribute('data-completed', 'P2');
+  await expect(completed.locator('[data-process-id="P2"]')).toBeVisible();
+  await expect(workbench).toHaveAttribute('data-ready', 'P1');
+  await expect(output).toContainText('No return value yet');
+
+  await seek(44);
+  await expect(workbench).toHaveAttribute('data-line', '9');
+  await expect(output).toContainText('Prepared: [P1 · 3 ms]');
+  await expect(output).toContainText('No return value yet');
+  await step.click();
+  await expect(output).toContainText('[P1 · 3 ms]');
+  await step.click();
+  await expect(step).toBeDisabled();
+  await expect(workbench).toHaveAttribute('data-turn', 'complete');
+  await expect(runtime).toContainText('Scenario complete');
+  await expect(runtime).toContainText('—');
+  await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(workbench).toHaveAttribute('data-phase', '3');
+  await expect(workbench).toHaveAttribute('data-ready', 'P1');
+  await expect(workbench).toHaveAttribute('data-completed', 'P2');
+
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByRole('button', { name: 'Restart', exact: true }).click();
+  await page.getByLabel('Motion preference', { exact: true }).selectOption('reduced');
+  await page.getByLabel('Speed', { exact: true }).selectOption('9');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(step).toBeDisabled({ timeout: 40000 });
+  await expect(workbench).toHaveAttribute('data-ready', 'P1');
+  await expect(workbench).toHaveAttribute('data-completed', 'P2');
+  await expect(output).toContainText('[P1 · 3 ms]');
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  if (testInfo.project.name === 'laptop') {
+    const left = await page.locator('.rr-left').boundingBox();
+    const right = await page.locator('.rr-right').boundingBox();
+    expect(left.width / (left.width + right.width)).toBeGreaterThan(.30);
+    expect(left.width / (left.width + right.width)).toBeLessThan(.38);
+    expect(right.x).toBeGreaterThan(left.x + left.width);
+  }
+});
+
+test('round robin process identities animate between Ready, CPU, and Completed in offline file mode', async ({ page }) => {
+  test.setTimeout(60000);
+  const { pathToFileURL } = require('url');
+  await page.context().setOffline(true);
+  await page.goto(`${pathToFileURL(path.resolve(__dirname, '..', 'visualizer.html')).href}?activity=queue-round-robin`);
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Motion preference', { exact: true }).selectOption('on');
+  await page.getByLabel('Speed', { exact: true }).selectOption('3');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  const seek = async (index) => {
+    await page.getByLabel('Playback settings', { exact: true }).click();
+    await page.getByLabel('Timeline step', { exact: true }).fill(String(index));
+    await page.getByLabel('Playback settings', { exact: true }).click();
+  };
+  const movement = async (id, from, to, index) => {
+    await seek(index);
+    const card = page.locator(`[data-process-id="${id}"]`);
+    await expect(card).toHaveAttribute('data-location', from);
+    const before = await card.boundingBox();
+    await page.getByRole('button', { name: 'Step', exact: true }).click();
+    await expect(card).toHaveAttribute('data-location', to);
+    await expect.poll(async () => {
+      const after = await card.boundingBox();
+      return Math.hypot(after.x - before.x, after.y - before.y);
+    }, { timeout: 2500 }).toBeGreaterThan(15);
+  };
+  await movement('P1', 'MOVING', 'CPU', 6);
+  await movement('P1', 'MOVING', 'READY', 22);
+  await movement('P2', 'MOVING', 'CPU', 27);
+  await movement('P2', 'CPU', 'COMPLETED', 40);
 });
 
 test('visualizer workspaces choose a structure-aware desktop composition', async ({ page }, testInfo) => {

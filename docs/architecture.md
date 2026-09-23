@@ -243,6 +243,20 @@ physical `[D, B, C]` with `front = 1`, `back = 0` and logical `[B, C, D]`.
 The workspace reuses the shared phase indicators, playback controller,
 speed/motion settings, Motion layout identity, and reversible snapshot history.
 
+Round-robin scheduling (`queue-round-robin`) keeps its existing curriculum ID
+and route but uses the `round-robin-execution` workspace. The deterministic
+`roundRobinProgram` generates 47 immutable snapshots across two scheduler turns.
+Each frame records Ready order, CPU process, Completed processes, optional
+Moving process, numeric remaining work, quantum, slice preview, branch result,
+runtime variables, transition metadata, and return output. A process occupies
+exactly one logical scheduler location per snapshot. Source line, scheduler
+turn, and operation phase are independent; lines 3–6 repeat for P2 after P1
+is re-enqueued. Line 4 computes and previews the 2 ms slice, while only line 5
+commits the new remaining value. The FALSE branch of line 6 shows its decision
+before transferring P2 from CPU to Completed. Stable process IDs support Motion
+travel among Ready, CPU, and Completed; the existing playback controller and
+phase UI provide Step, Play, Previous, seek, speed, and motion preferences.
+
 ## Functions, calls, and recurrences
 
 The parser root is `Program { functions, body }`. Top-level function definitions

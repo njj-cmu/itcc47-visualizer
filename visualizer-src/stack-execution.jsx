@@ -4,10 +4,10 @@ import './stack-execution.css';
 
 const displaySource = (line) => line.replaceAll('<-', '←');
 
-export function PhaseIndicators({ execution, compact = false }) {
+export function PhaseIndicators({ execution, compact = false, showChecks = false }) {
   return <ol className={compact ? 'stack-phase-dots' : 'stack-phase-stepper'} aria-label="Operation phases">
     {execution.phaseLabels.map((label, index) => <li key={label} aria-current={index === execution.phaseIndex ? 'step' : undefined}>
-      <span aria-hidden="true">{compact ? '' : index + 1}</span>{!compact ? <small>{label}</small> : <span className="sr-only">{label}</span>}
+      <span aria-hidden="true">{compact ? '' : showChecks && index < execution.phaseIndex ? '✓' : index + 1}</span>{!compact ? <small>{label}</small> : <span className="sr-only">{label}</span>}
     </li>)}
   </ol>;
 }
@@ -119,10 +119,10 @@ function TransferConnector({ execution }) {
   </svg>;
 }
 
-export function PhasePlayback({ state, controller, event, execution, source, Icon, motionPreference, iteration, iterationLabel = 'Token', contextLabel }) {
+export function PhasePlayback({ state, controller, event, execution, source, Icon, motionPreference, iteration, iterationLabel = 'Token', iterationDisplay, contextLabel }) {
   return <section className="stack-playback" aria-label="Playback controls">
     <div className="stack-progress"><span>Line {event.source.line} / {source.length}</span><progress aria-label="Source line progress" value={event.source.line} max={source.length}/></div>
-    {iteration ? <div className="stack-progress"><span>{iterationLabel} {iteration.index < 0 ? iteration.processed : iteration.index + 1} / {iteration.count}</span><progress aria-label={`${iterationLabel} progress`} value={iteration.processed} max={iteration.count || 1}/></div> : null}
+    {iteration ? <div className="stack-progress"><span>{iterationDisplay ? `${iterationLabel} ${iterationDisplay}` : `${iterationLabel} ${iteration.index < 0 ? iteration.processed : iteration.index + 1} / ${iteration.count}`}</span><progress aria-label={`${iterationLabel} progress`} value={iteration.processed} max={iteration.count || 1}/></div> : null}
     <div className="stack-progress"><span>Operation phase {execution.phaseIndex + 1} / {execution.phaseCount}</span><progress aria-label="Operation phase progress" value={execution.phaseIndex + 1} max={execution.phaseCount}/></div>
     {contextLabel ? <div className="stack-progress stack-context-progress"><span>Context</span><strong>{contextLabel}</strong></div> : null}
     <div className="transport"><button type="button" aria-label="Previous" disabled={state.index === 0} onClick={() => controller.step(-1)}><Icon name="previous" size={18}/><span>Previous</span></button><button type="button" className="primary" aria-label={state.status === 'playing' ? 'Pause' : 'Play'} disabled={state.atEnd} onClick={controller.toggle}><Icon name={state.status === 'playing' ? 'pause' : 'play'} size={18}/><span>{state.status === 'playing' ? 'Pause' : 'Play'}</span></button><button type="button" id="btn-step" aria-label="Step" disabled={state.atEnd} onClick={() => controller.step(1)}><Icon name="next" size={18}/><span>Step</span></button></div>

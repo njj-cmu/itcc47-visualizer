@@ -804,6 +804,203 @@ const ITCC47LinearADTActivities = (() => {
     };
   }
 
+  const ROUND_ROBIN_SOURCE = Object.freeze([
+    'ready <- [P1:5, P2:2]',
+    'quantum <- 2',
+    'process <- DEQUEUE ready',
+    'RUN process FOR MIN(quantum, remaining)',
+    'remaining <- remaining - quantum',
+    'IF remaining > 0 THEN',
+    '  ENQUEUE ready, process',
+    'ENDIF',
+    'RETURN ready',
+  ]);
+
+  function roundRobinProgram() {
+    const processes = Object.freeze({
+      P1: entity('process-p1', 'P1', '5 ms initial work'),
+      P2: entity('process-p2', 'P2', '2 ms initial work'),
+    });
+    const operations = [];
+    const ready = ['P1', 'P2'];
+    const completed = [];
+    const remaining = { P1: 5, P2: 2 };
+    const quantum = 2;
+    let cpu = null, moving = null, runtimeProcess = null, runtimeRemaining = null;
+    let turn = 0, sliceDuration = null, sliceResult = null, branchResult = null;
+    let transition = null, returnValue = null, output = [], complete = false;
+    let operationCount = 0, comparisons = 0;
+
+    const snapshot = (execution = {}) => {
+      const locations = [...ready, ...(cpu ? [cpu] : []), ...(moving ? [moving.id] : []), ...completed];
+      if (locations.length !== 2 || new Set(locations).size !== 2) throw new Error('Round-robin process must occupy exactly one scheduler location');
+      const readyQueue = Object.freeze([...ready]);
+      const completedProcesses = Object.freeze([...completed]);
+      const remainingByProcess = Object.freeze({ ...remaining });
+      const scheduler = Object.freeze({
+        readyQueue, cpu, moving: moving ? Object.freeze({ ...moving }) : null,
+        completedProcesses, remainingByProcess, quantum, turn, turnCount: 2,
+        runtime: Object.freeze({ process: runtimeProcess, remaining: runtimeRemaining }),
+        sliceDuration, sliceResult, branchResult,
+        transition: transition ? Object.freeze({ ...transition }) : null,
+        returnValue: returnValue ? Object.freeze([...returnValue]) : null,
+        complete,
+      });
+      return {
+        lanes: [{ id: 'main', label: 'Ready Queue', kind: 'queue', order: readyQueue.map((id) => processes[id].id) }],
+        held: cpu ? [{ id: `runtime-${cpu}`, label: 'CPU', value: `${cpu} · ${remaining[cpu]} ms` }] : [],
+        variables: { process: runtimeProcess || 'none', remaining: runtimeRemaining ?? 'none', quantum, turn: complete ? 'complete' : turn || 'ready' },
+        scheduler, execution, output: [...output], operations: operationCount, comparisons,
+      };
+    };
+    const addOperation = (line, kind, title, description, labels, messages, makePhase, turnLabel = turn) => {
+      operations.push({ id: `round-robin-${kind}-${operations.length}`, line, kind, title, description,
+        phases: labels.map((label, phase) => ({
+          title: label, message: messages[phase], operation: { label: title, end: 'front' },
+          segment: turnLabel ? `Turn ${turnLabel}` : 'Setup',
+          ...makePhase(phase),
+        })),
+      });
+    };
+
+    addOperation(1, 'setup', 'Initialize the ready queue', 'Load P1 and P2 in FIFO order and establish the 2 ms time quantum.',
+      ['Load processes', 'Establish FIFO order', 'Set quantum', 'Ready scheduler'],
+      ['P1 begins with 5 ms; P2 begins with 2 ms.', 'P1 is FRONT and P2 is BACK.', 'The scenario grants at most 2 ms per turn.', 'The scheduler is ready; no CPU time has been consumed.'],
+      (phase) => snapshot({ complete: phase === 3 }));
+    addOperation(2, 'quantum', 'Set the time quantum', 'Confirm that each dispatched process receives at most 2 ms.',
+      ['Confirm quantum'], ['quantum = 2 ms. The ready order remains P1, then P2.'],
+      () => snapshot({ complete: true }));
+
+    const dispatch = (id) => {
+      const next = ready[0];
+      if (next !== id) throw new Error(`Expected ${id} at READY FRONT, found ${next}`);
+      addOperation(3, 'dispatch', `Dispatch ${id} to the CPU`, `Remove ${id} at FRONT from the ready queue and move it to the CPU. Do not run it yet.`,
+        ['Identify FRONT', 'Remove process', 'Move process to CPU', 'Update ready queue'],
+        [`${id} is at FRONT with ${remaining[id]} ms of work.`, `DEQUEUE ${id} from Ready; CPU time remains unchanged.`, `Move ${id} from Ready FRONT into the CPU receiving area.`, `${id} is in the CPU with ${remaining[id]} ms remaining; the new Ready FRONT is ${ready[1] || 'none'}.`],
+        (phase) => {
+          turn = id === 'P1' ? 1 : 2;
+          transition = null;
+          if (phase === 0) { branchResult = null; sliceDuration = null; sliceResult = null; }
+          if (phase === 1) {
+            ready.shift();
+            moving = { id, from: 'READY', to: 'CPU' };
+            transition = { kind: 'DISPATCH', id, from: 'READY', to: 'CPU', stage: 'removed' };
+          }
+          if (phase === 2) {
+            moving = null;
+            cpu = id;
+            runtimeProcess = id;
+            runtimeRemaining = remaining[id];
+            transition = { kind: 'DISPATCH', id, from: 'READY', to: 'CPU', stage: 'receiving' };
+          }
+          if (phase === 3) operationCount++;
+          return snapshot({ processId: id, complete: phase === 3 });
+        }, id === 'P1' ? 1 : 2);
+    };
+    const run = (id) => {
+      const before = remaining[id];
+      addOperation(4, 'run', `Run ${id} for one time quantum`, `The CPU grants ${id} at most ${quantum} ms, then the scheduler reevaluates the process.`,
+        ['Read remaining work', 'Compute slice duration', 'Execute slice', 'Finish CPU slice'],
+        [`${id} has ${before} ms committed remaining.`, `MIN(${quantum}, ${before}) = ${Math.min(quantum, before)} ms.`, `${id} consumes ${Math.min(quantum, before)} ms of CPU time. The new remaining work is only a preview.`, `The slice is finished. Line 5 will commit the remaining-work assignment.`],
+        (phase) => {
+          transition = null;
+          if (phase >= 1) sliceDuration = Math.min(quantum, before);
+          if (phase >= 2) sliceResult = before - sliceDuration;
+          if (phase === 3) operationCount++;
+          return snapshot({ processId: id, before, complete: phase === 3 });
+        });
+    };
+    const updateRemaining = (id) => {
+      const before = remaining[id];
+      const after = before - sliceDuration;
+      addOperation(5, 'update-remaining', `Update ${id} remaining work`, 'Subtract the CPU slice and commit the new remaining value.',
+        ['Read previous remaining', 'Subtract CPU slice', 'Compute new remaining', 'Commit remaining state'],
+        [`Read committed remaining = ${before} ms.`, `${before} - ${sliceDuration} = ${after} ms.`, `The computed result is ${after} ms; the assignment is still pending.`, `Commit remaining = ${after} ms for ${id}.`],
+        (phase) => {
+          transition = null;
+          if (phase === 3) {
+            remaining[id] = after;
+            runtimeRemaining = after;
+            operationCount++;
+          }
+          return snapshot({ processId: id, before, after, complete: phase === 3 });
+        });
+    };
+    const checkFinished = (id) => {
+      const value = remaining[id];
+      const unfinished = value > 0;
+      addOperation(6, 'check-finished', unfinished ? `Check whether ${id} is finished` : `${id} completes its CPU burst`,
+        unfinished ? `The CPU slice has ended. Decide whether ${id} returns to the ready queue.` : `${id} has no work left. It leaves scheduling as completed.`,
+        ['Read remaining', 'Evaluate remaining > 0', 'Choose branch', unfinished ? 'Explain scheduler action' : 'Move to completed'],
+        [`Read remaining = ${value} ms.`, `${value} > 0 is ${unfinished ? 'TRUE' : 'FALSE'}.`, unfinished ? 'Choose RE-ENQUEUE AT BACK. P1 stays in CPU until line 7.' : 'Choose DO NOT RE-ENQUEUE. P2 stays in CPU while this decision is shown.',
+          unfinished ? 'P1 will move behind P2 on line 7; it does not continue running immediately.' : 'Move P2 from the CPU to Completed. It never returns to Ready.'],
+        (phase) => {
+          transition = null;
+          if (phase >= 1) branchResult = unfinished;
+          if (phase === 1) comparisons++;
+          if (phase === 3 && !unfinished) {
+            cpu = null;
+            completed.push(id);
+            transition = { kind: 'COMPLETE', id, from: 'CPU', to: 'COMPLETED', stage: 'arrived' };
+          }
+          return snapshot({ processId: id, branch: phase >= 1 ? unfinished : null, complete: phase === 3 });
+        });
+    };
+    const reenqueue = (id) => {
+      addOperation(7, 'reenqueue', `Re-enqueue unfinished ${id}`, `Move ${id} behind the waiting process so P2 receives the next CPU turn.`,
+        ['Prepare unfinished process', 'Move toward BACK', 'Commit enqueue', 'Update ready order'],
+        [`${id} has ${remaining[id]} ms remaining. P2 stays at FRONT.`, `Move ${id} from CPU toward Ready BACK; it is not committed yet.`, `Commit ${id} at Ready BACK, behind P2.`, `Ready order is P2, then P1. Next FRONT = P2.`],
+        (phase) => {
+          transition = null;
+          if (phase === 1) {
+            cpu = null;
+            moving = { id, from: 'CPU', to: 'READY' };
+            transition = { kind: 'REENQUEUE', id, from: 'CPU', to: 'READY', stage: 'moving' };
+          }
+          if (phase === 2) {
+            moving = null;
+            ready.push(id);
+            transition = { kind: 'REENQUEUE', id, from: 'CPU', to: 'READY', stage: 'arrived' };
+            operationCount++;
+          }
+          return snapshot({ processId: id, complete: phase === 3 });
+        });
+    };
+    const endIf = (id) => addOperation(8, 'endif', `Finish ${id} decision`, 'Close this branch and continue to the next scheduler action.',
+      ['End branch'], [`${id === 'P1' ? 'P2 is now the next Ready FRONT.' : 'P2 has completed; P1 remains ready with 3 ms.'}`],
+      () => { transition = null; runtimeProcess = null; runtimeRemaining = null; return snapshot({ complete: true }); });
+
+    dispatch('P1');
+    run('P1');
+    updateRemaining('P1');
+    checkFinished('P1');
+    reenqueue('P1');
+    endIf('P1');
+    dispatch('P2');
+    run('P2');
+    updateRemaining('P2');
+    checkFinished('P2');
+    endIf('P2');
+
+    addOperation(9, 'return', 'Return the remaining ready queue', 'Unfinished P1 remains ready while finished P2 stays completed.',
+      ['Read ready queue', 'Prepare return value', 'Return queue', 'Complete scenario'],
+      ['Read Ready Queue: P1 has 3 ms remaining.', 'Prepare [P1 · 3 ms] as the logical return value.', 'RETURN ready produces [P1 · 3 ms].', 'P2 is complete; P1 still has 3 ms remaining.'],
+      (phase) => {
+        transition = null;
+        if (phase >= 1) returnValue = ready.map((id) => `${id} · ${remaining[id]} ms`);
+        if (phase === 2) output = [...returnValue];
+        if (phase === 3) complete = true;
+        return snapshot({ complete: phase === 3 });
+      }, 0);
+
+    return {
+      entities: Object.values(processes), source: ROUND_ROBIN_SOURCE,
+      steps: operationSteps(operations),
+      result: { ready: ['P1:3'], completed: ['P2'] },
+      scenario: { quantum, processCount: 2 },
+    };
+  }
+
   function stackFoundationsSteps() {
     const lane = (order) => [{ id: 'main', label: 'Stack', kind: 'stack', order }];
     const snapshot = (order, runtime = {}, operations = 0) => ({
@@ -936,6 +1133,7 @@ const ITCC47LinearADTActivities = (() => {
           auxiliary: step.auxiliary || null,
           undoRedo: step.undoRedo || null,
           queue: step.queue || null,
+          scheduler: step.scheduler || null,
           invariants: invariant,
           markers: Object.freeze({ teaching, variables: Object.freeze({ ...(step.variables || {}) }) }),
         },
@@ -1036,22 +1234,10 @@ const ITCC47LinearADTActivities = (() => {
   });
 
   const roundRobin = buildActivity({
-    id:'queue-round-robin',topic:'Queues',family:'Queues',exampleKind:'Scheduling algorithm',checkpointId:'m4-queue-deque',
-    title:'Round-robin CPU scheduling',subtitle:'Serve one time slice, then re-enqueue unfinished work.',variant:'queue-round-robin',
-    entities:[entity('process-a','P1 · 5 ms'),entity('process-b','P2 · 2 ms'),entity('process-a2','P1 · 3 ms','remaining work')],
-    source:['ready <- [P1:5, P2:2]','quantum <- 2','process <- DEQUEUE ready','RUN process FOR MIN(quantum, remaining)','remaining <- remaining - quantum','IF remaining > 0 THEN','  ENQUEUE ready, process','ENDIF','RETURN ready'],
+    id:'queue-round-robin',contentVersion:'2026.09-round-robin-phases',topic:'Queues',family:'Queues',exampleKind:'Scheduling algorithm',checkpointId:'m4-queue-deque',
+    title:'Round-robin CPU scheduling',subtitle:'Use a ready queue to give each process a fair CPU time slice.',variant:'queue-round-robin',workspaceComposition:'round-robin-execution',
     complexity:{best:'O(1) per slice',avg:'O(1) per slice',worst:'O(k) slices',space:'O(n)'},
-    steps:[
-      {line:1,title:'Ready queue preserves arrival order',message:'P1 is at the front; P2 waits behind it.',lanes:[{id:'main',label:'Ready queue',kind:'queue',order:['process-a','process-b']}],focus:[{id:'process-a',label:'front / next'}],operation:{label:'initialize'},status:[{label:'quantum',value:'2 ms',tone:'secondary'}],variables:{front:'P1',quantum:2},operations:0},
-      {line:3,title:'Dispatch P1 from the front',message:'DEQUEUE P1 for one CPU time slice.',lanes:[{id:'main',label:'Ready queue',kind:'queue',order:['process-b']}],held:[{id:'running-p1',label:'running',value:'P1 · 5 ms',tone:'primary'}],focus:[{id:'running-p1',label:'CPU',where:'held'}],operation:{label:'DEQUEUE P1',end:'front'},variables:{process:'P1',remaining:5},operations:1},
-      {line:4,title:'Run only one quantum',message:'P1 uses 2 ms; the scheduler must not let it monopolize the CPU.',lanes:[{id:'main',label:'Ready queue',kind:'queue',order:['process-b']}],held:[{id:'running-p1',label:'running',value:'P1 · 3 ms left',tone:'primary'}],focus:[{id:'running-p1',label:'after slice',where:'held'}],operation:{label:'RUN 2 ms'},status:[{label:'remaining',value:'3 ms',tone:'minimum'}],variables:{process:'P1',remaining:3},operations:2},
-      {line:6,title:'Check whether P1 is finished',message:'P1 still has 3 ms, so it must return to the queue.',type:'comparison',lanes:[{id:'main',label:'Ready queue',kind:'queue',order:['process-b']}],held:[{id:'running-p1',label:'running',value:'P1 · 3 ms left',tone:'primary'}],focus:[{id:'running-p1',label:'unfinished',where:'held'}],comparison:{text:'remaining > 0',outcome:true},operation:{label:'CHECK remaining'},variables:{remaining:3},operations:2,comparisons:1,boundary:true},
-      {line:7,title:'Re-enqueue unfinished P1',message:'P1 moves to the back, giving P2 its turn.',lanes:[{id:'main',label:'Ready queue',kind:'queue',order:['process-b','process-a2']}],focus:[{id:'process-b',label:'new front',tone:'minimum'},{id:'process-a2',label:'re-enqueued back'}],operation:{label:'ENQUEUE P1',end:'back'},variables:{front:'P2',back:'P1'},operations:3,comparisons:1},
-      {line:3,title:'Dispatch P2 next',message:'P2 has waited at the front and now receives the CPU.',lanes:[{id:'main',label:'Ready queue',kind:'queue',order:['process-a2']}],held:[{id:'running-p2',label:'running',value:'P2 · 2 ms',tone:'primary'}],focus:[{id:'running-p2',label:'CPU',where:'held'}],operation:{label:'DEQUEUE P2',end:'front'},variables:{process:'P2',remaining:2},operations:4,comparisons:1},
-      {line:4,title:'P2 finishes in one quantum',message:'P2 needs exactly 2 ms, so no work remains.',lanes:[{id:'main',label:'Ready queue',kind:'queue',order:['process-a2']}],held:[{id:'done-p2',label:'completed',value:'P2',tone:'success'}],focus:[{id:'done-p2',label:'complete',where:'held'}],operation:{label:'RUN 2 ms'},status:[{label:'remaining',value:'0 ms',tone:'success'}],output:['P2 completed'],variables:{process:'P2',remaining:0},operations:5,comparisons:1},
-      {line:6,title:'Do not re-enqueue completed work',message:'remaining > 0 is false, so P2 leaves the system.',type:'comparison',lanes:[{id:'main',label:'Ready queue',kind:'queue',order:['process-a2']}],focus:[{id:'process-a2',label:'next process'}],comparison:{text:'remaining > 0',outcome:false},operation:{label:'SKIP enqueue'},output:['P2 completed'],variables:{remaining:0,front:'P1'},operations:5,comparisons:2,boundary:true},
-      {line:9,title:'P1 is ready for its next turn',message:'Return the ready queue with P1 at the front and 3 ms remaining.',type:'return',lanes:[{id:'main',label:'Ready queue',kind:'queue',order:['process-a2']}],focus:[{id:'process-a2',label:'front / next',tone:'minimum'}],operation:{label:'RETURN ready'},output:['P2 completed'],variables:{front:'P1',remaining:3},operations:5,comparisons:2},
-    ],result:{ready:['P1'],completed:['P2']},
+    ...roundRobinProgram(),
   });
 
   const printerQueue = buildActivity({
@@ -1137,7 +1323,7 @@ const ITCC47LinearADTActivities = (() => {
     return activities.map((activity) => catalog.register(activity));
   }
 
-  return Object.freeze({ activities, register, postfixProgram, delimiterProgram, undoRedoProgram, queueFoundationsProgram });
+  return Object.freeze({ activities, register, postfixProgram, delimiterProgram, undoRedoProgram, queueFoundationsProgram, roundRobinProgram });
 })();
 
 if (typeof ITCC47Activities !== 'undefined') ITCC47LinearADTActivities.register(ITCC47Activities);

@@ -1839,8 +1839,43 @@ undoRedoController.step(1);
 undoRedoController.step(-1);
 ok('undo redo Previous restores stack command document and transfer metadata', undoRedoController.getState().currentEvent === undoRedoEvents[3] && historyValues(undoRedoController.getState().currentEvent, 'undo').join() === 'Type A' && undoRedoController.getState().currentEvent.frame.undoRedo.transit.id === 'cmd-b' && undoRedoController.getState().currentEvent.frame.undoRedo.document.value === 'AB');
 undoRedoController.dispose();
-ok('queue basics visibly enforce FIFO', Activities.get('queue-fifo-basics').run().result.served === 'A');
-ok('queue basics demonstrates circular wraparound', Activities.get('queue-fifo-basics').run().events.some((event)=>event.message.toLowerCase().includes('wrap')));
+const queueActivity = Activities.get('queue-fifo-basics');
+const queueEvents = queueActivity.run().events;
+const queuePhases = (line) => queueEvents.filter((event) => event.source.line === line);
+const queueSlotValues = (event) => event.frame.queue.slots.map((slot) => slot.item?.value || null);
+ok('queue foundations expands nine lines into thirty-five immutable phase snapshots', queueActivity.workspaceComposition === 'queue-execution' && queueEvents.length === 35 && queueEvents.every((event) => Object.isFrozen(event.frame.execution) && Object.isFrozen(event.frame.queue) && Object.isFrozen(event.frame.queue.slots)));
+ok('queue source lines own operation-specific phase counts', [1,2,3,4,5,7,8,9].every((line) => queuePhases(line).length === 4) && queuePhases(6).length === 3 && queueEvents.every((event) => event.frame.execution.phaseIndex < event.frame.execution.phaseCount));
+ok('physical queue slots keep stable index identity in every snapshot', queueEvents.every((event) => event.frame.queue.slots.length === 3 && event.frame.queue.slots.every((slot, index) => slot.index === index)));
+for (const [line, value, before, after, front, back, size] of [
+  [3, 'A', ',,', 'A,,', 0, 0, 1],
+  [4, 'B', 'A,,', 'A,B,', 0, 1, 2],
+  [5, 'C', 'A,B,', 'A,B,C', 0, 2, 3],
+]) {
+  const phases = queuePhases(line);
+  ok(`queue line ${line} stages ${value} outside fixed slots before atomic commit`, phases.slice(0, 3).every((event) => queueSlotValues(event).join() === before) && phases[0].frame.queue.pending.item.value === value && phases[2].frame.queue.pending.destinationIndex === line - 3 && phases[2].frame.queue.transition.kind === 'ENQUEUE_MOVE' && queueSlotValues(phases[3]).join() === after && phases[3].frame.queue.front === front && phases[3].frame.queue.back === back && phases[3].frame.queue.size === size);
+}
+const frontPhases = queuePhases(6);
+ok('FRONT copies A into next without changing circular storage or metadata', frontPhases.every((event) => queueSlotValues(event).join() === 'A,B,C' && event.frame.queue.front === 0 && event.frame.queue.back === 2 && event.frame.queue.size === 3) && frontPhases[0].frame.queue.runtime.next === null && frontPhases[1].frame.queue.transition.kind === 'FRONT_COPY' && frontPhases[1].frame.queue.runtime.next === 'A' && frontPhases[2].frame.queue.runtime.next === 'A');
+const dequeuePhases = queuePhases(7);
+ok('DEQUEUE shows A in transit before clearing physical slot 0 at commit', dequeuePhases.slice(0, 3).every((event) => queueSlotValues(event).join() === 'A,B,C' && event.frame.queue.front === 0 && event.frame.queue.size === 3) && dequeuePhases[1].frame.queue.transition.kind === 'DEQUEUE_MOVE' && dequeuePhases[1].frame.queue.pending.runtimeDestination === 'served' && dequeuePhases[2].frame.queue.runtime.served === 'A' && queueSlotValues(dequeuePhases[3]).join() === ',B,C' && dequeuePhases[3].frame.queue.front === 1 && dequeuePhases[3].frame.queue.back === 2 && dequeuePhases[3].frame.queue.size === 2);
+const wrapPhases = queuePhases(8);
+ok('wraparound computes index 0 before committing D to physical slot 0', wrapPhases.slice(0, 3).every((event) => queueSlotValues(event).join() === ',B,C') && wrapPhases[1].frame.queue.pending.formula === '(2 + 1) MOD 3 = 0' && wrapPhases[2].frame.queue.transition.kind === 'WRAP_ENQUEUE' && wrapPhases[2].frame.queue.transition.destinationIndex === 0 && queueSlotValues(wrapPhases[3]).join() === 'D,B,C' && wrapPhases[3].frame.queue.front === 1 && wrapPhases[3].frame.queue.back === 0 && wrapPhases[3].frame.queue.size === 3);
+ok('logical FIFO order is derived from circular storage rather than physical index order', queueEvents.every((event) => {
+  const state = event.frame.queue;
+  const derived = Array.from({ length: state.size }, (_, offset) => state.slots[(state.front + offset) % state.capacity].item.value);
+  return derived.join() === state.logicalOrder.join();
+}) && wrapPhases[3].frame.queue.logicalOrder.join() === 'B,C,D');
+const returnQueue = queuePhases(9);
+ok('runtime values remain separate from RETURN output', queueEvents.filter((event) => event.source.line < 9).every((event) => event.frame.output.length === 0) && returnQueue.every((event) => event.frame.queue.runtime.next === 'A' && event.frame.queue.runtime.served === 'A') && returnQueue[1].frame.queue.returnValue.join() === 'B,C,D' && returnQueue[1].frame.output.length === 0 && returnQueue[2].frame.output.join() === 'B,C,D' && returnQueue[3].terminal);
+ok('only enqueue and dequeue commit phases mutate physical slots', queueEvents.every((event, index) => index === 0 || queueSlotValues(event).join() === queueSlotValues(queueEvents[index - 1]).join() || (event.frame.execution.complete && [3,4,5,7,8].includes(event.source.line))));
+const queueController = Playback.createController();
+queueController.load(queueEvents, 24);
+queueController.step(1);
+queueController.step(-1);
+ok('queue Previous restores slots pointers runtime output phase and transition state', queueController.getState().currentEvent === queueEvents[24] && queueSlotValues(queueController.getState().currentEvent).join() === 'A,B,C' && queueController.getState().currentEvent.frame.queue.front === 0 && queueController.getState().currentEvent.frame.queue.runtime.served === null && queueController.getState().currentEvent.frame.queue.transition.kind === 'DEQUEUE_MOVE');
+queueController.dispose();
+ok('queue basics visibly enforce FIFO', queueActivity.run().result.served === 'A' && queueActivity.run().result.logicalOrder.join() === 'B,C,D');
+ok('queue basics demonstrates circular wraparound', queueEvents.some((event)=>event.frame.queue.transition?.kind === 'WRAP_ENQUEUE'));
 ok('deque foundation uses both removal ends', Activities.get('deque-end-operations').run().result.remaining.join(',') === 'A');
 ok('monotonic deque returns both window maxima', Activities.get('deque-sliding-window').run().result.maxima.join(',') === '12,12');
 const materialsPage = fs.readFileSync(path.join(ROOT,'student-materials.html'),'utf8');

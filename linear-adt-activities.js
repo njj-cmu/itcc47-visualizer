@@ -384,6 +384,18 @@ const ITCC47LinearADTActivities = (() => {
     'RETURN document',
   ]);
 
+  const QUEUE_FOUNDATIONS_SOURCE = Object.freeze([
+    'queue <- empty with capacity 3',
+    'IF queue is empty THEN DEQUEUE is UNDERFLOW',
+    'ENQUEUE queue, "A"',
+    'ENQUEUE queue, "B"',
+    'ENQUEUE queue, "C"',
+    'next <- FRONT queue',
+    'served <- DEQUEUE queue',
+    'ENQUEUE queue, "D" AT (back + 1) MOD 3',
+    'RETURN queue',
+  ]);
+
   // Model one UNDO followed by one REDO as immutable operation snapshots.
   // The command owns exactly one location in each snapshot: a history stack,
   // the transfer lane, or the command register. Document mutation is separate.
@@ -570,6 +582,228 @@ const ITCC47LinearADTActivities = (() => {
     };
   }
 
+  // Keep physical slots as the source of truth. Logical FIFO order is derived
+  // from front, size, and capacity for every immutable playback snapshot.
+  function queueFoundationsProgram() {
+    const capacity = 3;
+    const values = Object.freeze({
+      A: entity('ticket-a', 'A', 'first arrival'),
+      B: entity('ticket-b', 'B'),
+      C: entity('ticket-c', 'C'),
+      D: entity('ticket-d', 'D', 'wraparound arrival'),
+    });
+    const entities = Object.freeze(Object.values(values));
+    const operations = [];
+    const slots = [null, null, null];
+    let front = null;
+    let back = null;
+    let size = 0;
+    let next = null;
+    let served = null;
+    let transition = null;
+    let pending = null;
+    let underflow = null;
+    let returnValue = null;
+    let context = 'INITIALIZE';
+    let operationCount = 0;
+    let comparisons = 0;
+
+    const logicalItems = () => Array.from({ length: size }, (_, offset) => slots[(front + offset) % capacity]);
+    const freezeItem = (item) => item ? Object.freeze({ id: item.id, value: item.value, detail: item.detail }) : null;
+    const freezePending = () => pending ? Object.freeze({ ...pending, item: freezeItem(pending.item) }) : null;
+    const snapshot = (execution = {}, output = []) => {
+      const logical = logicalItems();
+      const runtime = Object.freeze({
+        next,
+        served,
+        receiving: pending?.runtimeDestination || null,
+        receivingValue: pending?.runtimeDestination ? pending.item?.value || null : null,
+      });
+      return {
+        lanes: [{ id: 'main', label: 'Logical FIFO queue', kind: 'queue', order: logical.filter(Boolean).map((item) => item.id) }],
+        queue: Object.freeze({
+          capacity,
+          slots: Object.freeze(slots.map((item, index) => Object.freeze({ index, item: freezeItem(item) }))),
+          front,
+          back,
+          size,
+          logicalOrder: Object.freeze(logical.filter(Boolean).map((item) => item.value)),
+          runtime,
+          transition: transition ? Object.freeze({ ...transition, item: freezeItem(transition.item) }) : null,
+          pending: freezePending(),
+          underflow: underflow ? Object.freeze({ ...underflow }) : null,
+          returnValue: returnValue ? Object.freeze([...returnValue]) : null,
+          context,
+        }),
+        variables: {
+          capacity,
+          size,
+          frontIndex: front ?? 'none',
+          backIndex: back ?? 'none',
+          ...(next ? { next } : {}),
+          ...(served ? { served } : {}),
+        },
+        operations: operationCount,
+        comparisons,
+        execution,
+        output,
+      };
+    };
+    const clearTransient = () => {
+      transition = null;
+      pending = null;
+      underflow = null;
+    };
+    const addOperation = (line, kind, title, description, labels, messages, makePhase) => {
+      operations.push({
+        id: `queue-foundations-${line}-${kind}`,
+        line,
+        kind,
+        title,
+        description,
+        phases: labels.map((label, phaseIndex) => ({
+          title: label,
+          message: messages[phaseIndex],
+          operation: { label: QUEUE_FOUNDATIONS_SOURCE[line - 1], end: kind === 'dequeue' || kind === 'front' ? 'front' : 'back' },
+          ...makePhase(phaseIndex),
+        })),
+      });
+    };
+
+    addOperation(1, 'initialize', 'Initialize a capacity-3 queue', 'Create three fixed physical slots and an empty logical queue.',
+      ['Read capacity', 'Create empty storage', 'Initialize size', 'Set front/back empty state'],
+      ['Read the requested capacity: 3 slots.', 'Create physical slots 0, 1, and 2 without placing a value.', 'Initialize size to 0.', 'Set front and back to none because the queue is empty.'],
+      (phase) => {
+        context = 'INITIALIZE';
+        clearTransient();
+        return snapshot({ complete: phase === 3 });
+      });
+
+    addOperation(2, 'underflow-guard', 'Check the empty queue', 'Demonstrate the underflow rule without performing a dequeue.',
+      ['Check size', 'Determine empty', 'Explain underflow condition', 'Continue without mutation'],
+      ['Read size = 0.', 'The queue is empty because size equals 0.', 'DEQUEUE would cause UNDERFLOW, so no value may be removed.', 'Continue the scenario with all three slots empty.'],
+      (phase) => {
+        context = 'GUARD';
+        clearTransient();
+        underflow = { checked: phase >= 1, empty: true, wouldUnderflow: phase >= 2, continued: phase === 3 };
+        if (phase === 3) comparisons = 1;
+        return snapshot({ complete: phase === 3 });
+      });
+
+    const enqueue = ({ line, value, wrap = false }) => {
+      const item = values[value];
+      const beforeBack = back;
+      const destinationIndex = size === 0 ? 0 : (back + 1) % capacity;
+      const beforeSize = size;
+      const afterFront = size === 0 ? 0 : front;
+      const kind = wrap ? 'wrap-enqueue' : 'enqueue';
+      const title = wrap ? 'Wraparound enqueue' : `ENQUEUE queue, "${value}"`;
+      const description = wrap ? 'Compute the wrapped back index and place D in physical slot 0.' : `Insert ${value} at the back of the queue.`;
+      const indexMessage = size === 0
+        ? 'The first insertion uses physical slot 0 and sets both pointers there.'
+        : `Compute (${beforeBack} + 1) MOD ${capacity} = ${destinationIndex}.`;
+      addOperation(line, kind, title, description,
+        wrap ? ['Read current back', 'Compute wrapped index', `Insert ${value} into physical slot`, 'Update back and size'] : ['Read / prepare value', 'Find insertion index', `Insert ${value} into physical slot`, 'Update pointers and size'],
+        [
+          wrap ? `Read the current back index: ${beforeBack}. D waits outside the queue.` : `Prepare ${value} outside the queue before insertion.`,
+          indexMessage,
+          `${value} moves toward fixed physical slot ${destinationIndex}. The committed circular buffer is unchanged during transit.`,
+          size === 0 ? `${value} is committed in slot 0. front = 0, back = 0, size = 1.` : `${value} is committed in slot ${destinationIndex}. back = ${destinationIndex}, size = ${beforeSize + 1}.`,
+        ],
+        (phase) => {
+          context = wrap ? 'WRAPAROUND' : 'ENQUEUE';
+          clearTransient();
+          if (phase <= 1) pending = {
+            kind: 'INCOMING', item, destinationIndex, fromBack: beforeBack, front: afterFront, back: destinationIndex, size: beforeSize + 1,
+            formula: size === 0 ? 'first item → index 0' : `(${beforeBack} + 1) MOD ${capacity} = ${destinationIndex}`,
+          };
+          if (phase === 2) {
+            pending = {
+              kind: 'INSERTING', item, destinationIndex, fromBack: beforeBack, front: afterFront, back: destinationIndex, size: beforeSize + 1,
+              formula: size === 0 ? 'first item → index 0' : `(${beforeBack} + 1) MOD ${capacity} = ${destinationIndex}`,
+            };
+            transition = { kind: wrap ? 'WRAP_ENQUEUE' : 'ENQUEUE_MOVE', item, source: 'incoming', destination: `slot-${destinationIndex}`, destinationIndex, fromBack: beforeBack };
+          }
+          if (phase === 3) {
+            slots[destinationIndex] = item;
+            front = afterFront;
+            back = destinationIndex;
+            size = beforeSize + 1;
+            operationCount++;
+            if (wrap) comparisons++;
+          }
+          return snapshot({ item, destinationIndex, beforeSize, afterSize: beforeSize + 1, pendingInsert: phase === 2, complete: phase === 3 });
+        });
+    };
+
+    enqueue({ line: 3, value: 'A' });
+    enqueue({ line: 4, value: 'B' });
+    enqueue({ line: 5, value: 'C' });
+
+    addOperation(6, 'front', 'FRONT queue', 'Read the value at the front without removing it.',
+      ['Read front element', 'Copy value to next', 'Confirm queue unchanged'],
+      ['A is stored at front index 0.', 'Copy A into next while A remains in physical slot 0.', 'FRONT is complete: slots, pointers, and size are unchanged.'],
+      (phase) => {
+        context = 'FRONT';
+        clearTransient();
+        const item = slots[front];
+        if (phase === 1) {
+          next = item.value;
+          pending = { kind: 'COPYING', item, sourceIndex: front, runtimeDestination: 'next' };
+          transition = { kind: 'FRONT_COPY', item, source: `slot-${front}`, destination: 'next', sourceIndex: front, runtimeDestination: 'next' };
+        }
+        if (phase === 2) operationCount++;
+        return snapshot({ item, sourceIndex: front, destination: 'next', receiving: phase === 1, complete: phase === 2 });
+      });
+
+    addOperation(7, 'dequeue', 'DEQUEUE queue', 'Remove the front element and assign it to served.',
+      ['Identify front', 'Remove front value', 'Assign value to served', 'Advance front and update size'],
+      ['A is the current front value at physical slot 0.', 'A leaves slot 0; served is receiving it. Pointer and size changes are still pending.', 'Assign A to served while the metadata update remains pending.', 'Clear slot 0, advance front to 1, keep back at 2, and update size to 2.'],
+      (phase) => {
+        context = 'DEQUEUE';
+        clearTransient();
+        const sourceIndex = front;
+        const item = slots[sourceIndex];
+        if (phase === 1) {
+          pending = { kind: 'REMOVING', item, sourceIndex, runtimeDestination: 'served', front: 1, back, size: 2 };
+          transition = { kind: 'DEQUEUE_MOVE', item, source: `slot-${sourceIndex}`, destination: 'served', sourceIndex, runtimeDestination: 'served' };
+        }
+        if (phase === 2) {
+          served = item.value;
+          pending = { kind: 'ASSIGNING', item, sourceIndex, front: 1, back, size: 2 };
+        }
+        if (phase === 3) {
+          served = item.value;
+          slots[sourceIndex] = null;
+          front = (front + 1) % capacity;
+          size--;
+          operationCount++;
+        }
+        return snapshot({ item, sourceIndex, destination: 'served', beforeSize: 3, afterSize: 2, pendingRemoval: phase === 1 || phase === 2, complete: phase === 3 });
+      });
+
+    enqueue({ line: 8, value: 'D', wrap: true });
+
+    addOperation(9, 'return-queue', 'RETURN queue', 'Return the queue in logical FIFO order.',
+      ['Read logical FIFO order', 'Prepare return value', 'Return queue', 'Complete scenario'],
+      ['Read from front index 1 for size 3: B, C, then wrapped slot 0 containing D.', 'Prepare [B, C, D] as the return value. Program output is still empty.', 'RETURN emits [B, C, D] in logical FIFO order.', 'Scenario complete: physical storage is [D, B, C], while logical FIFO order is [B, C, D].'],
+      (phase) => {
+        context = phase === 3 ? 'COMPLETE' : 'RETURN';
+        clearTransient();
+        returnValue = phase >= 1 ? logicalItems().map((item) => item.value) : null;
+        if (phase === 3) operationCount++;
+        return { ...snapshot({ returnPrepared: phase >= 1, complete: phase === 3 }, phase >= 2 ? [...returnValue] : []), type: 'return' };
+      });
+
+    return {
+      entities,
+      steps: operationSteps(operations),
+      result: { slots: ['D', 'B', 'C'], front: 1, back: 0, size: 3, logicalOrder: ['B', 'C', 'D'], next: 'A', served: 'A', output: ['B', 'C', 'D'] },
+      scenario: { label: 'Trace FIFO behavior in a circular array', capacity },
+      source: QUEUE_FOUNDATIONS_SOURCE,
+    };
+  }
+
   function stackFoundationsSteps() {
     const lane = (order) => [{ id: 'main', label: 'Stack', kind: 'stack', order }];
     const snapshot = (order, runtime = {}, operations = 0) => ({
@@ -701,6 +935,7 @@ const ITCC47LinearADTActivities = (() => {
           matching: step.matching || null,
           auxiliary: step.auxiliary || null,
           undoRedo: step.undoRedo || null,
+          queue: step.queue || null,
           invariants: invariant,
           markers: Object.freeze({ teaching, variables: Object.freeze({ ...(step.variables || {}) }) }),
         },
@@ -794,22 +1029,10 @@ const ITCC47LinearADTActivities = (() => {
   });
 
   const queueBasics = buildActivity({
-    id:'queue-fifo-basics',topic:'Queues',family:'Queues',exampleKind:'Foundations',checkpointId:'m4-queue-deque',
-    title:'Enqueue, front, and dequeue',subtitle:'See why the earliest arrival leaves first.',variant:'queue-foundations',
-    entities:[entity('ticket-a','A','first arrival'),entity('ticket-b','B'),entity('ticket-c','C'),entity('ticket-d','D','wraparound arrival')],
-    source:['queue <- empty with capacity 3','IF queue is empty THEN DEQUEUE is UNDERFLOW','ENQUEUE queue, "A"','ENQUEUE queue, "B"','ENQUEUE queue, "C"','next <- FRONT queue','served <- DEQUEUE queue','ENQUEUE queue, "D" AT (back + 1) MOD 3','RETURN queue'],
+    id:'queue-fifo-basics',contentVersion:'2026.09-queue-circular-phases',topic:'Queues',family:'Queues',exampleKind:'Foundations',checkpointId:'m4-queue-deque',
+    title:'Enqueue, front, and dequeue',subtitle:'Explore FIFO behavior, front and back pointers, and circular array operations.',variant:'queue-foundations',workspaceComposition:'queue-execution',
     complexity:{best:'O(1)',avg:'O(1)',worst:'O(1)',space:'O(n)'},
-    steps:[
-      {line:1,title:'Start with an empty queue',message:'Front and back do not point to an item yet.',lanes:[{id:'main',label:'FIFO queue',kind:'queue',order:[]}],operation:{label:'initialize'},variables:{size:0},operations:0},
-      {line:2,title:'Guard the empty case',message:'DEQUEUE and FRONT require size > 0; otherwise the operation reports underflow.',type:'comparison',lanes:[{id:'main',label:'FIFO queue',kind:'queue',order:[]}],comparison:{text:'DEQUEUE allowed when size = 0',outcome:false},operation:{label:'UNDERFLOW guard',end:'front'},variables:{size:0,frontIndex:-1,backIndex:-1},operations:0,comparisons:1,boundary:true},
-      {line:3,title:'A arrives at the back',message:'The first item is both front and back.',lanes:[{id:'main',label:'FIFO queue',kind:'queue',order:['ticket-a']}],focus:[{id:'ticket-a',label:'front = back'}],operation:{label:'ENQUEUE A',end:'back'},variables:{front:'A',back:'A',frontIndex:0,backIndex:0,size:1},operations:1,comparisons:1},
-      {line:4,title:'B joins behind A',message:'ENQUEUE never cuts in front of an earlier arrival.',lanes:[{id:'main',label:'FIFO queue',kind:'queue',order:['ticket-a','ticket-b']}],focus:[{id:'ticket-b',label:'new back'}],operation:{label:'ENQUEUE B',end:'back'},variables:{front:'A',back:'B',frontIndex:0,backIndex:1,size:2},operations:2,comparisons:1},
-      {line:5,title:'C becomes the back',message:'The service order is now A, then B, then C.',lanes:[{id:'main',label:'FIFO queue',kind:'queue',order:['ticket-a','ticket-b','ticket-c']}],focus:[{id:'ticket-a',label:'front',tone:'minimum'},{id:'ticket-c',label:'back',tone:'secondary'}],operation:{label:'ENQUEUE C',end:'back'},variables:{front:'A',back:'C',frontIndex:0,backIndex:2,size:3},operations:3,comparisons:1},
-      {line:6,title:'Read the front without removal',message:'FRONT returns A and leaves all three items in place.',type:'comparison',lanes:[{id:'main',label:'FIFO queue',kind:'queue',order:['ticket-a','ticket-b','ticket-c']}],focus:[{id:'ticket-a',label:'next'}],held:[{id:'peek-a',label:'next',value:'A',tone:'minimum'}],comparison:{text:'size before = size after',outcome:true},operation:{label:'FRONT',end:'front'},variables:{next:'A',frontIndex:0,backIndex:2,size:3},operations:4,comparisons:2,boundary:true},
-      {line:7,title:'Dequeue the earliest arrival',message:'A leaves from the front; B becomes the new front at physical index 1.',lanes:[{id:'main',label:'FIFO queue',kind:'queue',order:['ticket-b','ticket-c']}],focus:[{id:'served-a',label:'served',where:'held',value:'A',tone:'danger'},{id:'ticket-b',label:'new front',tone:'minimum'}],held:[{id:'served-a',label:'served',value:'A',tone:'danger'}],operation:{label:'DEQUEUE',end:'front'},output:['A'],variables:{served:'A',front:'B',back:'C',frontIndex:1,backIndex:2,size:2},operations:5,comparisons:2},
-      {line:8,title:'Back wraps from index 2 to index 0',message:'D joins after C logically even though its circular-array slot wraps to 0.',lanes:[{id:'main',label:'FIFO queue',kind:'queue',order:['ticket-b','ticket-c','ticket-d']}],focus:[{id:'ticket-b',label:'front',tone:'minimum'},{id:'ticket-d',label:'back at slot 0',tone:'secondary'}],comparison:{text:'(2 + 1) MOD 3 = 0',outcome:true},operation:{label:'ENQUEUE D',end:'back'},output:['A'],status:[{label:'logical order',value:'B → C → D',tone:'success'}],variables:{front:'B',back:'D',frontIndex:1,backIndex:0,size:3},operations:6,comparisons:3,boundary:true},
-      {line:9,title:'FIFO order survives wraparound',message:'Physical indices wrapped, but B is still the next logical front.',type:'return',lanes:[{id:'main',label:'FIFO queue',kind:'queue',order:['ticket-b','ticket-c','ticket-d']}],focus:[{id:'ticket-b',label:'next'}],operation:{label:'RETURN queue'},status:[{label:'rule',value:'first in, first out',tone:'success'}],output:['A'],variables:{front:'B',back:'D',frontIndex:1,backIndex:0,size:3},operations:6,comparisons:3},
-    ],result:{served:'A',remaining:['B','C','D']},
+    ...queueFoundationsProgram(),
   });
 
   const roundRobin = buildActivity({
@@ -914,7 +1137,7 @@ const ITCC47LinearADTActivities = (() => {
     return activities.map((activity) => catalog.register(activity));
   }
 
-  return Object.freeze({ activities, register, postfixProgram, delimiterProgram, undoRedoProgram });
+  return Object.freeze({ activities, register, postfixProgram, delimiterProgram, undoRedoProgram, queueFoundationsProgram });
 })();
 
 if (typeof ITCC47Activities !== 'undefined') ITCC47LinearADTActivities.register(ITCC47Activities);

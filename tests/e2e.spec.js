@@ -1715,8 +1715,8 @@ test('public release exposes ten line-by-line Module 4 examples', async ({ page 
   await expect(page.locator('.visualization-group', { hasText: 'Deques' }).locator('.visualization-card')).toHaveCount(3);
   for (const activity of activities) {
     await page.goto(`/visualizer.html?activity=${activity}`);
-    const workbench = activity === 'stack-lifo-basics' ? '.stack-execution-workbench' : activity === 'stack-postfix-evaluator' ? '.postfix-workbench' : activity === 'stack-delimiter-audit' ? '.delimiter-workbench' : activity === 'stack-editor-undo' ? '.undo-redo-workbench' : '.linear-adt';
-    const teaching = activity === 'stack-lifo-basics' ? '.stack-execution-header' : activity === 'stack-postfix-evaluator' ? '.postfix-operation' : activity === 'stack-delimiter-audit' ? '.delimiter-current-token' : activity === 'stack-editor-undo' ? '.undo-redo-operation' : '.linear-teaching';
+    const workbench = activity === 'stack-lifo-basics' ? '.stack-execution-workbench' : activity === 'stack-postfix-evaluator' ? '.postfix-workbench' : activity === 'stack-delimiter-audit' ? '.delimiter-workbench' : activity === 'stack-editor-undo' ? '.undo-redo-workbench' : activity === 'queue-fifo-basics' ? '.queue-workbench' : '.linear-adt';
+    const teaching = activity === 'stack-lifo-basics' ? '.stack-execution-header' : activity === 'stack-postfix-evaluator' ? '.postfix-operation' : activity === 'stack-delimiter-audit' ? '.delimiter-current-token' : activity === 'stack-editor-undo' ? '.undo-redo-operation' : activity === 'queue-fifo-basics' ? '.queue-operation' : '.linear-teaching';
     await expect(page.locator(workbench)).toBeVisible();
     await expect(page.locator(teaching)).toBeVisible();
     await expect(page.locator('.source-line.is-current')).toHaveCount(1);
@@ -1999,6 +1999,173 @@ test('undo redo transfers animate the stable Type B identity from offline file U
   await expect.poll(async () => Math.abs((await commandB.boundingBox()).x - beforePush.x), { timeout: 2500 }).toBeGreaterThan(25);
 });
 
+test('queue debugger separates physical circular storage, logical FIFO order, runtime values, and return output', async ({ page }, testInfo) => {
+  test.setTimeout(90000);
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.goto('/visualizer.html?activity=queue-fifo-basics');
+  const workbench = page.locator('.queue-workbench');
+  const step = page.getByRole('button', { name: 'Step', exact: true });
+  const physical = page.getByRole('region', { name: 'Physical Circular Array', exact: true });
+  const logical = page.getByRole('region', { name: 'Logical Queue Order', exact: true });
+  const runtime = page.getByRole('region', { name: 'Runtime Values', exact: true });
+  const output = page.getByRole('region', { name: 'Program / Return Output', exact: true });
+  const slot = (index) => physical.locator(`[data-slot-index="${index}"]`);
+  const seek = async (index) => {
+    await page.getByLabel('Playback settings', { exact: true }).click();
+    await page.getByLabel('Timeline step', { exact: true }).fill(String(index));
+    await page.getByLabel('Playback settings', { exact: true }).click();
+  };
+
+  await expect(page.getByRole('heading', { name: 'Enqueue, front, and dequeue' })).toBeVisible();
+  await expect(workbench).toHaveAttribute('data-line', '1');
+  await expect(workbench).toHaveAttribute('data-slots', '_,_,_');
+  await expect(workbench).toHaveAttribute('data-front', 'none');
+  await expect(workbench).toHaveAttribute('data-back', 'none');
+  await expect(physical.locator('[data-slot-index]')).toHaveCount(3);
+
+  await seek(6);
+  await expect(workbench).toHaveAttribute('data-operation', 'underflow-guard');
+  await expect(page.getByRole('region', { name: 'Underflow Check', exact: true })).toContainText('DEQUEUE would cause UNDERFLOW');
+  await expect(workbench).toHaveAttribute('data-slots', '_,_,_');
+
+  await seek(10);
+  await expect(workbench).toHaveAttribute('data-line', '3');
+  await expect(workbench).toHaveAttribute('data-phase', '3');
+  await expect(slot(0)).toHaveAttribute('data-slot-value', 'A');
+  await expect(slot(0)).toHaveAttribute('data-committed-value', 'empty');
+  await expect(workbench).toHaveAttribute('data-size', '0');
+  await step.click();
+  await expect(workbench).toHaveAttribute('data-slots', 'A,_,_');
+  await expect(workbench).toHaveAttribute('data-front', '0');
+  await expect(workbench).toHaveAttribute('data-back', '0');
+  await expect(workbench).toHaveAttribute('data-size', '1');
+  await expect(slot(0).locator('.queue-pointer-markers')).toContainText('FRONT');
+  await expect(slot(0).locator('.queue-pointer-markers')).toContainText('BACK');
+
+  await seek(19);
+  await expect(workbench).toHaveAttribute('data-slots', 'A,B,C');
+  await expect(workbench).toHaveAttribute('data-front', '0');
+  await expect(workbench).toHaveAttribute('data-back', '2');
+  await expect(workbench).toHaveAttribute('data-size', '3');
+  await expect(logical).toContainText('A');
+  await expect(logical).toContainText('B');
+  await expect(logical).toContainText('C');
+
+  await seek(21);
+  await expect(workbench).toHaveAttribute('data-operation', 'front');
+  await expect(workbench).toHaveAttribute('data-slots', 'A,B,C');
+  await expect(workbench).toHaveAttribute('data-front', '0');
+  await expect(workbench).toHaveAttribute('data-back', '2');
+  await expect(workbench).toHaveAttribute('data-size', '3');
+  await expect(runtime.locator('article').filter({ has: page.locator('code', { hasText: /^next$/ }) })).toContainText('A');
+  await expect(page.getByRole('region', { name: 'Explanation', exact: true })).toContainText('Queue unchanged');
+  await expect(output).toContainText('No output yet.');
+
+  await seek(24);
+  await expect(workbench).toHaveAttribute('data-operation', 'dequeue');
+  await expect(slot(0)).toHaveAttribute('data-slot-value', 'empty');
+  await expect(slot(0)).toHaveAttribute('data-committed-value', 'A');
+  await expect(workbench).toHaveAttribute('data-front', '0');
+  await expect(workbench).toHaveAttribute('data-size', '3');
+  await expect(runtime.locator('article').filter({ has: page.locator('code', { hasText: /^served$/ }) })).toContainText('receiving A');
+  await expect(page.getByRole('region', { name: 'Queue State', exact: true })).toContainText('pending');
+  await step.click();
+  await expect(runtime.locator('article').filter({ has: page.locator('code', { hasText: /^served$/ }) })).toContainText('assigned');
+  await step.click();
+  await expect(workbench).toHaveAttribute('data-slots', '_,B,C');
+  await expect(workbench).toHaveAttribute('data-front', '1');
+  await expect(workbench).toHaveAttribute('data-back', '2');
+  await expect(workbench).toHaveAttribute('data-size', '2');
+  await expect(workbench).toHaveAttribute('data-logical-order', 'B,C');
+
+  await seek(28);
+  await expect(workbench).toHaveAttribute('data-operation', 'wrap-enqueue');
+  await expect(page.locator('.queue-wrap-cue')).toContainText('(2 + 1) MOD 3 = 0');
+  await expect(workbench).toHaveAttribute('data-slots', '_,B,C');
+  await step.click();
+  await expect(slot(0)).toHaveAttribute('data-slot-value', 'D');
+  await expect(slot(0)).toHaveAttribute('data-committed-value', 'empty');
+  await expect(workbench).toHaveAttribute('data-back', '2');
+  await step.click();
+  await expect(workbench).toHaveAttribute('data-slots', 'D,B,C');
+  await expect(workbench).toHaveAttribute('data-front', '1');
+  await expect(workbench).toHaveAttribute('data-back', '0');
+  await expect(workbench).toHaveAttribute('data-size', '3');
+  await expect(workbench).toHaveAttribute('data-logical-order', 'B,C,D');
+  await expect(slot(0).locator('.queue-pointer-markers')).toContainText('BACK');
+  await expect(slot(1).locator('.queue-pointer-markers')).toContainText('FRONT');
+
+  await seek(32);
+  await expect(workbench).toHaveAttribute('data-line', '9');
+  await expect(workbench).toHaveAttribute('data-phase', '2');
+  await expect(output).toContainText('Prepared: [B, C, D]');
+  await expect(output).toContainText('No output yet.');
+  await step.click();
+  await expect(output).toContainText('Return Value');
+  await expect(output).toContainText('[B, C, D]');
+  await step.click();
+  await expect(step).toBeDisabled();
+  await expect(workbench).toHaveAttribute('data-context', 'COMPLETE');
+  await expect(page.getByRole('region', { name: 'Explanation', exact: true })).toContainText('physical array wrapped around');
+  await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(workbench).toHaveAttribute('data-phase', '3');
+
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByRole('button', { name: 'Restart', exact: true }).click();
+  await page.getByLabel('Motion preference', { exact: true }).selectOption('reduced');
+  await expect(page.locator('.visualizer-workspace')).toHaveClass(/motion-reduced/);
+  await page.getByLabel('Speed', { exact: true }).selectOption('9');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
+  await expect(step).toBeDisabled({ timeout: 25000 });
+  await expect(workbench).toHaveAttribute('data-slots', 'D,B,C');
+  expect(errors).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  if (testInfo.project.name === 'laptop') {
+    const left = await page.locator('.queue-left').boundingBox();
+    const right = await page.locator('.queue-right').boundingBox();
+    expect(left.width / (left.width + right.width)).toBeGreaterThanOrEqual(.30);
+    expect(left.width / (left.width + right.width)).toBeLessThanOrEqual(.34);
+    expect(right.x).toBeGreaterThan(left.x + left.width);
+  }
+});
+
+test('queue enqueue and dequeue animate stable value identities from offline file URLs', async ({ page }) => {
+  const { pathToFileURL } = require('url');
+  await page.context().setOffline(true);
+  await page.goto(`${pathToFileURL(path.resolve(__dirname, '..', 'visualizer.html')).href}?activity=queue-fifo-basics`);
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Motion preference', { exact: true }).selectOption('on');
+  await page.getByLabel('Speed', { exact: true }).selectOption('3');
+  await page.getByLabel('Timeline step', { exact: true }).fill('13');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  const ticketB = page.locator('[data-queue-value-id="ticket-b"]');
+  const beforeEnqueue = await ticketB.boundingBox();
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.locator('[data-slot-index="1"] [data-queue-value-id="ticket-b"]')).toHaveCount(1);
+  await expect.poll(() => ticketB.evaluate(element => getComputedStyle(element).transform)).not.toBe('none');
+  await expect.poll(async () => {
+    const after = await ticketB.boundingBox();
+    return Math.hypot(after.x - beforeEnqueue.x, after.y - beforeEnqueue.y);
+  }, { timeout: 2500 }).toBeGreaterThan(35);
+
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Timeline step', { exact: true }).fill('23');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  const ticketA = page.locator('[data-queue-value-id="ticket-a"]:not(.is-copy)');
+  const beforeDequeue = await ticketA.boundingBox();
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Runtime Values', exact: true }).locator('[data-queue-value-id="ticket-a"]:not(.is-copy)')).toHaveCount(1);
+  await expect.poll(() => ticketA.evaluate(element => getComputedStyle(element).transform)).not.toBe('none');
+  await expect.poll(async () => {
+    const after = await ticketA.boundingBox();
+    return Math.hypot(after.x - beforeDequeue.x, after.y - beforeDequeue.y);
+  }, { timeout: 2500 }).toBeGreaterThan(35);
+});
+
 test('visualizer workspaces choose a structure-aware desktop composition', async ({ page }, testInfo) => {
   await page.goto('/visualizer.html?activity=stack-lifo-basics&preview=1');
   await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-workspace-composition', 'stack-execution');
@@ -2021,15 +2188,17 @@ test('visualizer workspaces choose a structure-aware desktop composition', async
   }
 
   await page.goto('/visualizer.html?activity=queue-fifo-basics&preview=1');
-  await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-workspace-composition', 'stacked-horizontal');
+  await expect(page.locator('.visualizer-workspace')).toHaveAttribute('data-workspace-composition', 'queue-execution');
   if (testInfo.project.name === 'laptop') {
-    await page.getByRole('button', { name: 'Expand learning evidence' }).click();
-    const queuePanels = await page.locator('.itcc47-workbench').evaluate((workbench) => {
-      const source = workbench.querySelector('.desktop-source').getBoundingClientRect();
-      const visual = workbench.querySelector('.itcc47-visual-shell').getBoundingClientRect();
-      return { sourceBottom: source.bottom, visualTop: visual.top };
+    const queuePanels = await page.locator('.queue-workbench').evaluate((workbench) => {
+      const source = workbench.querySelector('.queue-left').getBoundingClientRect();
+      const visual = workbench.querySelector('.queue-right').getBoundingClientRect();
+      return { sourceTop: source.top, visualTop: visual.top, sourceRight: source.right, visualLeft: visual.left, ratio: source.width / (source.width + visual.width) };
     });
-    expect(queuePanels.visualTop).toBeGreaterThan(queuePanels.sourceBottom);
+    expect(Math.abs(queuePanels.sourceTop - queuePanels.visualTop)).toBeLessThan(3);
+    expect(queuePanels.visualLeft).toBeGreaterThan(queuePanels.sourceRight);
+    expect(queuePanels.ratio).toBeGreaterThanOrEqual(.30);
+    expect(queuePanels.ratio).toBeLessThanOrEqual(.34);
   }
 
   await page.goto('/visualizer.html?activity=tree-traversals&preview=1');

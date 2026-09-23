@@ -229,6 +229,20 @@ during `APPLY inverse(command)`, and from `A` to `AB` solely during
 `APPLY command`. The workspace reuses the shared phase indicators, playback
 controller, speed/motion settings, and snapshot-based Previous/seek behavior.
 
+Queue foundations (`queue-fifo-basics`) uses the `queue-execution` workspace on
+the existing activity route. `queueFoundationsProgram` expands the nine-line
+scenario into 35 immutable operation snapshots with operation-specific phase
+counts. `frame.queue.slots` is the physical source of truth: three stable slot
+records retain indices 0–2 while `front`, `back`, and `size` describe the active
+circular buffer. Logical FIFO order is derived for every frame by reading
+`slots[(front + offset) % capacity]`; it is never stored as the only queue model.
+ENQUEUE and DEQUEUE use pending transition metadata before an atomic commit,
+FRONT copies into `next` without changing slots or metadata, and runtime values
+remain separate from RETURN output. The final snapshot therefore proves both
+physical `[D, B, C]` with `front = 1`, `back = 0` and logical `[B, C, D]`.
+The workspace reuses the shared phase indicators, playback controller,
+speed/motion settings, Motion layout identity, and reversible snapshot history.
+
 ## Functions, calls, and recurrences
 
 The parser root is `Program { functions, body }`. Top-level function definitions

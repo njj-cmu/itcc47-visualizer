@@ -121,7 +121,7 @@ function TransferConnector({ execution }) {
 
 export function PhasePlayback({ state, controller, event, execution, source, Icon, motionPreference, iteration, iterationLabel = 'Token', iterationDisplay, contextLabel, progressLabel, progressValue, progressMax, progressAriaLabel, showPhaseProgress = true }) {
   return <section className="stack-playback" aria-label="Playback controls">
-    <div className="stack-progress"><span>{progressLabel || `Line ${event.source.line} / ${source.length}`}</span><progress aria-label={progressAriaLabel || 'Source line progress'} value={progressValue ?? event.source.line} max={progressMax ?? source.length}/></div>
+    <div className="stack-progress" data-activity-teaching><span>{progressLabel || `Line ${event.source.line} / ${source.length}`}</span><progress aria-label={progressAriaLabel || 'Source line progress'} value={progressValue ?? event.source.line} max={progressMax ?? source.length}/></div>
     {iteration ? <div className="stack-progress"><span>{iterationDisplay ? `${iterationLabel} ${iterationDisplay}` : `${iterationLabel} ${iteration.index < 0 ? iteration.processed : iteration.index + 1} / ${iteration.count}`}</span><progress aria-label={`${iterationLabel} progress`} value={iteration.processed} max={iteration.count || 1}/></div> : null}
     {showPhaseProgress ? <div className="stack-progress"><span>Operation phase {execution.phaseIndex + 1} / {execution.phaseCount}</span><progress aria-label="Operation phase progress" value={execution.phaseIndex + 1} max={execution.phaseCount}/></div> : null}
     {contextLabel ? <div className="stack-progress stack-context-progress"><span>Context</span><strong>{contextLabel}</strong></div> : null}

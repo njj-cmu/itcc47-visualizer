@@ -1713,14 +1713,23 @@ test('public release exposes ten line-by-line Module 4 examples', async ({ page 
   await expect(page.locator('.visualization-group', { hasText: 'Stacks' }).locator('.visualization-card')).toHaveCount(4);
   await expect(page.locator('.visualization-group', { hasText: 'Queues' }).locator('.visualization-card')).toHaveCount(3);
   await expect(page.locator('.visualization-group', { hasText: 'Deques' }).locator('.visualization-card')).toHaveCount(3);
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   for (const activity of activities) {
-    await page.goto(`/visualizer.html?activity=${activity}`);
-    const workbench = activity === 'stack-lifo-basics' ? '.stack-execution-workbench' : activity === 'stack-postfix-evaluator' ? '.postfix-workbench' : activity === 'stack-delimiter-audit' ? '.delimiter-workbench' : activity === 'stack-editor-undo' ? '.undo-redo-workbench' : activity === 'queue-fifo-basics' ? '.queue-workbench' : activity === 'queue-round-robin' ? '.rr-workbench' : '.linear-adt';
-    const teaching = activity === 'stack-lifo-basics' ? '.stack-execution-header' : activity === 'stack-postfix-evaluator' ? '.postfix-operation' : activity === 'stack-delimiter-audit' ? '.delimiter-current-token' : activity === 'stack-editor-undo' ? '.undo-redo-operation' : activity === 'queue-fifo-basics' ? '.queue-operation' : activity === 'queue-round-robin' ? '.rr-operation' : '.linear-teaching';
-    await expect(page.locator(workbench)).toBeVisible();
-    await expect(page.locator(teaching)).toBeVisible();
+    const errorOffset = errors.length;
+    const response = await page.goto(`/visualizer.html?activity=${activity}`);
+    expect(response?.status(), `${activity} should load successfully`).toBe(200);
+    const workbench = page.getByRole('region', { name: 'Activity workbench', exact: true });
+    await expect(workbench).toHaveCount(1);
+    await expect(workbench).toBeVisible();
+    await expect(workbench).toHaveAttribute('data-activity-id', activity);
+    const teaching = page.locator('[data-activity-teaching]');
+    await expect(teaching).toHaveCount(1);
+    await expect(teaching).toBeVisible();
     await expect(page.locator('.source-line.is-current')).toHaveCount(1);
     await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+    expect(errors.slice(errorOffset), `${activity} should not emit browser errors`).toEqual([]);
   }
 });
 

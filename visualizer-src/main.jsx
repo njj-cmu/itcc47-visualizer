@@ -18,6 +18,8 @@ import { QueueExecutionWorkspace } from './queue-execution.jsx';
 import { PrinterQueueExecutionWorkspace } from './printer-queue-execution.jsx';
 import { RoundRobinExecutionWorkspace } from './round-robin-execution.jsx';
 
+if (typeof window !== 'undefined') window.BSITVisualizerReact = React;
+
 const MAX_VISUAL_VALUES = 18;
 const DEFAULT_SPEED = 6;
 const MOTION_STORAGE_KEY = 'itcc47:visualizer-motion:v1';
@@ -805,12 +807,13 @@ function PlaybackSettings({ state, controller, motionPreference, mobile = false,
   </div>;
 }
 
-function IntegratedPlayback({ state, controller, event, motionPreference, granularity, onGranularityChange, granularityLabels }) {
+function IntegratedPlayback({ activity, state, controller, event, motionPreference, granularity, onGranularityChange, granularityLabels }) {
   return <section className="integrated-playback" aria-label="Playback controls">
     <div id="result-caption" className="integrated-step" data-activity-teaching aria-live="polite"><strong>{state.total ? state.index + 1 : 0} / {state.total}</strong><span>{event?.message || 'Preparing activity…'}</span></div>
     <GranularityControl value={granularity} onChange={onGranularityChange} labels={granularityLabels}/>
     <div className="transport">
       <button type="button" aria-label="Previous" onClick={() => controller.step(-1)} disabled={state.index === 0 || state.transitioning}><Icon name="previous"/></button>
+      {activity?.id === 'deque-end-operations' ? <button type="button" aria-label="Restart" onClick={() => controller.seek(0)} disabled={state.index === 0}><Icon name="restart"/></button> : null}
       <button type="button" className="primary" aria-label={state.status === 'playing' ? 'Pause' : 'Play'} onClick={controller.toggle} disabled={state.atEnd}><Icon name={state.status === 'playing' ? 'pause' : 'play'}/><span>{state.status === 'playing' ? 'Pause' : 'Play'}</span></button>
       <button id="btn-step" type="button" aria-label="Step" onClick={() => controller.step(1)} disabled={state.atEnd || state.transitioning}><Icon name="next"/><span>Step</span></button>
     </div>
@@ -829,6 +832,64 @@ function useWorkspaceLayout(enabled, engine, adaptive = false) {
     setLayout((current) => engine.write(localStorage, { ...current, ...patch }, adaptive ? window.innerWidth : undefined));
   }, [adaptive, enabled, engine]);
   return [layout, updateLayout];
+}
+
+function SlidingWindowMaximumPackLoader(props) {
+  const [Workspace, setWorkspace] = useState(() => window.BSITSlidingWindowMaximumPack?.SlidingWindowMaximumWorkspace || null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (Workspace) return undefined;
+    const stylesheetUrl = new URL('activity-packs/sliding-window-maximum.css', location.href).href;
+    if (!document.querySelector(`link[href="${stylesheetUrl}"]`)) {
+      const stylesheet = document.createElement('link');
+      stylesheet.rel = 'stylesheet';
+      stylesheet.href = stylesheetUrl;
+      stylesheet.dataset.activityPack = 'deque-sliding-window';
+      document.head.appendChild(stylesheet);
+    }
+    const script = document.createElement('script');
+    script.src = new URL('activity-packs/sliding-window-maximum.js', location.href).href;
+    script.async = true;
+    script.onload = () => {
+      const component = window.BSITSlidingWindowMaximumPack?.SlidingWindowMaximumWorkspace;
+      if (component) setWorkspace(() => component);
+      else setFailed(true);
+    };
+    script.onerror = () => setFailed(true);
+    document.head.appendChild(script);
+    return () => { script.onload = null; script.onerror = null; };
+  }, [Workspace]);
+  if (Workspace) return <Workspace {...props}/>;
+  return <main className="sw-pack-loader" role={failed ? 'alert' : 'status'}>{failed ? 'This activity pack could not load. Reconnect and reload the activity.' : 'Loading sliding-window maximum…'}</main>;
+}
+
+function PriorityServiceLanePackLoader(props) {
+  const [Workspace, setWorkspace] = useState(() => window.BSITPriorityServiceLanePack?.PriorityServiceLaneWorkspace || null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (Workspace) return undefined;
+    const stylesheetUrl = new URL('activity-packs/priority-service-lane.css', location.href).href;
+    if (!document.querySelector(`link[href="${stylesheetUrl}"]`)) {
+      const stylesheet = document.createElement('link');
+      stylesheet.rel = 'stylesheet';
+      stylesheet.href = stylesheetUrl;
+      stylesheet.dataset.activityPack = 'deque-service-lane';
+      document.head.appendChild(stylesheet);
+    }
+    const script = document.createElement('script');
+    script.src = new URL('activity-packs/priority-service-lane.js', location.href).href;
+    script.async = true;
+    script.onload = () => {
+      const component = window.BSITPriorityServiceLanePack?.PriorityServiceLaneWorkspace;
+      if (component) setWorkspace(() => component);
+      else setFailed(true);
+    };
+    script.onerror = () => setFailed(true);
+    document.head.appendChild(script);
+    return () => { script.onload = null; script.onerror = null; };
+  }, [Workspace]);
+  if (Workspace) return <Workspace {...props}/>;
+  return <main className="sw-pack-loader" role={failed ? 'alert' : 'status'}>{failed ? 'This activity pack could not load. Reconnect and reload the activity.' : 'Loading Priority service lane…'}</main>;
 }
 
 const ITCC45LabStage = memo(function ITCC45LabStage({ activity, event, previousEvent, index, source, mobileTab, layout, onRatioChange, duration, motionMode }) {
@@ -1072,6 +1133,12 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
       : ITCC47CurriculumUI.href(`tracer.html?activity=${encodeURIComponent(activity.id)}`);
   const itcc47ActionLabel = activity.traceHandoff === false ? 'Review mental model' : activity.renderer === 'linear-adt' ? 'Practice this module' : 'Edit pseudocode';
   const mobileEvidenceActive = mobileTab === 'trace' || mobileTab === 'steps' || mobileTab === 'more';
+  if (activity.id === 'deque-sliding-window') {
+    return <LazyMotion features={domMax} strict><MotionConfig reducedMotion={motionPreference.mode === 'on' ? 'never' : 'always'} transition={{ duration }}><SlidingWindowMaximumPackLoader activity={activity} event={event} state={playback} controller={controller} motionPreference={motionPreference} Icon={Icon}/></MotionConfig></LazyMotion>;
+  }
+  if (activity.id === 'deque-service-lane') {
+    return <LazyMotion features={domMax} strict><MotionConfig reducedMotion={motionPreference.mode === 'on' ? 'never' : 'always'} transition={{ duration }}><PriorityServiceLanePackLoader activity={activity} event={event} state={playback} controller={controller} motionPreference={motionPreference} Icon={Icon}/></MotionConfig></LazyMotion>;
+  }
   return <LazyMotion features={domMax} strict><MotionConfig reducedMotion={motionPreference.mode === 'on' ? 'never' : 'always'} transition={{ duration }}><div className={`visualizer-workspace course-${courseId} evidence-${workspaceLayout.evidence} motion-${motionPreference.mode} navigation-${playback.navigationSource} composition-${workspaceComposition}`} data-motion-duration={isComputerNetworking ? networkDuration : duration} data-workspace-composition={workspaceComposition} role="region" aria-label="Activity workbench" data-activity-workbench data-activity-id={activity.id}>
     <main className="workspace-main">
       <div className={`activity-heading ${usesContextualControls ? 'has-contextual-controls' : ''}`}><div>{!isComputerArchitecture ? <p><a href={isITCC45 || isComputerNetworking ? backHref : ITCC47CurriculumUI.href(backHref)}><Icon name="back" size={14}/>{backLabel}</a><span>{isITCC45 ? `Topic ${activity.module} / ${activity.topic} / Example ${exampleIndex + 1} of ${topicActivities.length}` : `Module ${activity.module} / ${activity.topic}${activity.breadcrumbLabel ? ` / ${activity.breadcrumbLabel}` : activity.exampleKind ? ` / ${activity.exampleKind}` : ''}`}</span></p> : null}<h1>{activity.title}</h1>{isITCC45 ? <span className="activity-learning-goal"><em>{activity.context}</em>{activity.learningGoal}</span> : <span>{activity.subtitle}</span>}{usesContextualControls ? <ContextualScenarioControls activity={activity} inputs={inputs} setInputs={setInputs} controller={controller}/> : null}</div><div className="activity-action-stack">{isITCC45 ? <nav className="activity-example-nav" aria-label="Examples in this topic">{previousExample ? <a href={exampleHref(previousExample)} aria-label={`Previous example: ${previousExample.title}`}><Icon name="back" size={14}/>Previous</a> : <span aria-disabled="true"><Icon name="back" size={14}/>Previous</span>}{nextExample ? <a href={exampleHref(nextExample)} aria-label={`Next example: ${nextExample.title}`}>Next<Icon name="next" size={14}/></a> : <span aria-disabled="true">Next<Icon name="next" size={14}/></span>}</nav> : null}<div className="activity-actions">{isITCC45 ? <OOPDataControls activity={activity} inputs={inputs} setInputs={setInputs}/> : isComputerArchitecture || isComputerNetworking ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : <a className={`edit-code ${usesContextualControls ? 'is-tertiary' : ''}`} href={itcc47ActionHref}><Icon name={activity.traceHandoff === false || activity.renderer === 'linear-adt' ? 'grid' : 'code'} size={17}/>{itcc47ActionLabel}</a>}</div></div></div>
@@ -1105,7 +1172,7 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
         <div className={`desktop-source mobile-surface ${mobileTab === 'code' ? 'mobile-active' : ''}`}><SourcePanel activity={activity} event={event} source={source}/></div>
         <div className="itcc47-visual-shell">
           <section className={`visual-canvas mobile-surface ${mobileTab === 'visualize' ? 'mobile-active' : ''}`} tabIndex="0" aria-label={`${activity.title} visualization canvas`}><Renderer frame={event?.frame} event={event} activity={activity} motionMode={motionPreference.mode} duration={visualDuration} onEntityComplete={onEntityComplete}/></section>
-          <IntegratedPlayback state={playback} controller={controller} event={event} motionPreference={motionPreference}/>
+          <IntegratedPlayback activity={activity} state={playback} controller={controller} event={event} motionPreference={motionPreference}/>
         </div>
       </div>}
       {isPhaseExecution && !isPrinterQueueExecution ? <details className="stack-evidence-details"><summary>Learning Evidence · trace, variables, and operation counts</summary><EvidenceDrawer tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/></details> : null}

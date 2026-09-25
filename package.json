@@ -7,7 +7,7 @@
     "build:curriculum": "node tools/build-curriculum.js",
     "build:problems": "node tools/build-problems.js",
     "build": "npm run build:curriculum && npm run build:problems && npm run build:visualizer && node tools/build-sw.js",
-    "build:visualizer": "vite build --config vite.visualizer.config.js && node tools/publish-visualizer.js",
+    "build:visualizer": "vite build --config vite.visualizer.config.js && vite build --config tools/vite.sliding-window-pack.config.js && vite build --config tools/vite.priority-service-lane-pack.config.js && node tools/publish-visualizer.js",
     "setup:instructor-preview": "node tools/setup-instructor-preview.js",
     "test:unit": "node tools/test.js",
     "test:e2e": "node tools/setup-instructor-preview.js && playwright test tests/e2e.spec.js",

@@ -1518,6 +1518,23 @@ ok('raw offline precache remains within the deterministic 2 MiB budget', rawPrec
   rawPrecacheBytes > 2 * 1024 * 1024
     ? `raw precache is ${rawPrecacheBytes} bytes; introduce an optional subject pack with its exact size and an explicit “Download for offline use” confirmation`
     : '');
+const slidingWindowPackManifestPath = path.join(ROOT, 'activity-packs', 'manifest.json');
+let slidingWindowPackManifest = null;
+try { slidingWindowPackManifest = JSON.parse(fs.readFileSync(slidingWindowPackManifestPath, 'utf8')); } catch { /* asserted below */ }
+const optionalPackBytes = slidingWindowPackManifest?.files?.reduce((total, file) => {
+  const filePath = path.join(ROOT, file);
+  return total + (fs.existsSync(filePath) && fs.statSync(filePath).isFile() ? fs.statSync(filePath).size : 0);
+}, 0);
+ok('sliding-window optional pack reports its exact installed size and stays outside the core precache', slidingWindowPackManifest?.id === 'deque-sliding-window' && slidingWindowPackManifest.bytes === optionalPackBytes && !listed.some((asset) => asset.startsWith('activity-packs/')));
+const serviceLanePackManifestPath = path.join(ROOT, 'activity-packs', 'priority-service-lane-manifest.json');
+let serviceLanePackManifest = null;
+try { serviceLanePackManifest = JSON.parse(fs.readFileSync(serviceLanePackManifestPath, 'utf8')); } catch { /* asserted below */ }
+const serviceLanePackBytes = serviceLanePackManifest?.files?.reduce((total, file) => {
+  const filePath = path.join(ROOT, file);
+  return total + (fs.existsSync(filePath) && fs.statSync(filePath).isFile() ? fs.statSync(filePath).size : 0);
+}, 0);
+ok('service-lane optional pack reports its exact installed size and stays outside the core precache', serviceLanePackManifest?.id === 'deque-service-lane' && serviceLanePackManifest.bytes === serviceLanePackBytes && !listed.some((asset) => asset.startsWith('activity-packs/')));
+ok('optional activity packs require explicit confirmation and survive service-worker activation', fs.readFileSync(path.join(ROOT, 'visualizer-src', 'sliding-window-maximum.jsx'), 'utf8').includes('Download for offline use') && fs.readFileSync(path.join(ROOT, 'visualizer-src', 'priority-service-lane.jsx'), 'utf8').includes('Download for offline use') && fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8').includes('n !== OPTIONAL_PACK_CACHE'));
 const rootHtml = fs.readdirSync(ROOT).filter((file) => file.endsWith('.html'))
   .map((file) => fs.readFileSync(path.join(ROOT, file), 'utf8')).join('\n');
 const referencedScripts = new Set([...rootHtml.matchAll(/<script[^>]+src=["']([^"']+)["']/g)]
@@ -1925,7 +1942,48 @@ printerController.step(-1);
 ok('printer Previous restores the exact DEQUEUE snapshot and output state', printerController.getState().currentEvent === printerEvents[4] && printerJobs(printerController.getState().currentEvent).map((item) => item.value).join('|') === 'Form · 1 page|Slides · 4 pages' && printerHeld(printerController.getState().currentEvent, 'current job')?.value === 'Report · 8 pages' && printerController.getState().currentEvent.frame.output.length === 0);
 printerController.dispose();
 ok('deque foundation uses both removal ends', Activities.get('deque-end-operations').run().result.remaining.join(',') === 'A');
+const serviceLaneActivity = Activities.get('deque-service-lane');
+const serviceLaneEvents = serviceLaneActivity.run().events;
+const serviceLaneItems = (event) => event.frame.lanes[0].items.map((item) => item.value);
+const serviceLaneVars = (event) => event.frame.markers.variables;
+ok('service lane retains seven source-synchronized snapshots and exact pseudocode', serviceLaneEvents.length === 7 && serviceLaneActivity.source.join('|') === 'lane ← empty|ADD_BACK lane, Request A|ADD_BACK lane, Request B|ADD_FRONT lane, Urgent U|served ← REMOVE_FRONT lane|cancelled ← REMOVE_BACK lane|RETURN lane' && serviceLaneEvents.map((event) => event.source.line).join(',') === '1,2,3,4,5,6,7');
+ok('service lane begins empty with no handled requests', serviceLaneItems(serviceLaneEvents[0]).length === 0 && serviceLaneVars(serviceLaneEvents[0]).size === 0 && serviceLaneEvents[0].frame.held.length === 0 && serviceLaneEvents[0].frame.output.length === 0);
+ok('ADD_BACK places Request A at both ends', serviceLaneItems(serviceLaneEvents[1]).join('|') === 'Request A' && serviceLaneVars(serviceLaneEvents[1]).front === 'A' && serviceLaneVars(serviceLaneEvents[1]).back === 'A');
+ok('second ADD_BACK preserves Request A then Request B', serviceLaneItems(serviceLaneEvents[2]).join('|') === 'Request A|Request B' && serviceLaneVars(serviceLaneEvents[2]).front === 'A' && serviceLaneVars(serviceLaneEvents[2]).back === 'B');
+ok('ADD_FRONT is the explicit operation that places Urgent U ahead of routine requests', serviceLaneItems(serviceLaneEvents[3]).join('|') === 'URGENT U|Request A|Request B' && serviceLaneVars(serviceLaneEvents[3]).front === 'U' && serviceLaneVars(serviceLaneEvents[3]).back === 'B' && serviceLaneEvents[3].frame.operation.label === 'ADD_FRONT U');
+ok('REMOVE_FRONT serves Urgent U and leaves Request A then Request B', serviceLaneItems(serviceLaneEvents[4]).join('|') === 'Request A|Request B' && serviceLaneEvents[4].frame.held.some((item) => item.label === 'served' && item.value === 'URGENT U') && serviceLaneEvents[4].frame.output.join('|') === 'Served U' && serviceLaneVars(serviceLaneEvents[4]).front === 'A' && serviceLaneVars(serviceLaneEvents[4]).back === 'B');
+ok('REMOVE_BACK cancels the current BACK while preserving Request A and served output', serviceLaneItems(serviceLaneEvents[5]).join('|') === 'Request A' && serviceLaneEvents[5].frame.operation.label === 'REMOVE_BACK' && serviceLaneEvents[5].frame.held.some((item) => item.label === 'cancelled' && item.value === 'Request B') && serviceLaneEvents[5].frame.output.join('|') === 'Served U|Cancelled B' && serviceLaneVars(serviceLaneEvents[5]).front === 'A' && serviceLaneVars(serviceLaneEvents[5]).size === 1);
+ok('RETURN exposes only Request A and the no-automatic-priority policy', serviceLaneItems(serviceLaneEvents[6]).join('|') === 'Request A' && serviceLaneVars(serviceLaneEvents[6]).front === 'A' && serviceLaneVars(serviceLaneEvents[6]).back === 'A' && serviceLaneActivity.run().result.remaining.join('|') === 'A' && serviceLaneEvents[6].frame.markers.teaching.comparison?.text === 'routine relative order preserved' && fs.readFileSync(path.join(ROOT, 'visualizer-src', 'priority-service-lane.jsx'), 'utf8').includes('No automatic priority sorting. Operations determine placement.'));
+const serviceLaneController = Playback.createController();
+serviceLaneController.load(serviceLaneEvents, 4);
+serviceLaneController.step(1);
+serviceLaneController.step(-1);
+const serviceLanePrevious = serviceLaneController.getState().currentEvent;
+serviceLaneController.seek(0);
+ok('service lane Previous restores state 5 exactly and Restart restores the empty first state', serviceLanePrevious === serviceLaneEvents[4] && serviceLaneItems(serviceLanePrevious).join('|') === 'Request A|Request B' && serviceLanePrevious.frame.output.join('|') === 'Served U' && serviceLaneController.getState().index === 0 && serviceLaneItems(serviceLaneController.getState().currentEvent).length === 0);
+serviceLaneController.dispose();
 ok('monotonic deque returns both window maxima', Activities.get('deque-sliding-window').run().result.maxima.join(',') === '12,12');
+const slidingWindowActivity = Activities.get('deque-sliding-window');
+const slidingWindowEvents = slidingWindowActivity.run().events;
+const slidingWindowItems = (event) => event.frame.lanes[0].items.map((item) => item.id);
+ok('sliding-window storyboard has 11 execution events and 12 synchronized source lines', slidingWindowEvents.length === 11 && slidingWindowActivity.source.length === 12 && slidingWindowEvents.map((event) => event.source.line).join(',') === '1,7,3,7,3,5,3,7,3,7,11');
+ok('manual stepping exposes 4/11 with both candidate indices', slidingWindowItems(slidingWindowEvents[3]).join(',') === 'v4,v2' && slidingWindowEvents[3].frame.presentation.index === 1 && slidingWindowEvents[3].frame.presentation.operationLabel === 'ADD_BACK i1');
+ok('5/11 keeps both candidates while testing 2 <= 12 as TRUE', slidingWindowItems(slidingWindowEvents[4]).join(',') === 'v4,v2' && slidingWindowEvents[4].frame.markers.teaching.comparison.text === '2 ≤ 12' && slidingWindowEvents[4].frame.markers.teaching.comparison.outcome === true && slidingWindowEvents[4].frame.presentation.removeId === 'v2');
+ok('6/11 removes i1 and stages it as dominated by 12', slidingWindowItems(slidingWindowEvents[5]).join(',') === 'v4' && slidingWindowEvents[5].frame.held[0].value === '2 · i1' && slidingWindowEvents[5].source.line === 5);
+ok('7/11 repeats the WHILE comparison against 4 <= 12', slidingWindowItems(slidingWindowEvents[6]).join(',') === 'v4' && slidingWindowEvents[6].frame.markers.teaching.comparison.text === '4 ≤ 12' && slidingWindowEvents[6].frame.markers.teaching.comparison.outcome === true);
+ok('8/11 adds i2 as sole candidate and emits the first maximum', slidingWindowItems(slidingWindowEvents[7]).join(',') === 'v12' && slidingWindowEvents[7].frame.output.join(',') === '12');
+ok('9/11 slides to window 1...3 and keeps 12 against 3', slidingWindowEvents[8].frame.presentation.index === 3 && slidingWindowEvents[8].frame.markers.teaching.comparison.text === '12 ≤ 3' && slidingWindowEvents[8].frame.markers.teaching.comparison.outcome === false && slidingWindowEvents[8].frame.output.join(',') === '12');
+ok('10/11 retains [12/i2, 3/i3] and emits [12, 12]', slidingWindowItems(slidingWindowEvents[9]).join(',') === 'v12,v3' && slidingWindowEvents[9].frame.output.join(',') === '12,12');
+ok('11/11 completes with the requested maxima and candidate deque', slidingWindowItems(slidingWindowEvents[10]).join(',') === 'v12,v3' && slidingWindowEvents[10].frame.output.join(',') === '12,12' && slidingWindowEvents[10].frame.presentation.operationLabel === 'Final output');
+const slidingWindowController = Playback.createController();
+slidingWindowController.load(slidingWindowEvents);
+slidingWindowController.step(1); slidingWindowController.step(1); slidingWindowController.step(1);
+const slidingWindowFourthState = slidingWindowController.getState().currentEvent;
+slidingWindowController.step(1); slidingWindowController.step(-1);
+ok('Previous returns from 5/11 to the independently represented 4/11 snapshot', slidingWindowController.getState().currentEvent === slidingWindowFourthState && slidingWindowController.getState().currentEvent.frame.lanes[0].items.map((item) => item.id).join(',') === 'v4,v2');
+slidingWindowController.seek(0);
+ok('Restart returns to the empty deque at 1/11', slidingWindowController.getState().index === 0 && slidingWindowController.getState().currentEvent.source.line === 1 && slidingWindowController.getState().currentEvent.frame.lanes[0].items.length === 0);
+slidingWindowController.dispose();
 const materialsPage = fs.readFileSync(path.join(ROOT,'student-materials.html'),'utf8');
 ok('former materials route is a metadata-free practice redirect', /problems\.html/.test(materialsPage) && !/curriculum\.data|student-bundles|laborator|project/i.test(materialsPage));
 ok('offline delivery excludes bundle metadata and downloads', !listed.some((asset)=>/student-bundles|student-materials\.js/.test(asset)) && !swSource.includes('student-bundles/'));

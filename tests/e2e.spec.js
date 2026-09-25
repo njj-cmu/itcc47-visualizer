@@ -1387,8 +1387,14 @@ for (const moduleNumber of [1, 2, 3, 4]) {
         await expect(page.locator('#code-box')).toBeVisible();
       }
       if (resource.kind === 'activity') {
-        await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
-        await expect(page.locator(resource.id.startsWith('industry-') ? '.industry-workbench' : '.visualizer-workspace')).toBeVisible();
+        if (resource.id === 'deque-sliding-window') {
+          await expect(page.locator('.sliding-window-app')).toBeVisible();
+          await expect(page.locator('.sw-footer')).toBeVisible();
+          await expect(page.locator('.sw-footer').getByRole('button', { name: 'Step', exact: true })).toBeVisible();
+        } else {
+          await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
+          await expect(page.locator(resource.id.startsWith('industry-') ? '.industry-workbench' : '[data-activity-workbench]')).toBeVisible();
+        }
       }
     }
   });
@@ -2708,15 +2714,53 @@ test('postfix phases animate real values and run from offline file URLs', async 
   await expect(page.getByRole('region', { name: 'Program Output', exact: true }).locator('.postfix-value')).toHaveText('21');
 });
 
-test('deque foundation names both ends and changes state line by line', async ({ page }) => {
+test('deque foundation names both ends and keeps playback, source, and output synchronized', async ({ page }) => {
+  test.setTimeout(60000);
   await page.goto('/visualizer.html?activity=deque-end-operations');
+  const workbench = page.getByRole('region', { name: 'Activity workbench' });
+  const progress = page.locator('.integrated-step strong');
+  const step = page.getByRole('button', { name: 'Step', exact: true });
+  const previous = page.getByRole('button', { name: 'Previous', exact: true });
+  const restart = page.getByRole('button', { name: 'Restart', exact: true });
+  const source = page.locator('.source-line.is-current');
+  const items = page.locator('.linear-lane .linear-item > strong');
+  const output = page.locator('.linear-output strong');
   await expect(page.getByRole('heading', { name: 'Use both ends of a deque' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Practice this module' })).toHaveAttribute('href', /problem-list\.html\?module=4$/);
   await expect(page.locator('.linear-end-label.end-front')).toContainText('front');
   await expect(page.locator('.linear-end-label.end-back')).toContainText('back');
-  await page.getByRole('button', { name: 'Step' }).click();
-  await expect(page.locator('.linear-item')).toContainText('A');
-  await expect(page.locator('.source-line.is-current')).toContainText('ADD_BACK deque, A');
+  await expect(workbench).toHaveAttribute('data-activity-id', 'deque-end-operations');
+  const expected = [
+    { line: 1, items: [], output: '—' },
+    { line: 2, items: ['A'], output: '—' },
+    { line: 3, items: ['A', 'B'], output: '—' },
+    { line: 4, items: ['VIP', 'A', 'B'], output: '—' },
+    { line: 5, items: ['VIP', 'A'], output: '—' },
+    { line: 6, items: ['A'], output: 'B · VIP' },
+    { line: 7, items: ['A'], output: 'B · VIP' },
+  ];
+  for (const [index, state] of expected.entries()) {
+    if (index) await step.click();
+    await expect(progress).toHaveText(`${index + 1} / 7`);
+    await expect(source.locator('> span')).toHaveText(String(state.line));
+    await expect(items).toHaveText(state.items);
+    await expect(output).toHaveText(state.output);
+  }
+  await previous.click();
+  await expect(progress).toHaveText('6 / 7');
+  await expect(source.locator('> span')).toHaveText('6');
+  await expect(items).toHaveText(['A']);
+  await expect(output).toHaveText('B · VIP');
+  await restart.click();
+  await expect(progress).toHaveText('1 / 7');
+  await expect(source.locator('> span')).toHaveText('1');
+  await expect(items).toHaveCount(0);
+  await expect(output).toHaveText('—');
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  await expect(progress).toHaveText('7 / 7', { timeout: 15000 });
+  await expect(source.locator('> span')).toHaveText('7');
+  await expect(items).toHaveText(['A']);
+  await expect(output).toHaveText('B · VIP');
 });
 
 test('public release opens the six-problem Module 3 practice bank', async ({ page }, testInfo) => {
@@ -3961,6 +4005,12 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
 });
 
 test('cached navigation remains available offline', async ({ page, context }, testInfo) => {
+  await page.goto('/visualizer.html?activity=deque-service-lane');
+  await expect(page.getByRole('heading', { name: 'Priority service lane' })).toBeVisible();
+  await page.locator('.psl-settings summary').click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Download for offline use' }).click();
+  await expect(page.locator('.psl-settings [role="status"]')).toContainText('Saved for offline use');
   await page.goto('/index.html');
   await page.evaluate(async () => {
     if ('serviceWorker' in navigator) await navigator.serviceWorker.ready;
@@ -4009,4 +4059,221 @@ test('service-worker updates remove only obsolete practice caches', async ({ pag
   await page.evaluate(async () => { await navigator.serviceWorker.ready; });
   await expect.poll(() => page.evaluate(async () => await caches.keys())).toContain('another-app-cache');
   expect(await page.evaluate(async () => (await caches.keys()).includes('itcc47-practice-obsolete'))).toBe(false);
+});
+
+test('priority service lane matches all seven frames and preserves playback behavior', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop', 'The seven storyboard captures use the 1920 × 1080 desktop viewport.');
+  test.setTimeout(60000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.goto('/visualizer.html?activity=deque-service-lane');
+  const app = page.getByTestId('priority-service-lane-app');
+  await expect(page).toHaveURL(/visualizer\.html\?activity=deque-service-lane$/);
+  await expect(page).toHaveTitle('Priority service lane · ITCC47 Learning Lab');
+  await expect(page.getByRole('heading', { name: 'Priority service lane', level: 1 })).toBeVisible();
+  await expect(app).toBeVisible();
+  await expect(page.locator('.psl-pseudocode li')).toHaveCount(7);
+  await expect(page.getByText('No automatic priority sorting. Operations determine placement.', { exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link')).toHaveCount(6);
+
+  const expected = [
+    { operation: 'Initialize service lane', lane: [], micro: 'Create lane' },
+    { operation: 'ADD_BACK Request A', lane: ['Request A'], micro: 'Add request' },
+    { operation: 'ADD_BACK Request B', lane: ['Request A', 'Request B'], micro: 'Add request' },
+    { operation: 'ADD_FRONT Urgent U', lane: ['Urgent U', 'Request A', 'Request B'], micro: 'Add at FRONT' },
+    { operation: 'REMOVE_FRONT / Serve next', lane: ['Request A', 'Request B'], micro: 'Store served' },
+    { operation: 'REMOVE_BACK / Cancel newest routine', lane: ['Request A'], micro: 'Store cancelled' },
+    { operation: 'RETURN [Request A]', lane: ['Request A'], micro: 'Complete' },
+  ];
+  const filenames = [
+    '01-initial-empty-lane.png', '02-add-back-request-a.png', '03-add-back-request-b.png',
+    '04-add-front-urgent-u.png', '05-serve-urgent-front.png', '06-cancel-request-b-back.png', '07-final-lane-a.png',
+  ];
+  for (let index = 0; index < expected.length; index += 1) {
+    const step = index + 1;
+    await expect(app).toHaveAttribute('data-state-index', String(step));
+    await expect(page.locator('.psl-operation h2')).toHaveText(expected[index].operation);
+    await expect(page.locator('.psl-pseudocode li.is-current > span')).toHaveText(String(step));
+    await expect(page.locator('.psl-microsteps li.is-active strong')).toHaveText(expected[index].micro);
+    await expect(page.locator('.psl-lane-track .psl-request strong')).toHaveText(expected[index].lane);
+    await expect(page.locator('.psl-footer')).toContainText(`Step ${step} of 7`);
+    await expect(page.locator('.psl-program')).toBeVisible();
+    await expect(page.locator('.psl-status')).toBeVisible();
+    await expect(page.locator('.psl-policy-warning')).toBeVisible();
+    if (step >= 5) await expect(page.locator('.psl-handled-list .is-served strong')).toHaveText('Urgent U');
+    if (step >= 6) await expect(page.locator('.psl-handled-list .is-cancelled strong')).toHaveText('Request B');
+    if (step === 4) await expect(page.locator('.psl-urgent-entry')).toContainText('Urgent U');
+    if (step === 7) await expect(page.getByRole('button', { name: 'Complete' })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath(`priority-service-lane-${filenames[index]}`), animations: 'disabled' });
+    if (step < 7) await page.locator('.psl-transport').getByRole('button', { name: 'Step', exact: true }).click();
+  }
+
+  await page.locator('.psl-transport').getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(app).toHaveAttribute('data-state-index', '6');
+  await expect(page.locator('.psl-lane-track .psl-request strong')).toHaveText(['Request A']);
+  await page.locator('.psl-transport').getByRole('button', { name: 'Restart', exact: true }).click();
+  await expect(app).toHaveAttribute('data-state-index', '1');
+  await page.getByRole('button', { name: 'Play' }).click();
+  await expect(app).toHaveAttribute('data-state-index', '7', { timeout: 15000 });
+  await expect(page.locator('.psl-lane-track .psl-request strong')).toHaveText(['Request A']);
+  const settings = page.locator('.psl-settings');
+  await settings.locator('summary').click();
+  await settings.getByLabel('Speed').selectOption('9');
+  await expect(settings.getByLabel('Speed')).toHaveValue('9');
+  await settings.getByLabel('Motion preference').selectOption('reduced');
+  await expect(settings.getByLabel('Motion preference')).toHaveValue('reduced');
+  let packConfirmation = '';
+  page.once('dialog', async (dialog) => { packConfirmation = dialog.message(); await dialog.dismiss(); });
+  await settings.getByRole('button', { name: 'Download for offline use' }).click();
+  await expect(settings.getByRole('status')).toHaveText('Download canceled.');
+  expect(packConfirmation).toContain('Download Priority service lane for offline use?');
+  await page.getByRole('button', { name: 'Service lane help' }).click();
+  await expect(page.getByRole('dialog', { name: 'How this service lane works' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close help' }).click();
+  await page.getByRole('button', { name: 'Focus pseudocode' }).click();
+  await expect(page.locator('.psl-pseudocode')).toBeFocused();
+  expect(pageErrors).toEqual([]);
+  const overflow = await page.evaluate(() => ({
+    document: document.documentElement.scrollWidth,
+    viewport: window.innerWidth,
+    body: document.body.scrollWidth,
+  }));
+  expect(overflow.document).toBeLessThanOrEqual(overflow.viewport);
+  expect(overflow.body).toBeLessThanOrEqual(overflow.viewport);
+});
+
+test('priority service lane remains usable on a phone viewport', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'The responsive check uses the phone viewport.');
+  await page.goto('/visualizer.html?activity=deque-service-lane');
+  const app = page.getByTestId('priority-service-lane-app');
+  await expect(app).toHaveAttribute('data-state-index', '1');
+  await expect(page.getByRole('heading', { name: 'Priority service lane', level: 1 })).toBeVisible();
+  await page.locator('.psl-transport').getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(app).toHaveAttribute('data-state-index', '2');
+  await expect(page.locator('.psl-lane-track .psl-request strong')).toHaveText(['Request A']);
+  const dimensions = await page.evaluate(() => ({
+    document: document.documentElement.scrollWidth,
+    viewport: window.innerWidth,
+    viewportHeight: window.innerHeight,
+    footerBottom: document.querySelector('.psl-footer').getBoundingClientRect().bottom,
+  }));
+  expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
+  expect(dimensions.footerBottom).toBeLessThanOrEqual(dimensions.viewportHeight);
+});
+
+test('sliding-window maximum renders and controls all eleven synchronized states', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'laptop', 'The storyboard captures use the 1920 × 1080 desktop viewport.');
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto('/visualizer.html?activity=deque-sliding-window');
+  const app = page.getByTestId('sliding-window-app');
+  await expect(app).toHaveAttribute('data-state-index', '1');
+  await expect(page.locator('.sw-source-list li')).toHaveCount(12);
+  await expect(page.getByRole('navigation', { name: 'Primary navigation' }).getByRole('link')).toHaveCount(6);
+
+  const expectedOperations = [
+    'Initialize candidate deque', 'Add index 0 to BACK', 'Compare BACK with incoming 2', 'Add index 1 to BACK',
+    'Compare BACK 2 with incoming 12', 'Remove dominated BACK candidate', 'Repeat comparison: 4 vs 12',
+    'Add 12, then emit the first maximum', 'Compare BACK 12 with incoming 3', 'Add 3 and emit the second maximum',
+    'Final maxima complete',
+  ];
+  const expectedSourceLines = [1, 7, 3, 7, 3, 5, 3, 7, 3, 7, 11];
+  const expectedInputFacts = [
+    ['i0 → 4', '0...0', '—', '—'],
+    ['i0 → 4', '0...0', '4 · i0', '4 · i0'],
+    ['i1 → 2', '0...1', '4 · i0', '4 · i0'],
+    ['i1 → 2', '0...1', '4 · i0', '2 · i1'],
+    ['i2 → 12', '0...2', '4 · i0', '2 · i1'],
+    ['i2 → 12', '0...2', '4 · i0', '4 · i0'],
+    ['i2 → 12', '0...2', '4 · i0', '4 · i0'],
+    ['i2 → 12', '0...2', '12 · i2', '12 · i2'],
+    ['i3 → 3', '1...3', '12 · i2', '12 · i2'],
+    ['i3 → 3', '1...3', '12 · i2', '3 · i3'],
+    ['i3 → 3', '1...3', '12 · i2', '3 · i3'],
+  ];
+  const expectedDequeItems = ['', 'v4', 'v4', 'v4,v2', 'v4,v2', 'v4', 'v4', 'v12', 'v12', 'v12,v3', 'v12,v3'];
+  const expectedOutputs = ['', '', '', '', '', '', '', '12', '12', '12,12', '12,12'];
+  const currentIndexes = [0, 0, 1, 1, 2, 2, 2, 2, 3, 3, 3];
+  const windowRanges = [[0, 0], [0, 0], [0, 1], [0, 1], [0, 2], [0, 2], [0, 2], [0, 2], [1, 3], [1, 3], [1, 3]];
+  for (let step = 1; step <= 11; step++) {
+    await expect(app).toHaveAttribute('data-state-index', String(step));
+    await expect(page.getByRole('heading', { name: expectedOperations[step - 1], exact: true })).toBeVisible();
+    await expect(page.locator('.sw-phase-list li')).toHaveCount(4);
+    await expect(page.locator('.sw-source-list li.is-current > span')).toHaveText(String(expectedSourceLines[step - 1]));
+    await expect(page.getByTestId('input-window')).toHaveAttribute('data-window-range', expectedInputFacts[step - 1][1]);
+    await expect(page.getByTestId('candidate-deque')).toHaveAttribute('data-deque-items', expectedDequeItems[step - 1]);
+    await expect(page.getByTestId('output')).toHaveAttribute('data-output', expectedOutputs[step - 1]);
+    expect(await page.getByTestId('input-window').locator('.sw-input-facts dd').allTextContents()).toEqual(expectedInputFacts[step - 1]);
+    expect(await page.locator('.sw-array-cell').evaluateAll((cells) => cells.map((cell) => cell.getAttribute('data-in-window')))).toEqual(
+      [0, 1, 2, 3].map((index) => String(index >= windowRanges[step - 1][0] && index <= windowRanges[step - 1][1]))
+    );
+    await expect(page.locator('.sw-array-cell.is-current')).toHaveCount(1);
+    await expect(page.locator('.sw-array-cell.is-current')).toHaveAttribute('aria-label', `index ${currentIndexes[step - 1]}, value ${expectedInputFacts[step - 1][0].split(' → ')[1]}, current`);
+    if (step === 1) await expect(page.locator('.sw-deque-empty')).toContainText('indices will enter from BACK');
+    await page.screenshot({ path: testInfo.outputPath(`sliding-window-${String(step).padStart(2, '0')}.png`), animations: 'disabled' });
+    if (step === 4) {
+      await expect(page.locator('.sw-source-list li.is-current > span')).toHaveText('7');
+      await expect(page.getByTestId('candidate-deque')).toHaveAttribute('data-deque-items', 'v4,v2');
+      await expect(page.getByTestId('input-window')).toHaveAttribute('data-window-range', '0...1');
+    }
+    if (step === 5) {
+      await expect(page.getByTestId('comparison')).toHaveAttribute('data-comparison', '2 ≤ 12 = TRUE');
+      await expect(page.locator('[data-deque-item="v2"]')).toHaveClass(/is-remove/);
+    }
+    if (step === 6) {
+      await expect(page.getByTestId('candidate-deque')).toHaveAttribute('data-deque-items', 'v4');
+      await expect(page.locator('.sw-discarded-item')).toContainText('2 · i1');
+    }
+    if (step === 7) await expect(page.getByTestId('comparison')).toHaveAttribute('data-comparison', '4 ≤ 12 = TRUE');
+    if (step === 8) {
+      await expect(page.getByTestId('candidate-deque')).toHaveAttribute('data-deque-items', 'v12');
+      await expect(page.getByTestId('output')).toHaveAttribute('data-output', '12');
+    }
+    if (step === 9) {
+      await expect(page.getByTestId('input-window')).toHaveAttribute('data-window-range', '1...3');
+      await expect(page.getByTestId('comparison')).toHaveAttribute('data-comparison', '12 ≤ 3 = FALSE');
+      await expect(page.locator('.sw-array-cell').nth(0)).toHaveAttribute('data-in-window', 'false');
+      await expect(page.getByTestId('window-outline')).toBeVisible();
+    }
+    if (step === 10) {
+      await expect(page.getByTestId('candidate-deque')).toHaveAttribute('data-deque-items', 'v12,v3');
+      await expect(page.getByTestId('output')).toHaveAttribute('data-output', '12,12');
+    }
+    if (step === 11) {
+      await expect(page.locator('.sw-source-list li.is-current > span')).toHaveText('11');
+      await expect(page.getByTestId('output')).toHaveAttribute('data-output', '12,12');
+      await expect(page.getByTestId('candidate-deque')).toHaveAttribute('data-deque-items', 'v12,v3');
+    }
+    if (step < 11) await page.getByRole('button', { name: 'Step', exact: true }).click();
+  }
+
+  await page.getByRole('button', { name: 'Previous' }).click();
+  await expect(app).toHaveAttribute('data-state-index', '10');
+  await page.getByRole('button', { name: 'Restart', exact: true }).click();
+  await expect(app).toHaveAttribute('data-state-index', '1');
+  await page.locator('.sw-settings summary').click();
+  await page.locator('.sw-settings-popover label').filter({ hasText: 'Speed' }).locator('select').selectOption('9');
+  await page.getByRole('button', { name: 'Play' }).click();
+  await expect(app).toHaveAttribute('data-state-index', '11', { timeout: 10000 });
+  await expect(page.getByTestId('output')).toHaveAttribute('data-output', '12,12');
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Download for offline use' }).click();
+  await expect(page.locator('.sw-pack-status')).toContainText('Saved for offline use');
+  const packFiles = await page.evaluate(async () => {
+    const manifest = await (await fetch('activity-packs/manifest.json')).json();
+    const cache = await caches.open(manifest.cacheName);
+    return (await cache.keys()).length;
+  });
+  expect(packFiles).toBe(3);
+});
+
+test('sliding-window maximum stays within a phone viewport and keeps step controls usable', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'Mobile layout coverage runs in the phone project.');
+  await page.goto('/visualizer.html?activity=deque-sliding-window');
+  await expect(page.getByTestId('sliding-window-app')).toHaveAttribute('data-state-index', '1');
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(page.getByTestId('sliding-window-app')).toHaveAttribute('data-state-index', '2');
+  await page.getByRole('button', { name: 'Previous' }).click();
+  await expect(page.getByTestId('sliding-window-app')).toHaveAttribute('data-state-index', '1');
 });

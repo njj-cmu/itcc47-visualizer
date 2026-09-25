@@ -4104,7 +4104,12 @@ test('priority service lane matches all seven frames and preserves playback beha
     if (step >= 5) await expect(page.locator('.psl-handled-list .is-served strong')).toHaveText('Urgent U');
     if (step >= 6) await expect(page.locator('.psl-handled-list .is-cancelled strong')).toHaveText('Request B');
     if (step === 4) await expect(page.locator('.psl-urgent-entry')).toContainText('Urgent U');
-    if (step === 7) await expect(page.getByRole('button', { name: 'Complete' })).toBeVisible();
+    if (step === 7) {
+      await expect(page.getByRole('button', { name: 'Complete' })).toBeVisible();
+      await expect(page.locator('.psl-program .tone-served')).toHaveText('Urgent U');
+      await expect(page.locator('.psl-program .tone-cancelled')).toHaveText('Request B');
+      await expect(page.locator('.psl-program .tone-return')).toHaveText('[Request A]');
+    }
     await page.screenshot({ path: testInfo.outputPath(`priority-service-lane-${filenames[index]}`), animations: 'disabled' });
     if (step < 7) await page.locator('.psl-transport').getByRole('button', { name: 'Step', exact: true }).click();
   }
@@ -4117,6 +4122,9 @@ test('priority service lane matches all seven frames and preserves playback beha
   await page.getByRole('button', { name: 'Play' }).click();
   await expect(app).toHaveAttribute('data-state-index', '7', { timeout: 15000 });
   await expect(page.locator('.psl-lane-track .psl-request strong')).toHaveText(['Request A']);
+  await expect(page.locator('.psl-program .tone-served')).toHaveText('Urgent U');
+  await expect(page.locator('.psl-program .tone-cancelled')).toHaveText('Request B');
+  await expect(page.locator('.psl-program .tone-return')).toHaveText('[Request A]');
   const settings = page.locator('.psl-settings');
   await settings.locator('summary').click();
   await settings.getByLabel('Speed').selectOption('9');

@@ -6,7 +6,7 @@
 <title>ITCC47 Problem Practice</title>
 <link rel="stylesheet" href="styles.css">
 </head>
-<body class="app-fixed" data-course="itcc47">
+<body class="app-fixed practice-page" data-course="itcc47">
 
 <header class="topbar">
   <div class="topbar-title">
@@ -79,8 +79,11 @@
         </div>
       </div>
 
-      <textarea id="code-box" class="code-box code-editor" spellcheck="false" rows="14"
-        placeholder="Choose a problem to start writing." aria-label="Problem solution pseudocode"></textarea>
+      <div class="numbered-editor">
+        <div class="editor-line-numbers" aria-hidden="true"><pre></pre></div>
+        <textarea id="code-box" class="code-box code-editor" data-line-numbers spellcheck="false" wrap="off" rows="14"
+          placeholder="Choose a problem to start writing." aria-label="Problem solution pseudocode"></textarea>
+      </div>
 
       <div id="draft-recovery" class="draft-recovery hidden"></div>
 
@@ -92,7 +95,7 @@
         <h2 class="panel-title">Results</h2>
         <span id="results-score" class="results-score">not checked yet</span>
       </div>
-      <div id="results-body" class="results-body muted" aria-live="polite">
+      <div id="results-body" class="results-body muted" role="region" aria-label="Check results" tabindex="0" aria-live="polite">
         Write your answer, then press <strong>Run Checks</strong>. Your pseudocode is run against
         every test case, including some you cannot see.
       </div>

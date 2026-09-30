@@ -23,7 +23,7 @@
           const record = stored.records?.[problem.id];
           if (record?.contentVersion === problem.contentVersion) progress.set(problem.id, {
             complete: Boolean(record.completed),
-            draft: typeof record.draft === 'string' && record.draft.length > 0,
+            draft: typeof record.draft === 'string' && record.draft.trim().length > 0 && record.draft !== problem.starter,
           });
         });
         return progress;
@@ -32,7 +32,7 @@
       const drafts = JSON.parse(localStorage.getItem('itcc47.problems.code.v1') || '{}') || {};
       PROBLEMS.forEach((problem) => progress.set(problem.id, {
         complete: Boolean(solved[problem.id]),
-        draft: Object.prototype.hasOwnProperty.call(drafts, problem.id),
+        draft: typeof drafts[problem.id] === 'string' && drafts[problem.id].trim().length > 0 && drafts[problem.id] !== problem.starter,
       }));
     } catch { /* Practice storage is optional. */ }
     return progress;

@@ -27,7 +27,7 @@
       const release = ITCC47Curriculum.stateForResource('problem', problem.id, releaseOptions);
       const open = ['available', 'current'].includes(release.state);
       const complete = Boolean(solved[problem.id]);
-      const hasDraft = typeof drafts[problem.id] === 'string' && drafts[problem.id].length > 0;
+      const hasDraft = typeof drafts[problem.id] === 'string' && drafts[problem.id].trim().length > 0 && drafts[problem.id] !== problem.starter;
       const difficultyClass = `diff-${problem.difficulty.toLowerCase().replace(/[^a-z]/g, '')}`;
       const article = document.createElement('article'); article.className = `problem-choice problem-choice-${release.state}`;
       article.innerHTML = `<div class="problem-choice-number" aria-hidden="true">${String(index + 1).padStart(2, '0')}</div>

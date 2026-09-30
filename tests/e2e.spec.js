@@ -3924,15 +3924,127 @@ test('problem work tabs reach code and results on a phone', async ({ page }, tes
   await expect(page.locator('#results-body')).toBeVisible();
 });
 
-test('problem selector reports local drafts accurately and clears only practice records after confirmation', async ({ browser }) => {
-  const context = await browser.newContext({ serviceWorkers: 'block' });
+test('practice editor keeps its gutter synchronized and results reflect only the current code', async ({ page }) => {
+  await page.goto('/practice.html?module=4&problem=queue-service');
+  const code = page.locator('#code-box');
+  const openCode = async () => { const tab = page.getByRole('tab', { name: 'Code', exact: true }); if (await tab.isVisible()) await tab.click(); };
+  await openCode();
+  await expect(page.locator('#btn-check')).toBeEnabled();
+  const starter = await code.inputValue();
+  const gutter = page.locator('.editor-line-numbers pre');
+  expect(await gutter.textContent()).toBe(starter.split('\n').map((_, index) => index + 1).join('\n'));
+  await page.locator('#btn-check').click();
+  await expect(page.locator('#results-score')).toHaveText('0/6 checks passed');
+  await expect(page.locator('.case-actual code')).toHaveText(['(no output)', '(no output)']);
+  await expect(page.locator('.case')).toHaveCount(2);
+  await expect(page.locator('.hidden-pill')).toHaveCount(4);
+  await openCode();
+  const manyLines = Array.from({ length: 80 }, (_, index) => `WRITE ${index}`).join('\n');
+  await code.fill(manyLines);
+  await expect(page.locator('#results-score')).toHaveText('Not checked yet');
+  await expect(page.locator('.case')).toHaveCount(0);
+  await code.press('Control+End');
+  await expect.poll(() => code.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  expect(await gutter.textContent()).toBe(Array.from({ length: 80 }, (_, index) => index + 1).join('\n'));
+  expect(await code.evaluate(element => {
+    const numbers = document.querySelector('.editor-line-numbers pre');
+    return { lineHeight: getComputedStyle(element).lineHeight === getComputedStyle(numbers).lineHeight, offset: Math.abs(new DOMMatrix(getComputedStyle(numbers).transform).m42 + element.scrollTop) < 1 };
+  })).toEqual({ lineHeight: true, offset: true });
+  await code.fill('WRITE (');
+  await page.locator('#btn-check').click();
+  await expect(page.locator('#results-score')).toHaveText('could not run');
+  await expect(page.locator('.case')).toHaveCount(0);
+  await openCode();
+  page.once('dialog', dialog => dialog.accept());
+  await page.locator('#btn-reset').click();
+  await expect(code).toHaveValue(starter);
+  await expect(page.locator('#results-score')).toHaveText('Not checked yet');
+  expect(await gutter.textContent()).toBe(starter.split('\n').map((_, index) => index + 1).join('\n'));
+});
+
+test('architecture section tabs retain answers and feedback and expose all seven source checks', async ({ page }) => {
+  await page.goto('/computer-architecture-practice.html');
+  const first = page.locator('[data-question-id="fetch-order"]');
+  await first.getByRole('button', { name: 'Check answer' }).click();
+  await expect(first.locator('.ca-practice-feedback')).toBeHidden();
+  await first.locator('input[value="1"]').check();
+  await first.getByRole('button', { name: 'Check answer' }).click();
+  await expect(first.locator('.ca-practice-feedback')).toContainText('Not quite.');
+  await page.getByRole('tab', { name: 'Decode', exact: true }).click();
+  await expect(first).toBeHidden();
+  await page.getByRole('tab', { name: 'Decode', exact: true }).press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Execute', exact: true })).toBeFocused();
+  await page.getByRole('tab', { name: 'Execute', exact: true }).press('Home');
+  await expect(first.locator('input[value="1"]')).toBeChecked();
+  await expect(first.locator('.ca-practice-feedback')).toContainText('Not quite.');
+  const questions = await page.evaluate(() => ComputerArchitecturePractice.QUESTIONS.map(({ id, section, answer }) => ({ id, section, answer })));
+  for (const question of questions) {
+    await page.locator(`#tab-${question.section}`).click();
+    const card = page.locator(`[data-question-id="${question.id}"]`);
+    await card.locator(`input[value="${question.answer}"]`).check();
+    await card.getByRole('button', { name: 'Check answer' }).click();
+    await expect(card.locator('.ca-practice-feedback')).toContainText('Correct.');
+  }
+  await expect(page.locator('#ca-practice-progress')).toHaveText('7 / 7 complete');
+  await page.reload();
+  await expect(page.locator('#ca-practice-progress')).toHaveText('7 / 7 complete');
+});
+
+test('networking group navigation retains responses while all six checks remain reachable', async ({ page }) => {
+  await page.goto('/computer-networking-practice.html');
+  const first = page.locator('[data-question-id="identify-network-roles"]');
+  await expect(first.locator('input:checked')).toHaveCount(0);
+  await first.locator('input[value="1"]').check();
+  await first.getByRole('button', { name: 'Check answer' }).click();
+  await expect(first.locator('.net-practice-feedback')).toContainText('Not quite.');
+  await page.locator('[data-question="compare-topology-views"]').click();
+  await expect(first.locator('form')).toBeHidden();
+  await first.locator('.net-question-summary').click();
+  await expect(first.locator('input[value="1"]')).toBeChecked();
+  await expect(first.locator('.net-practice-feedback')).toContainText('Not quite.');
+  const questions = await page.evaluate(() => ComputerNetworkingPractice.QUESTIONS.map(({ id, answer }) => ({ id, answer })));
+  for (const question of questions) {
+    await page.locator(`[data-question="${question.id}"]`).click();
+    const card = page.locator(`[data-question-id="${question.id}"]`);
+    await card.locator(`input[value="${question.answer}"]`).check();
+    await card.getByRole('button', { name: 'Check answer' }).click();
+    await expect(card.locator('.net-practice-feedback')).toContainText('Correct.');
+  }
+  await expect(page.locator('#network-practice-progress')).toHaveText('6 / 6 complete');
+  await page.reload();
+  await expect(page.locator('#network-practice-progress')).toHaveText('6 / 6 complete');
+});
+
+test('lesson rail reaches every original section and copies the actual Python example', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/lesson.html?checkpoint=m3-linked-foundations&preview=1');
+  const content = await page.evaluate(() => ITCC47CheckpointCompanions.get('m3-linked-foundations'));
+  await expect(page.locator('.companion-invariants li')).toHaveCount(content.invariants.length);
+  await page.locator('.companion-misconceptions summary').click();
+  await expect(page.locator('.companion-misconceptions li')).toHaveCount(content.misconceptions.length);
+  for (const text of [...content.invariants, ...content.misconceptions]) await expect(page.locator('.lesson-companion')).toContainText(text);
+  await expect(page.locator('.companion-trace tbody tr')).toHaveCount(content.workedTrace.length);
+  await expect(page.locator('.companion-self-check details')).toHaveCount(2);
+  for (const link of await page.locator('.lesson-rail a[href^="#"]').all()) {
+    const target = await link.getAttribute('href');
+    await link.click();
+    await expect(page.locator(`${target} h2`)).toBeFocused();
+  }
+  await page.locator('#copy-companion-code').click();
+  await expect(page.locator('#copy-companion-status')).toHaveText(' Copied.');
+  // The Windows clipboard normalizes line endings to CRLF.
+  expect((await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n')).toBe(content.codeComparison.lines.join('\n'));
+});
+
+test('problem selector reports local drafts accurately and clears only practice records after confirmation', async ({ browser }, testInfo) => {
+  const context = await browser.newContext({ serviceWorkers: 'block', viewport: testInfo.project.use.viewport });
   const page = await context.newPage();
   try {
     await page.goto('http://127.0.0.1:' + (process.env.ITCC47_TEST_PORT || 4173) + '/problem-list.html?module=4');
     await page.evaluate(() => {
       const problems = PROBLEMS.filter(problem => problem.module === 'Module 4');
       const records = Object.fromEntries(problems.map((problem, index) => [problem.id, {
-        contentVersion: problem.contentVersion, draft: index === 1 ? 'WRITE 1' : '', completed: index === 2,
+        contentVersion: problem.contentVersion, draft: index === 1 ? 'WRITE 1' : index === 0 ? problem.starter : '', completed: index === 2,
       }]));
       localStorage.setItem('itcc47.practice-records:v2', JSON.stringify({ schemaVersion: 2, records }));
       localStorage.setItem('itcc47.problems.v1', '{}');
@@ -3957,6 +4069,12 @@ test('problem selector reports local drafts accurately and clears only practice 
     await expect(rows.locator('.problem-choice-action')).toHaveText(Array(6).fill('Start'));
     expect(await page.evaluate(() => ['itcc47.practice-records:v2', 'itcc47.problems.v1', 'itcc47.problems.code.v1'].map(key => localStorage.getItem(key)))).toEqual([null, null, null]);
     expect(await page.evaluate(() => ['itcc47.visualizer-progress:v1', 'itcc45.practice:v1'].map(key => localStorage.getItem(key)))).toEqual(['{"sentinel":"keep"}', '{"sentinel":"keep"}']);
+    await rows.first().locator('.problem-choice-action').click();
+    await expect(page.locator('#btn-check')).toBeEnabled();
+    await page.goBack();
+    await expect(rows.locator('.problem-choice-action')).toHaveText(Array(6).fill('Start'));
+    await page.goto('http://127.0.0.1:' + (process.env.ITCC47_TEST_PORT || 4173) + '/problems.html?view=midterm&module=4');
+    await expect(page.locator('[data-midterm-module="4"] .midterm-module-progress')).toContainText('0 completed · 0 continue · 6 start');
   } finally { await context.close(); }
 });
 

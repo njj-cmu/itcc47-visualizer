@@ -2,6 +2,18 @@
 (function () {
   const INDENT = '    ';
   const pointerViewports = new WeakMap();
+  const lineCounts = new WeakMap();
+
+  function syncLineNumbers(textarea) {
+    const gutter = textarea.closest('.numbered-editor')?.querySelector('.editor-line-numbers pre');
+    if (!gutter) return;
+    const count = textarea.value.split('\n').length;
+    if (lineCounts.get(textarea) !== count) {
+      gutter.textContent = Array.from({ length: count }, (_, index) => index + 1).join('\n');
+      lineCounts.set(textarea, count);
+    }
+    gutter.style.transform = `translateY(${-textarea.scrollTop}px)`;
+  }
 
   function captureViewportScroll(element) {
     const containers = [];
@@ -90,6 +102,11 @@
   });
 
   document.querySelectorAll('textarea.code-editor').forEach((textarea) => {
+    if (textarea.hasAttribute('data-line-numbers')) {
+      textarea.addEventListener('input', () => syncLineNumbers(textarea));
+      textarea.addEventListener('scroll', () => syncLineNumbers(textarea));
+      syncLineNumbers(textarea);
+    }
     textarea.addEventListener('keydown', (event) => {
       if (event.key !== 'Tab') return;
       event.preventDefault();
@@ -101,5 +118,6 @@
     captureViewportScroll,
     editIndent,
     focusWithoutViewportShift,
+    syncLineNumbers,
   });
 })();

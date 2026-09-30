@@ -207,6 +207,7 @@ function runHiddenCase(ast, hidden, salt, index) {
 function checkAnswer() {
   const problem = pstate.problem;
   if (!problem) return;
+  workPane.classList.add('has-results');
 
   pels.errorBox.classList.add('hidden');
 
@@ -292,7 +293,7 @@ function renderResults(visible, hidden, passed, total, allPass, allVisiblePass) 
     const { test, result } = row;
     const inputs = test.inputs.map((v) => fmtValue(v)).join(', ');
     const expected = test.expected.map((v) => fmtValue(v)).join(', ');
-    const actual = result.actual ? result.actual.map((v) => fmtValue(v)).join(', ') : '—';
+    const actual = result.actual ? result.actual.length ? result.actual.map((v) => fmtValue(v)).join(', ') : '(no output)' : '—';
     parts.push(`
       <div class="case ${result.pass ? 'case-pass' : 'case-fail'}">
         <div class="case-head">
@@ -337,6 +338,16 @@ function renderProgress() {
   pels.progressLine.textContent = `${solved} of ${moduleProblems.length} solved`;
 }
 
+function resetResults() {
+  pstate.lastEvaluation = null;
+  workPane.classList.remove('has-results');
+  pels.errorBox.classList.add('hidden');
+  pels.resultsScore.textContent = 'Not checked yet';
+  pels.resultsScore.className = 'results-score';
+  pels.resultsBody.className = 'results-body muted';
+  pels.resultsBody.innerHTML = 'Write your answer, then press <strong>Run Checks</strong>. Includes visible and hidden tests.';
+}
+
 function selectProblem(problem) {
   pstate.problem = problem;
 
@@ -367,16 +378,14 @@ function selectProblem(problem) {
   pels.recovery.innerHTML = recovered.length ? `<details><summary>Recover an earlier draft (${recovered.length})</summary><p>This problem contract changed. The new starter is loaded and only this problem’s earlier completion was cleared.</p>${recovered.map((item,index) => `<section><header>Content version ${esc(item.contentVersion)}</header><pre>${esc(item.draft)}</pre><button type="button" data-restore-draft="${index}">Restore this draft for editing</button></section>`).join('')}</details>` : '';
 
   pels.codeBox.value = pstate.drafts[problem.id] !== undefined ? pstate.drafts[problem.id] : problem.starter;
+  ITCC47EditorTools.syncLineNumbers(pels.codeBox);
   pels.codeBox.disabled = false;
   pels.btnCheck.disabled = false;
   pels.btnTrace.disabled = false;
   pels.btnReset.disabled = false;
   pels.errorBox.classList.add('hidden');
 
-  pels.resultsScore.textContent = 'not checked yet';
-  pels.resultsScore.className = 'results-score';
-  pels.resultsBody.className = 'results-body muted';
-  pels.resultsBody.innerHTML = 'Write your answer, then press <strong>Run Checks</strong>. Your pseudocode is run against every test case, including some you cannot see.';
+  resetResults();
 
   renderProblemMeta();
   renderProgress();
@@ -387,6 +396,7 @@ function selectProblem(problem) {
 
 pels.codeBox.addEventListener('input', () => {
   if (!pstate.problem) return;
+  resetResults();
   pstate.drafts[pstate.problem.id] = pels.codeBox.value;
   saveProgress();
 });
@@ -414,6 +424,8 @@ pels.btnReset.addEventListener('click', () => {
   if (!pstate.problem) return;
   if (!confirm('Replace your code with the starting code for this problem?')) return;
   pels.codeBox.value = pstate.problem.starter;
+  ITCC47EditorTools.syncLineNumbers(pels.codeBox);
+  resetResults();
   pstate.drafts[pstate.problem.id] = pels.codeBox.value;
   saveProgress();
 });
@@ -432,6 +444,8 @@ pels.recovery.addEventListener('click', (event) => {
   const recovered = pstate.recovery[pstate.problem.id]?.[Number(button.dataset.restoreDraft)];
   if (!recovered) return;
   pels.codeBox.value = recovered.draft;
+  ITCC47EditorTools.syncLineNumbers(pels.codeBox);
+  resetResults();
   pstate.drafts[pstate.problem.id] = recovered.draft;
   pstate.solved[pstate.problem.id] = false;
   saveProgress(); renderProblemMeta(); renderProgress();

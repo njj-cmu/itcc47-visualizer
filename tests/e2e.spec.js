@@ -1252,7 +1252,9 @@ test('start page gives students a clear route into the current practice bank', a
   await expect(page.locator('#current-checkpoint')).toContainText('Queues and deques');
   await page.getByRole('link', { name: /Open current practice bank/ }).click();
   await expect(page).toHaveURL(/problem-list\.html\?module=4$/);
-  await expect(page.getByRole('heading', { name: /Stacks, Queues, and Deques: select a problem/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Stacks, Queues, and Deques', exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Problem set breadcrumb' })).toContainText('Module 4');
+  await expect(page.locator('.problem-choice')).toHaveCount(6);
 });
 
 test('curriculum roadmap expands the current module and compacts locked modules', async ({ page }) => {
@@ -3010,7 +3012,8 @@ test('public Module 3 opens all linked practice and mutation visualizations', as
 test('legacy checkpoint-guide routes redirect to module practice without companion content', async ({ page }) => {
   await page.goto('/lesson.html?checkpoint=m2-binary-search&preview=1');
   await expect(page).toHaveURL(/problem-list\.html\?module=2&preview=1$/);
-  await expect(page.getByRole('heading', { name: /Arrays, Lists, Searching, and Sorting: select a problem/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Arrays, Lists, Searching, and Sorting', exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Problem set breadcrumb' })).toContainText('Module 2');
   await expect(page.locator('.lesson-companion, .companion-mental, .companion-trace, .lesson-sequence')).toHaveCount(0);
 });
 
@@ -3336,7 +3339,9 @@ test('mismatched ITCC45 activity falls back and normalizes the URL', async ({ pa
 
 test('Visualize opens the canonical Modules visualization catalog', async ({ page }) => {
   await page.goto('/itcc47.html');
-  await page.getByRole('link', { name: /Visualize an algorithm/ }).click();
+  const browse = page.getByRole('link', { name: /^Browse visualizations/ });
+  await expect(browse).toHaveAttribute('href', 'problems.html?view=visualizations');
+  await browse.click();
   await expect(page).toHaveURL(/problems\.html\?view=visualizations$/);
   await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.visualization-card')).toHaveCount(35);

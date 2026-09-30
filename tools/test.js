@@ -1431,6 +1431,39 @@ ok('problems.data.js has problems', PROBLEMS.length > 0);
 });
 ok('round count is set', ROUNDS > 0);
 
+// Public fixtures must survive reference verification and repeated student runs.
+// Exercise the actual boundary functions with public data and legal in-run aliasing.
+const publicProblemFixtures = JSON.parse(fs.readFileSync(path.join(ROOT, 'problems.public.json'), 'utf8'));
+publicProblemFixtures.forEach((problem) => {
+  const shipped = PROBLEMS.find((entry) => entry.id === problem.id);
+  ok(`${problem.id}: generated visible fixtures match public source`,
+    JSON.stringify(shipped?.visibleTests) === JSON.stringify(problem.visibleTests));
+});
+const fixtureSource = 'READ capacity\nREAD items\nREAD front\nREAD value\ncopy <- items\nitems[0] <- value\nWRITE copy[0]';
+const fixtureAst = parse(fixtureSource);
+const referenceBoundary = fs.readFileSync(path.join(ROOT, 'tools/build-problems.js'), 'utf8')
+  .match(/function runReference\([\s\S]*?\n\}/)[0];
+const runtimeBoundary = fs.readFileSync(path.join(ROOT, 'problems-app.js'), 'utf8')
+  .match(/function execCase\([\s\S]*?\n\}/)[0];
+const runFixtureReference = vm.runInNewContext(`${referenceBoundary}; runReference`);
+const runFixtureRuntime = vm.runInNewContext(`${runtimeBoundary}; execCase`, {
+  collectSteps: collectForCounting,
+  STEP_CAP: 20000,
+  TracerError: countingEngine.get('TracerError'),
+  outputsOf: (steps) => steps.filter((step) => step.type === 'write').map((step) => step.frame.outputValue),
+});
+for (const [name, execute] of [
+  ['reference', (inputs) => runFixtureReference({ runProgram }, fixtureAst, inputs)],
+  ['runtime', (inputs) => runFixtureRuntime(fixtureAst, inputs).outputs],
+]) {
+  const fixture = [3, ['A', 'B', 'C'], 1, 'D'];
+  const original = JSON.stringify(fixture);
+  for (let repeat = 1; repeat <= 2; repeat++) {
+    ok(`${name} run ${repeat}: array aliases still observe mutations inside one execution`, eq(execute(fixture), ['D']));
+    ok(`${name} run ${repeat}: nested public fixture is unchanged`, JSON.stringify(fixture) === original);
+  }
+}
+
 PROBLEMS.forEach((p) => {
   ok(`${p.id}: starter parses`, parses(p.starter));
   ok(`${p.id}: has visible examples`, p.visibleTests.length > 0);

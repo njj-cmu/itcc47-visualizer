@@ -145,7 +145,8 @@ function outputsOf(steps) {
 
 /** Execute the student's program against one case; returns outputs or a failure reason. */
 function execCase(ast, inputs) {
-  const { steps, truncated, error } = collectSteps(ast, [...inputs], STEP_CAP);
+  // Do not let an array-mutating answer change this fixture for later checks.
+  const { steps, truncated, error } = collectSteps(ast, JSON.parse(JSON.stringify(inputs)), STEP_CAP);
   if (error) {
     return { ok: false, reason: error instanceof TracerError ? error.message : String(error.message || error) };
   }

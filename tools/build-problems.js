@@ -86,7 +86,9 @@ function loadInterpreter() {
 }
 
 function runReference(engine, ast, inputs, cap = 200000) {
-  const gen = engine.runProgram(ast, [...inputs]);
+  // Fixtures are JSON data. Isolate nested arrays once per run while retaining
+  // normal array references and mutation within the executing program.
+  const gen = engine.runProgram(ast, JSON.parse(JSON.stringify(inputs)));
   const out = [];
   let steps = 0;
   let r = gen.next();

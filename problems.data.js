@@ -1846,10 +1846,10 @@ const PROBLEMS = [
       {
         "inputs": [
           [
+            5,
             1,
             4,
-            2,
-            5
+            2
           ]
         ],
         "expected": [
@@ -1890,17 +1890,17 @@ const PROBLEMS = [
     ],
     "hidden": [
       {
-        "i": "a6zCiNPICYVUzj0=",
+        "i": "a6zDiNzICIVbzj0=",
         "n": 1,
         "h": "42a296228367703f16eb5d0a812dc486dc391435c093e187fb58ff07a447dc1d"
       },
       {
-        "i": "02Yyf/kIJw30",
+        "i": "02Yyf/oIJA30",
         "n": 1,
         "h": "d4d819d28ad491748885cd104a9554df71fa39ba61af5fd9fb645d3da4ab2b1a"
       },
       {
-        "i": "tf2pvMHPLjTjFv8=",
+        "i": "tf2pvsHPLDTjFv8=",
         "n": 1,
         "h": "004a0f4e6b9d8684d74239a08c93d30c661469ec3a3549312a692c9b9ee7b7c2"
       }
@@ -2028,16 +2028,16 @@ const PROBLEMS = [
       {
         "inputs": [
           [
-            1,
+            2,
             1,
             2,
-            2
+            1
           ],
           [
-            "B",
-            "D",
             "A",
-            "C"
+            "B",
+            "C",
+            "D"
           ]
         ],
         "expected": [
@@ -2085,7 +2085,7 @@ const PROBLEMS = [
     ],
     "hidden": [
       {
-        "i": "daQoLo6OtE9cT9CsZCNqzBrdCP7GqZ0IOR765c0=",
+        "i": "daQqLo2OtE9dT9CsZCBqzBrbCP7Gq50IORn65c0=",
         "n": 2,
         "h": "1ca7ab5b76add2d89239f4d811201677b2e5137407f9e091ae379b1af9c134ff"
       },
@@ -2095,7 +2095,7 @@ const PROBLEMS = [
         "h": "39caa72b65e98008beb1e362fd2d89004559a80638c7a1974f452aec5fece6a9"
       },
       {
-        "i": "ps5CC1twOa4OKJmilBz8h3E=",
+        "i": "ps5BC1hwOa4OL5milBv8h3E=",
         "n": 2,
         "h": "47185b84edde5cde9a383fe2473b680b86d20798ba5ff1dd7804c9d0af5cd3c1"
       }
@@ -2144,9 +2144,9 @@ const PROBLEMS = [
           "INSERT",
           [
             10,
-            15,
             20,
-            30
+            30,
+            0
           ],
           3,
           1,
@@ -2168,8 +2168,8 @@ const PROBLEMS = [
           "REMOVE",
           [
             10,
+            20,
             30,
-            0,
             0
           ],
           3,
@@ -2205,12 +2205,12 @@ const PROBLEMS = [
     ],
     "hidden": [
       {
-        "i": "1ckywDrCn/2TdwWSUfE5aFx/5wWKoYiT",
+        "i": "1ckywDrCn/2TdwWSUfE5a1x/5wWKoYiT",
         "n": 3,
         "h": "21372e8cc9632c6275e6c8e5b32c39eb6ff1abcde62bc1f7844277bba855c8bc"
       },
       {
-        "i": "mYFlktK38CSGXqfuik1T+QK37hlJBOVG",
+        "i": "mYFlktK38CSGXqftikxT+gK37hlJBOVG",
         "n": 3,
         "h": "77b25bebdf3ab1d5fe591594f7074b973bfde8fb7b0823909f3fc736a5bdfd9e"
       },
@@ -3109,7 +3109,7 @@ const PROBLEMS = [
         "inputs": [
           3,
           [
-            "D",
+            "A",
             "B",
             "C"
           ],
@@ -3128,7 +3128,7 @@ const PROBLEMS = [
         "inputs": [
           4,
           [
-            9,
+            1,
             2,
             3,
             4
@@ -3145,12 +3145,12 @@ const PROBLEMS = [
     ],
     "hidden": [
       {
-        "i": "rbieiafFWxMxVP8=",
+        "i": "rbieianFWxMxVP8=",
         "n": 2,
         "h": "c6e9a41e1b02b478b1ca3830fbdd9bb55a07479a609ee3b7b74956c32eca415c"
       },
       {
-        "i": "qHzCprgXitE6Ccz3VNcY",
+        "i": "qHzCpr0XitE6Ccz3VNcY",
         "n": 3,
         "h": "2bdcda49cd0ef52b0d3d50cce6f4f1d8886eaf1efd7f9a61d079de85ba5f8a0f"
       },
@@ -3207,8 +3207,8 @@ const PROBLEMS = [
       {
         "inputs": [
           [
-            0,
-            0
+            5,
+            2
           ],
           2
         ],
@@ -3221,9 +3221,9 @@ const PROBLEMS = [
       {
         "inputs": [
           [
-            0,
-            0,
-            0
+            1,
+            1,
+            1
           ],
           3
         ],
@@ -3252,12 +3252,12 @@ const PROBLEMS = [
         "h": "7481a5bef3c50c5cb0d858515f3cb6284701c5d7ac58bce21c4c97a76be31391"
       },
       {
-        "i": "dTsChhQF7M6cSEg=",
+        "i": "dTsBhhcF7c6cSEg=",
         "n": 3,
         "h": "b32ea97921bf8f021944c7e2de07f1252e7b75d761aec0bb7c9fb06c7b223a79"
       },
       {
-        "i": "5JuPWNW1I7KL",
+        "i": "5JuPWNe1I7KL",
         "n": 2,
         "h": "0e175b630493e1a60dbbf529826ecb7b990a8357531bfa067ff341a71f6c240b"
       },

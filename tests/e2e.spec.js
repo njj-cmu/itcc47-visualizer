@@ -28,6 +28,7 @@ async function selectReviewModule(page, number) {
 }
 
 const studentStateTests = new Set([
+  'Industry overview and direct routes keep records closed before their release',
   'curriculum roadmap expands the current module and compacts locked modules',
   'student preview query cannot expose instructor controls or locked content',
   'instructor preview is explicit, persistent, and does not change the deployed profile',
@@ -1558,7 +1559,15 @@ test('released Module 2 workbench hub previews records without initializing play
   await expect(page.locator('.industry-scenario-row')).toContainText(['SLA Breach Scan', 'Priority Range Recall', 'Stable Priority Dispatch', 'Review Queue Mutation']);
   await expect(page.locator('.industry-scenario-row').first()).toContainText('Linear search');
   await expect(page.locator('.industry-record')).toHaveCount(0);
-  await expect(page.locator('.industry-scenario-preview')).toHaveCount(4);
+  await expect(page.locator('.industry-dataset-preview')).toHaveCount(1);
+  await expect(page.getByRole('table', { name: 'arrival dataset preview' })).toBeVisible();
+  const previewRecords = await page.evaluate(() => ITCC47IndustryWorkbench.getScenario('industry-sla-breach-scan').previewIndices.slice(0, 4).map(index => ITCC47IndustryWorkbench.dataset.recordAt('arrival', index)));
+  const previewRows = page.locator('.industry-dataset-preview tbody tr');
+  for (let index = 0; index < previewRecords.length; index++) {
+    await expect(previewRows.nth(index)).toContainText(previewRecords[index].ticketId);
+    await expect(previewRows.nth(index)).toContainText(previewRecords[index].status);
+    await expect(previewRows.nth(index)).toContainText(previewRecords[index].priority);
+  }
   await expect(page.getByRole('region', { name: 'Playback controls' })).toHaveCount(0);
   await expect(page.locator('.industry-release-note')).toHaveCount(0);
 });
@@ -1608,12 +1617,72 @@ test('all four workbench scenarios use the shared visualization-only shell', asy
   for (const [id, title] of scenarios) {
     await page.goto(`/industry-workbench.html?scenario=${id}&preview=1`);
     await expect(page.getByRole('heading', { name: title })).toBeVisible();
-    await expect(page.locator('.industry-record-rail')).toBeVisible();
-    await expect(page.locator('.industry-state-evidence')).toContainText('Metrics');
-    await expect(page.locator('.industry-state-evidence')).toContainText('Invariants');
+    const recordSurface = page.locator('.industry-record-rail, .industry-record-table');
+    await expect(recordSurface).toHaveCount(1);
+    await expect(recordSurface).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Operation metrics', exact: true })).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Current invariants', exact: true })).toBeVisible();
     await expect(page.locator('.source-panel, .evidence-drawer, .desktop-evidence')).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
   }
+});
+
+test('SLA table preserves every compressed frame and selected record interaction', async ({ page }) => {
+  await page.goto('/industry-workbench.html?scenario=industry-sla-breach-scan');
+  const frames = await page.evaluate(() => ITCC47IndustryWorkbench.getScenario('industry-sla-breach-scan').run().events.map(event => ({ frame: event.frame, metrics: event.metrics })));
+  const table = page.locator('.industry-record-table');
+  await expect(page.locator('.industry-record-rail')).toHaveCount(0);
+  await expect(page.locator('.industry-predicate code')).toHaveText('status ≠ Resolved AND age > SLA');
+  await expect(page.getByRole('region', { name: 'Result', exact: true })).toContainText('Not found yet');
+  await expect(page.getByRole('region', { name: 'Active range', exact: true })).toContainText('0 … 12,399');
+  const first = table.locator('[data-record-button]').first();
+  await first.focus();
+  await expect(page.locator('.industry-record-inspector')).toContainText('TCK-000001');
+  await first.press('ArrowDown');
+  await expect(table.locator('[data-record-index="1"]')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(table.locator('[data-record-index="1"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.industry-record-inspector')).toHaveCount(0);
+  const slider = await visualizerTimeline(page);
+  for (let index = 0; index < frames.length; index++) {
+    await slider.fill(String(index));
+    const { frame, metrics } = frames[index];
+    await expect(table.locator('tbody tr')).toHaveCount(frame.tokens.length);
+    const actual = await table.locator('tbody tr').allTextContents();
+    frame.tokens.forEach((token, position) => {
+      if (token.kind === 'record') {
+        expect(actual[position]).toContain(token.record.ticketId);
+        expect(actual[position]).toContain(token.record.status);
+        expect(actual[position]).toContain(token.record.openedAt.slice(5));
+      } else if (token.kind === 'gap') expect(actual[position]).toContain(`${token.count.toLocaleString()} records compressed`);
+    });
+    await expect(page.getByRole('region', { name: 'Operation metrics', exact: true }).locator('b')).toHaveText(String(metrics.comparisons));
+    await expect(table.locator('.industry-table-pointer')).toHaveCount(frame.pointers.length);
+  }
+  await expect(page.getByRole('region', { name: 'Result', exact: true })).toContainText('TCK-000028');
+  await expect(page.getByRole('region', { name: 'Result', exact: true })).toContainText('Index 27');
+  await slider.fill('0');
+  await expect(page.getByRole('region', { name: 'Result', exact: true })).toContainText('Not found yet');
+  await expect(table.locator('.role-found')).toHaveCount(0);
+});
+
+test('Industry overview and direct routes keep records closed before their release', async ({ page }) => {
+  await page.route('**/release-profile.js*', async route => {
+    const response = await route.fetch();
+    const body = (await response.text()).replace(/currentCheckpointId:\s*'[^']+'/, "currentCheckpointId: 'm1-ipo'");
+    expect(body).not.toEqual(await response.text());
+    await route.fulfill({ response, body });
+  });
+  await page.goto('/industry-workbench.html');
+  expect(await page.evaluate(() => ITCC47Curriculum.activeProfile().currentCheckpointId)).toBe('m1-ipo');
+  await expect(page.locator('.industry-scenario-row')).toHaveCount(4);
+  await expect(page.locator('.industry-dataset-preview, [data-record-button]')).toHaveCount(0);
+  await expect(page.locator('.industry-scenario-locked-preview')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View requirements' })).toHaveCount(4);
+  await page.goto('/industry-workbench.html?scenario=industry-sla-breach-scan');
+  await expect(page.locator('.curriculum-lock')).toBeVisible();
+  await expect(page.locator('.industry-record-table, .industry-record-rail')).toHaveCount(0);
 });
 
 test('compressed mutation stages name every covered operation span', async ({ page }) => {

@@ -1753,3 +1753,57 @@ to{opacity:1;transform:translateY(0);border-color:#484852}}
 .lesson-companion section{padding:18px}
 .companion-vocabulary, .companion-progression ol{grid-template-columns:1fr}
 .companion-trace table{min-width:620px}}
+/* Writer and Tracer share the native editor and source-owned execution model. */
+.writer-page .layout{grid-template-columns:300px minmax(0,1fr) 360px;gap:20px;padding:20px;align-items:stretch}
+.writer-page .stage>.card{min-height:calc(100vh - 114px);display:flex;flex-direction:column;padding:22px}
+.writer-page .card-header h1{font-size:1.8rem;line-height:1.2}
+.writer-page .card-header .muted{font-size:.95rem;line-height:1.5}
+.writer-page .sidebar .panel{padding:16px}
+.writer-page .algo-btn{min-height:50px;font-size:.95rem;padding:12px}
+.writer-page .keylist,.writer-page .legend{font-size:.85rem;line-height:1.6}
+.writer-page .keylist dt{font-size:.8rem}
+.writer-page .trace-panel{padding:14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--panel-2)}
+.writer-page .check-blurb{font-size:.83rem;line-height:1.5}
+.writer-page .check-status{font-size:.8rem}
+.writer-page .check-card{padding:14px}
+.writer-page .nesting-toolbar{background:var(--panel-2)}
+.writer-page .nesting-toolbar .muted{flex-basis:100%;font-size:.78rem}
+.writer-page .title-input{flex:0 0 42px;height:42px;min-height:42px;font-size:1rem}
+.writer-page .steps{flex:1;margin-block:16px 0}
+.writer-page .step-row{position:relative;min-height:45px;align-items:center}
+.writer-page .step-input{font-size:1rem;line-height:1.5;padding:6px 0}
+.writer-page .step-input:focus-visible{outline:none}
+.writer-page .step-num{padding-top:0;font-size:.85rem}
+.writer-page .step-row:focus-within{border-color:var(--course-dsa);box-shadow:inset 0 0 0 1px var(--course-dsa);background:#192b3f}
+.writer-page .step-row.is-nested::before{content:'';position:absolute;left:-14px;top:-4px;bottom:-4px;border-left:1px dashed #607389}
+.writer-page .step-row.is-nested::after{content:'';position:absolute;left:-14px;top:50%;width:12px;border-top:1px dashed #607389}
+.writer-page .badge{margin:0;font-size:.68rem;padding:4px 7px}
+.writer-page .step-input::placeholder{color:var(--muted)}
+.writer-page .controls-4{flex:none;padding-top:16px;margin-top:12px}
+.tracer-page .layout-2col{grid-template-columns:minmax(0,1.04fr) minmax(0,1fr);gap:20px;padding:18px 20px}
+.tracer-page .editor-card{padding-inline:18px}
+.tracer-page .editor-toolbar{gap:8px;padding-top:14px}
+.tracer-page .editor-toolbar .btn{min-height:44px;padding-inline:12px}
+.tracer-page .numbered-editor{margin-top:12px;align-items:start}
+.tracer-page .numbered-editor:has(#code-box.hidden){display:none}
+.tracer-page .editor-line-numbers pre,.tracer-page .numbered-editor textarea.code-editor{font-size:.95rem;line-height:1.5;padding-block:10px}
+.tracer-page .numbered-editor textarea.code-editor{height:auto;overflow-y:hidden;min-height:192px}
+.tracer-page .code-view{font-size:.95rem;line-height:1.5;padding-block:8px}
+.tracer-page .code-line{padding-block:0;min-height:1.5em}
+.tracer-page .inputs-block{margin-top:16px}
+.tracer-page .inputs-box{min-height:58px;max-height:120px}
+.tracer-page .status-line{font-size:.9rem;line-height:1.5}
+.tracer-page .tabs .tab{min-height:44px;font-size:.9rem}
+.tracer-page .trace-table th{z-index:1;padding:14px 12px;font-size:.85rem}
+.tracer-page .trace-table td{padding:12px;font-size:.9rem;line-height:1.4}
+.tracer-page .trace-table .current-row,.tracer-page .code-line.current-line{background:#164d9b}
+.tracer-page .trace-table tr:focus-visible{outline:2px solid var(--course-dsa);outline-offset:-2px}
+.tracer-page .trace-table-wrap:has(.trace-empty:not(.hidden)){display:grid;grid-template-rows:auto 1fr}
+.trace-empty{display:grid;place-content:center;text-align:center;min-height:420px;padding:24px;color:var(--muted)}
+.trace-empty .ui-icon{width:54px;height:54px;margin:0 auto 20px;color:#8297ac}
+.trace-empty strong{font-size:1.2rem;color:var(--text)}
+.trace-empty p{margin:10px 0 0;line-height:1.6}
+@media(max-width:1500px) and (min-width:1101px){.writer-page .layout{grid-template-columns:240px minmax(0,1fr) 290px;gap:14px;padding:16px}.writer-page .stage>.card{padding:18px}.writer-page .card-header h1{font-size:1.45rem}.writer-page .step-input{font-size:.9rem}.writer-page .step-row{min-height:41px}.writer-page .controls-4{grid-template-columns:1fr 1fr}.tracer-page .editor-toolbar .btn{font-size:.78rem;padding-inline:9px}.tracer-page .editor-toolbar .toolbar-spacer{display:none}}
+@media(max-width:1100px){.writer-page .layout,.tracer-page .layout-2col{grid-template-columns:minmax(0,1fr);padding:14px;gap:14px}.writer-page .stage>.card{min-height:580px}.writer-page .card-header h1{font-size:1.5rem}.writer-page .trace-panel{min-height:0}.tracer-page .numbered-editor textarea.code-editor{height:auto}.tracer-page .trace-table{table-layout:fixed;width:100%}.tracer-page .trace-table th,.tracer-page .trace-table td{overflow-wrap:anywhere;padding:10px 6px}.tracer-page .trace-table th:nth-child(1),.tracer-page .trace-table th:nth-child(2){width:10%}.tracer-page .trace-table code{white-space:normal}.tracer-page .trace-empty{min-height:420px}.tracer-page .editor-toolbar .btn{padding-inline:9px}.writer-page .step-row.is-nested::before,.writer-page .step-row.is-nested::after{display:none}}
+@media(max-width:700px){.writer-page .stage>.card{padding:14px}.writer-page .step-input{font-size:.9rem}.writer-page .step-row .badge{font-size:.55rem;padding:3px}.writer-page .step-num{font-size:.75rem;min-width:2em}.writer-page .nesting-toolbar .btn{flex:1 1 40%}.tracer-page .editor-line-numbers pre,.tracer-page .numbered-editor textarea.code-editor{font-size:.85rem}.tracer-page .editor-card{padding-inline:12px}}
+

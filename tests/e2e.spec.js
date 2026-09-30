@@ -3908,6 +3908,84 @@ test('tracer runs and its result tabs work from the keyboard', async ({ page }) 
   await expect(page.getByRole('tab', { name: /operations/i })).toHaveAttribute('aria-selected', 'true');
 });
 
+test('writer move buttons and keyboard move whole blocks and blank retains honest checks', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/writer.html');
+  await page.getByRole('button', { name: 'Blank', exact: true }).click();
+  const up = page.getByRole('button', { name: /Move up/ });
+  const down = page.getByRole('button', { name: /Move down/ });
+  await expect(up).toBeDisabled(); await expect(down).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Indent step' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Outdent step' })).toBeDisabled();
+  await expect(page.locator('.step-input')).toHaveAttribute('placeholder', 'Write your first step…');
+  await expect(page.locator('.step-input')).toHaveValue('');
+  await expect(page.locator('#checks')).toContainText('This step is empty.');
+  await expect(page.locator('#checks')).toContainText('No step displays a result.');
+  await page.locator('.step-input').fill('Start'); await page.locator('.step-input').press('Enter');
+  await page.locator('.step-input').nth(1).fill('If ready'); await page.locator('.step-input').nth(1).press('Enter');
+  await page.locator('.step-input').nth(2).fill('Write value'); await page.locator('.step-input').nth(2).press('Tab');
+  await page.locator('.step-input').nth(2).press('Enter');
+  await page.locator('.step-input').nth(3).fill('Stop'); await page.locator('.step-input').nth(3).press('Shift+Tab');
+  const values = () => page.locator('.step-input').evaluateAll(items => items.map(item => item.value));
+  const original = ['Start', 'If ready', 'Write value', 'Stop'];
+  expect(await values()).toEqual(original);
+  await up.click(); expect(await values()).toEqual(['Start', 'Stop', 'If ready', 'Write value']);
+  await down.click(); expect(await values()).toEqual(original);
+  await page.locator('.step-input').nth(1).focus(); await up.click();
+  expect(await values()).toEqual(['If ready', 'Write value', 'Start', 'Stop']);
+  await expect(page.locator('.step-input').first()).toBeFocused();
+  await page.locator('.step-input').first().press('Alt+ArrowDown');
+  expect(await values()).toEqual(original);
+  await page.getByRole('button', { name: 'Copy as text' }).click();
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied.replace(/\r\n/g, '\n')).toContain('2. If ready\n    2.1. Write value\n3. Stop');
+  await page.reload(); expect(await values()).toEqual(original);
+  await page.getByRole('button', { name: /Pseudocode skeleton/ }).click();
+  await expect(page).toHaveURL(/tracer.html/);
+  await expect(page.getByLabel('Pseudocode editor')).toHaveValue(/IF ready THEN\n    WRITE value\nENDIF/);
+  await expect(page.locator('#trace-body tr')).toHaveCount(0);
+});
+
+test('authoring presets load canonical text and tracer separates recording from selected output', async ({ page }, testInfo) => {
+  await page.goto('/writer.html');
+  const writerPresets = await page.evaluate(() => WRITER_PRESETS.map(p => ({ name: p.name, steps: p.steps.map(s => s.text) })));
+  for (const preset of writerPresets) {
+    await page.getByRole('button', { name: preset.name, exact: true }).click();
+    expect(await page.locator('.step-input').evaluateAll(items => items.map(item => item.value))).toEqual(preset.steps);
+  }
+  await page.goto('/tracer.html');
+  await expect(page.locator('#inputs-box')).toHaveValue('7, true');
+  await expect(page.locator('#trace-empty')).toContainText('Run to inspect execution');
+  const presets = await page.evaluate(() => PRESETS.map(p => ({ name: p.name, code: p.code, inputs: p.inputs })));
+  for (const preset of presets) {
+    await page.getByRole('button', { name: 'Load Example' }).click();
+    await page.getByRole('button', { name: preset.name, exact: true }).click();
+    await expect(page.locator('#code-box')).toHaveValue(preset.code);
+    await expect(page.locator('#inputs-box')).toHaveValue(preset.inputs);
+    await expect(page.locator('#trace-body tr')).toHaveCount(0);
+    await expect(page.locator('#btn-play')).toBeDisabled();
+  }
+  await page.getByRole('button', { name: 'Load Example' }).click();
+  await page.getByRole('button', { name: 'Library Fine, corrected (Algorithm 1-4)', exact: true }).click();
+  await expect(page.locator('.editor-line-numbers pre')).toHaveText(Array.from({ length: 20 }, (_, i) => i + 1).join('\n'));
+  await page.getByRole('button', { name: 'Pseudocode Grammar' }).click();
+  await expect(page.locator('#dlg-grammar')).toBeVisible(); await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Pseudocode Grammar' })).toBeFocused();
+  await page.getByRole('button', { name: 'Run', exact: true }).click();
+  await expect(page.locator('#trace-body tr')).toHaveCount(14);
+  await expect(page.locator('#trace-empty')).toBeHidden();
+  await expect(page.locator('#trace-row-0')).toHaveClass(/current-row/);
+  await expect(page.locator('#output-box')).toContainText('(no output yet)');
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code & Run' }).click();
+  await page.locator('#step-slider').fill('13'); await expect(page.locator('#output-box')).toHaveText('280');
+  await page.locator('#step-slider').fill('0'); await expect(page.locator('#output-box')).toContainText('(no output yet)');
+  await expect(page.locator('#vars-box')).toContainText('overdue_days');
+  await expect(page.locator('#vars-box')).not.toContainText('fine');
+  await page.getByRole('button', { name: 'Edit Code', exact: true }).click();
+  await expect(page.locator('#trace-body tr')).toHaveCount(0);
+  await expect(page.locator('#trace-empty')).not.toHaveClass(/hidden/);
+});
+
 test('tracer delegates editor and trace overflow to their parent surfaces', async ({ page }, testInfo) => {
   await page.goto('/tracer.html');
   const source = ['x <- 0', ...Array.from({ length: 48 }, () => 'x <- x + 1'), 'WRITE x'].join('\n');

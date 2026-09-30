@@ -23,6 +23,9 @@ const wels = {
   btnToTracer: document.getElementById('btn-to-tracer'),
   btnIndent: document.getElementById('btn-indent'),
   btnOutdent: document.getElementById('btn-outdent'),
+  btnMoveUp: document.getElementById('btn-move-up'),
+  btnMoveDown: document.getElementById('btn-move-down'),
+  guidance: document.getElementById('writer-guidance'),
   toast: document.getElementById('toast'),
 };
 let pendingNestingViewport = null;
@@ -92,7 +95,7 @@ function fullRender(focusIndex, caretAtEnd, viewportSnapshot) {
 
   wstate.steps.forEach((step, i) => {
     const row = document.createElement('div');
-    row.className = 'step-row';
+    row.className = `step-row${step.level ? ' is-nested' : ''}`;
     row.dataset.idx = String(i);
     row.style.marginLeft = `${step.level * 26}px`;
     row.style.setProperty('--step-level', String(step.level));
@@ -106,7 +109,7 @@ function fullRender(focusIndex, caretAtEnd, viewportSnapshot) {
     ta.rows = 1;
     ta.spellcheck = false;
     ta.value = step.text;
-    ta.placeholder = i === 0 ? 'Read the number of overdue days' : '';
+    ta.placeholder = i === 0 ? 'Write your first step…' : '';
     ta.setAttribute('aria-label', `Step ${numbers[i]}`);
     ta.addEventListener('input', onInput);
     ta.addEventListener('keydown', onKeyDown);
@@ -180,6 +183,9 @@ function softUpdate() {
   });
 
   renderChecks();
+  wels.guidance.textContent = wstate.steps.length === 1 && !wstate.steps[0].text.trim()
+    ? 'Start with one clear action, or load an example.'
+    : 'Write one action per step. Use the nesting controls or Tab to create sub-steps.';
   wels.nameDisplay.textContent = wstate.name.trim() || 'Untitled algorithm';
   updateNestingControls();
   save();
@@ -296,6 +302,8 @@ function updateNestingControls() {
   const idx = Math.max(0, Math.min(wstate.activeIndex, wstate.steps.length - 1));
   wels.btnIndent.disabled = !canIndent(idx);
   wels.btnOutdent.disabled = wstate.steps[idx].level === 0;
+  wels.btnMoveUp.disabled = idx === 0;
+  wels.btnMoveDown.disabled = blockEnd(idx) >= wstate.steps.length;
 }
 
 function changeIndent(idx, delta) {
@@ -523,6 +531,8 @@ wels.btnAdd.addEventListener('click', () => {
 });
 wels.btnIndent.addEventListener('click', () => changeIndent(wstate.activeIndex, 1));
 wels.btnOutdent.addEventListener('click', () => changeIndent(wstate.activeIndex, -1));
+wels.btnMoveUp.addEventListener('click', () => moveBlock(wstate.activeIndex, -1));
+wels.btnMoveDown.addEventListener('click', () => moveBlock(wstate.activeIndex, 1));
 
 wels.btnClear.addEventListener('click', () => {
   if (!confirm('Clear all steps?')) return;

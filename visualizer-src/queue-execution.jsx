@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId, useState } from 'react';
 import { LayoutGroup, m } from 'motion/react';
 import { PhaseIndicators, PhasePlayback } from './stack-execution.jsx';
 import './queue-execution.css';
@@ -60,9 +60,10 @@ function OperationHeader({ event }) {
 }
 
 function TransferArrow({ active, wrap }) {
+  const markerId = useId();
   return <svg className={`queue-context-arrow ${active ? 'is-active' : ''} ${wrap ? 'is-wrap' : ''}`} viewBox="0 0 120 30" role="img" aria-label={wrap ? 'Value wraps from index 2 to index 0' : 'Value moves toward its destination slot'}>
-    <defs><marker id="queue-context-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10Z"/></marker></defs>
-    <path d={wrap ? 'M110 24 C88 1 31 1 10 24' : 'M5 15 H112'} markerEnd="url(#queue-context-arrowhead)"/>
+    <defs><marker id={markerId} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 10 5 0 10Z"/></marker></defs>
+    <path d={wrap ? 'M110 24 C88 1 31 1 10 24' : 'M5 15 H112'} markerEnd={`url(#${markerId})`}/>
   </svg>;
 }
 
@@ -174,13 +175,26 @@ function Explanation({ event }) {
   </section>;
 }
 
-export function QueueExecutionWorkspace({ source, event, state, controller, duration, Icon, motionPreference }) {
+export function QueueExecutionWorkspace({ source, event, state, controller, duration, Icon, motionPreference, compact, evidence }) {
+  const [tab, setTab] = useState('visualize');
+  const tabs = [['visualize', 'grid', 'Visualize'], ['source', 'code', 'Source'], ['evidence', 'list', 'Evidence']];
+  const panelProps = (id) => ({ id: `queue-panel-${id}`, role: compact ? 'tabpanel' : undefined, 'aria-labelledby': compact ? `queue-tab-${id}` : undefined, hidden: compact && tab !== id });
+  function navigateTab(e, index) {
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? 2 : e.key === 'ArrowRight' ? (index + 1) % 3 : e.key === 'ArrowLeft' ? (index + 2) % 3 : null;
+    if (next === null) return;
+    e.preventDefault();
+    setTab(tabs[next][0]);
+    e.currentTarget.parentElement.children[next].focus();
+  }
   if (!event?.frame.execution || !event.frame.queue) return null;
   const { frame } = event;
   const { execution, queue } = frame;
   return <div className={`queue-workbench operation-${execution.kind} context-${queue.context.toLowerCase()}`} data-line={event.source.line} data-phase={execution.phaseIndex + 1} data-operation={execution.kind} data-context={queue.context} data-front={displayIndex(queue.front)} data-back={displayIndex(queue.back)} data-size={queue.size} data-slots={queue.slots.map((slot) => slot.item?.value || '_').join(',')} data-logical-order={queue.logicalOrder.join(',')}>
-    <div className="queue-left"><PseudocodePanel source={source} event={event}/><ExecutionStatus event={event} source={source} Icon={Icon}/><QueueConcepts/></div>
-    <div className="queue-right"><OperationHeader event={event}/><LayoutGroup id="queue-foundations"><div className="queue-primary-row"><ContextValue queue={queue} execution={execution} duration={duration}/><PhysicalQueue queue={queue} execution={execution} duration={duration}/><QueueState queue={queue}/></div><div className="queue-secondary-row"><LogicalOrder queue={queue}/><RuntimeValues queue={queue} execution={execution} duration={duration}/><ReturnOutput queue={queue} output={frame.output}/></div></LayoutGroup><Explanation event={event}/>
+    {compact ? <><div className="queue-tabs" role="tablist" aria-label="Workspace view">{tabs.map(([id, icon, label], index) => <button key={id} type="button" role="tab" id={`queue-tab-${id}`} aria-controls={`queue-panel-${id}`} aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} onClick={() => setTab(id)} onKeyDown={(e) => navigateTab(e, index)}><Icon name={icon} size={16}/>{label}</button>)}</div><div className="queue-mobile-status"><span>Line {event.source.line}/{source.length}</span><span>Phase {execution.phaseIndex + 1}/{execution.phaseCount}</span><span>Scenario {event.source.line}/{source.length}</span></div></> : null}
+    <div className="queue-left" {...panelProps('source')}><PseudocodePanel source={source} event={event}/><ExecutionStatus event={event} source={source} Icon={Icon}/></div>
+    <div className="queue-right" {...panelProps('visualize')}><OperationHeader event={event}/><LayoutGroup id="queue-foundations"><div className="queue-primary-row"><ContextValue queue={queue} execution={execution} duration={duration}/><PhysicalQueue queue={queue} execution={execution} duration={duration}/><QueueState queue={queue}/></div><div className="queue-secondary-row"><LogicalOrder queue={queue}/><RuntimeValues queue={queue} execution={execution} duration={duration}/><ReturnOutput queue={queue} output={frame.output}/></div></LayoutGroup><Explanation event={event}/></div>
+    <div className="queue-evidence" {...panelProps('evidence')}><QueueConcepts/>{compact ? evidence : <details className="stack-evidence-details"><summary>Learning Evidence · trace, variables, and operation counts</summary>{evidence}</details>}</div>
+    <div className="queue-playback-container">
       <PhasePlayback state={state} controller={controller} event={event} execution={execution} source={source} Icon={Icon} motionPreference={motionPreference} contextLabel={queue.context}/>
     </div>
   </div>;

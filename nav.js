@@ -28,6 +28,11 @@
     cpu: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 1v5m6-5v5M9 18v5m6-5v5M1 9h5m-5 6h5m12-6h5m-5 6h5M10 10h4v4h-4z"/>',
     memory: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h8"/>',
     network: '<circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="m7.3 10.9 9.4-3.8M7.3 13.1l9.4 3.8"/>',
+    laptop: '<rect x="5" y="3" width="14" height="13" rx="1"/><path d="m5 16-3 4h20l-3-4M9 20h6"/>',
+    router: '<circle cx="12" cy="12" r="10"/><path d="M12 4v6m-3-3 3-3 3 3M12 20v-6m-3 3 3 3 3-3M4 12h6m-3-3-3 3 3 3M20 12h-6m3-3 3 3-3 3"/>',
+    cloud: '<path d="M6 19a5 5 0 0 1-1-10 7 7 0 0 1 13-2 6 6 0 0 1 0 12Z"/>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 6 9 7 9-7"/>',
+    globe: '<circle cx="12" cy="12" r="10"/><ellipse cx="12" cy="12" rx="4" ry="10"/><path d="M3 8h18M3 16h18"/>',
   };
 
   function svg(name) {
@@ -44,6 +49,15 @@
 
   const nav = document.querySelector('.topbar-nav');
   if (!nav) return;
+  const masthead = nav.closest('.topbar');
+  if (masthead && !masthead.querySelector('.lab-brand')) {
+    const brand = document.createElement('a');
+    brand.className = 'lab-brand';
+    brand.href = 'index.html';
+    brand.setAttribute('aria-label', 'BSIT Learning Lab home');
+    brand.innerHTML = '<span class="lab-brand-mark" aria-hidden="true">BS<br>IT</span><strong>BSIT Learning Lab</strong>';
+    masthead.prepend(brand);
+  }
   const page = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
   const requestedCourse = new URLSearchParams(location.search).get('course');
   const declaredCourse = document.body.dataset.course;
@@ -89,7 +103,7 @@
     const active = (href === page && !isITCC47CatalogPage)
       || (isITCC47CatalogPage && isVisualizerLink && ['visualizations', 'workbenches'].includes(currentCatalogView))
       || (isITCC47CatalogPage && isModulesLink && currentCatalogView === 'problems')
-      || (courseId === 'itcc47' && ['practice.html', 'problem-list.html'].includes(page) && href === 'problems.html')
+      || (courseId === 'itcc47' && ['practice.html', 'problem-list.html', 'lesson.html'].includes(page) && isModulesLink)
       || (courseId === 'itcc47' && ['visualizer.html', 'industry-workbench.html'].includes(page) && isVisualizerLink)
       || (page === 'visualizer.html' && href === 'visualizer.html' && hrefParams.get('course') === courseId);
     link.classList.toggle('active', active);
@@ -119,5 +133,5 @@
   });
   nav.addEventListener('click', (event) => { if (event.target.closest('a')) close(false); });
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && nav.classList.contains('is-open')) close(true); });
-  window.addEventListener('resize', () => { if (window.innerWidth > 700) close(false); });
+  window.addEventListener('resize', () => { if (window.innerWidth > 1100) close(false); });
 })();

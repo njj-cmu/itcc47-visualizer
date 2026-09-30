@@ -23,8 +23,8 @@
 
 <main class="catalog-main">
   <header class="catalog-intro">
-    <div><p class="eyebrow">Self-paced learning roadmap</p><h1>Choose how to review</h1>
-    <p>Follow the Midterm path, open a practice bank, or inspect a focused visualization. Opening an activity never advances the semester.</p></div>
+    <div><p class="eyebrow">Self-paced learning roadmap</p><h1 id="catalog-heading">Practice banks</h1>
+    <p id="catalog-description">Choose a module, then a checked practice problem. Work stays in this browser.</p></div>
   </header>
 
   <div class="catalog-tabs" role="tablist" aria-label="Module resources">
@@ -35,7 +35,10 @@
   </div>
 
   <section id="problem-catalog" class="catalog-view" role="tabpanel" aria-labelledby="problems-tab">
-    <div id="module-grid" class="module-grid" aria-label="ITCC47 problem-set modules"></div>
+    <div class="practice-bank-layout">
+      <nav class="practice-module-nav" aria-label="Practice bank modules"><ol id="practice-module-list"></ol></nav>
+      <div id="module-grid" class="module-grid" aria-label="ITCC47 problem-set modules"></div>
+    </div>
     <aside class="practice-note" aria-label="Practice data notice">
       <span class="practice-note-icon" aria-hidden="true">i</span>
       <p>This is a self-paced practice area. Your drafts and completion indicators stay in this browser.</p>
@@ -44,9 +47,7 @@
 
   <section id="midterm-review" class="catalog-view" role="tabpanel" aria-labelledby="midterm-tab" hidden>
     <header class="midterm-review-intro">
-      <div><p class="eyebrow">Reviewed Modules 1–4</p><h2>Move from understanding to visible evidence to checked practice</h2>
-      <p>Start with each checkpoint’s core path, then open More examples or More practice when you want another pass. Every reviewed resource remains here.</p>
-      <p class="midterm-review-local-note"><strong>Private review aid:</strong> New, Visited, Reviewed, Continue, and Completed reflect only this browser. They are not grades or prerequisites.</p></div>
+      <p class="midterm-review-local-note"><strong>Private review aid:</strong> New, Visited and Reviewed describe visual resources. Practice completion is separate. These indicators stay in this browser; they are not grades or prerequisites.</p>
       <div id="midterm-review-summary" class="midterm-review-summary" aria-label="Midterm release inventory"></div>
     </header>
     <div class="midterm-review-layout">
@@ -69,11 +70,6 @@
   </section>
 
   <section id="workbench-catalog" class="catalog-view" role="tabpanel" aria-labelledby="workbenches-tab" hidden>
-    <header class="workbench-catalog-intro">
-      <p class="eyebrow">Industry-level walkthroughs</p>
-      <h2>See how algorithms support real data decisions</h2>
-      <p>Workbench samples use realistic-scale synthetic data to connect focused classroom techniques into a larger operational workflow.</p>
-    </header>
     <div id="workbench-grid" class="workbench-grid" aria-label="ITCC47 workbench samples"></div>
   </section>
 </main>

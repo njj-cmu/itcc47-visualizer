@@ -1,5 +1,6 @@
-import React, { memo, useMemo, useRef } from 'react';
+import React, { memo, useMemo, useRef, useState } from 'react';
 import { NetworkOperationCarousel } from './network-operation-carousel.jsx';
+import { NetworkStepsView } from './network-topology.jsx';
 
 const SCENE_LAYOUTS = Object.freeze({
   'client-server-services': {
@@ -194,7 +195,7 @@ function FoundationRoleRegions({ frame, compact }) {
   </g>;
 }
 
-function FoundationDevice({ device, box, interfaces, active }) {
+function FoundationDevice({ device, box, interfaces, active, showInterfaceLabels }) {
   return <g className={`network-foundation-device kind-${device.kind} ${active ? 'is-focused' : ''}`} data-device-id={device.id} data-classification={classificationFor(device)}>
     <GenericDeviceIcon device={device} box={box}/>
     <text className="network-foundation-device-title" x={box.x + box.w / 2} y={box.y + box.h - 20} textAnchor="middle">{device.label}</text>
@@ -204,12 +205,18 @@ function FoundationDevice({ device, box, interfaces, active }) {
       return <g className={`network-foundation-interface media-${item.media}`} data-interface-id={item.id} data-interface-media={item.media} key={item.id}>
         <rect className="network-foundation-port" x={point.x - 8} y={point.y - 7} width="16" height="14" rx="3"/>
         <circle className="network-foundation-interface-core" cx={point.x} cy={point.y} r="4"/>
+        {showInterfaceLabels ? <text x={point.x + (point.side === 'left' ? -11 : 11)} y={point.y - 10} textAnchor={point.side === 'left' ? 'end' : 'start'}>{item.label}</text> : null}
       </g>;
     })}
   </g>;
 }
 
-export const NetworkFoundationsRenderer = memo(function NetworkFoundationsRenderer({ frame, compact = false }) {
+export function NetworkFoundationHeader({ frame }) {
+  if (!frame) return null;
+  return <div className="network-foundation-header"><NetworkOperationCarousel timeline={frame.operationTimeline} label="Eight-step Networking Today overview"/><div className="network-diagram-toolbar"><div className="network-detail-label"><strong>Operation {frame.operation.index} of {frame.operation.total}</strong><span>Detail {frame.detail.index} of {frame.detail.total} · {frame.detail.label}</span></div><div className="network-situation-badge"><span>Situation</span><strong>{frame.situation.label}</strong><em>{frame.situation.protocol}</em></div></div></div>;
+}
+
+export const NetworkFoundationsRenderer = memo(function NetworkFoundationsRenderer({ frame, compact = false, displayMode = 'generic', showInterfaceLabels = false }) {
   const geometry = useMemo(() => frame ? geometryFor(frame, compact) : null, [compact, frame]);
   if (!frame || !geometry) return null;
   const focused = new Set(frame.focus.deviceIds);
@@ -219,9 +226,8 @@ export const NetworkFoundationsRenderer = memo(function NetworkFoundationsRender
   const calloutIds = new Set(Object.keys(frame.callouts || {}));
   const calloutDevices = frame.topology.devices.filter((item) => calloutIds.has(item.id)).slice(0, compact ? 1 : 2);
   const viewBoxWidth = Number(geometry.viewBox.split(' ')[2]);
-  return <div className="network-foundations-renderer representation-generic display-generic" data-layout={geometry.id} data-scene-id={frame.scene.id} data-situation-id={frame.situation.id} data-operation-id={frame.operation.id} data-detail-id={frame.detail.id} data-display-mode="generic" data-interface-labels="hidden">
-    <NetworkOperationCarousel timeline={frame.operationTimeline} label="Eight-step Networking Today overview"/>
-    <div className="network-diagram-toolbar"><div className="network-detail-label"><strong>Operation {frame.operation.index} of {frame.operation.total}</strong><span>Detail {frame.detail.index} of {frame.detail.total} · {frame.detail.label}</span></div><div className="network-situation-badge"><span>Situation</span><strong>{frame.situation.label}</strong><em>{frame.situation.protocol}</em></div></div>
+  return <div className={`network-foundations-renderer representation-generic display-${displayMode}`} data-layout={geometry.id} data-scene-id={frame.scene.id} data-situation-id={frame.situation.id} data-operation-id={frame.operation.id} data-detail-id={frame.detail.id} data-display-mode={displayMode} data-interface-labels={displayMode === 'interfaces' && showInterfaceLabels ? 'visible' : 'hidden'}>
+    {compact ? <NetworkFoundationHeader frame={frame}/> : <header className="network-topology-heading"><strong>Network topology</strong><span>{frame.scene.description}</span></header>}
     <svg className="network-foundations-svg" viewBox={geometry.viewBox} role="img" aria-labelledby="network-foundations-title network-foundations-description">
       <title id="network-foundations-title">{frame.scene.title}</title>
       <desc id="network-foundations-description">{frame.scene.description} {frame.phase.explanation}</desc>
@@ -232,11 +238,11 @@ export const NetworkFoundationsRenderer = memo(function NetworkFoundationsRender
           data-link-id={item.id} data-from-interface-id={item.fromInterfaceId} data-to-interface-id={item.toInterfaceId} data-path-definition={geometry.paths[item.id]}
           markerEnd={focusedLinks.has(item.id) ? `url(#foundation-arrow-${geometry.id})` : undefined} key={item.id}/>)}
       </g>
-      {frame.topology.devices.map((item) => <FoundationDevice device={item} box={geometry.devices[item.id]} interfaces={geometry.interfaces} active={deviceIsFocused(item)} key={item.id}/>)}
+      {frame.topology.devices.map((item) => <FoundationDevice device={item} box={geometry.devices[item.id]} interfaces={geometry.interfaces} active={deviceIsFocused(item)} showInterfaceLabels={displayMode === 'interfaces' && showInterfaceLabels} key={item.id}/>)}
       {calloutDevices.map((item) => <FoundationCallout device={item} box={geometry.devices[item.id]} frame={frame} viewBoxWidth={viewBoxWidth} key={`callout:${item.id}`}/>)}
       <g className="network-foundation-zone-labels" aria-hidden="true">{frame.topology.zones.map((zone, index) => <text x={`${zoneWidth * index + zoneWidth / 2}%`} y="98%" textAnchor="middle" key={zone.id}>{zone.label}</text>)}</g>
     </svg>
-    <div className="network-foundation-caption"><span>{frame.scene.networkType}</span><strong>{frame.evidence.conclusion}</strong><em>Generic view</em></div>
+    <div className="network-foundation-caption"><span>{frame.scene.networkType}</span><strong>{frame.evidence.conclusion}</strong><em>{displayMode === 'interfaces' ? 'Interface' : 'Generic'} view</em></div>
     <p className="sr-only" role="status">Operation {frame.operation.index} of 8. Detail {frame.detail.index} of {frame.detail.total}: {frame.detail.label}. {frame.phase.explanation}</p>
   </div>;
 });
@@ -250,12 +256,35 @@ export function NetworkFoundationConceptsView({ frame }) {
   </section>;
 }
 
-export function NetworkFoundationEvidenceView({ frame }) {
+export function NetworkFoundationEvidenceView({ frame, displayMode = 'generic' }) {
   if (!frame) return null;
   return <section className="network-foundation-evidence" aria-label="Foundation evidence">
     <span>Step evidence</span><strong>{frame.evidence.conclusion}</strong>
-    <dl><div><dt>Network topology</dt><dd>{frame.scene.label}</dd></div><div><dt>Situation</dt><dd>{frame.situation.label}</dd></div><div><dt>Representation</dt><dd>Generic</dd></div><div><dt>Focus</dt><dd>{frame.evidence.category}</dd></div></dl>
+    <dl><div><dt>Network topology</dt><dd>{frame.scene.label}</dd></div><div><dt>Situation</dt><dd>{frame.situation.label}</dd></div><div><dt>Representation</dt><dd>{displayMode === 'interfaces' ? 'Interfaces' : 'Generic'}</dd></div><div><dt>Focus</dt><dd>{frame.evidence.category}</dd></div></dl>
   </section>;
+}
+
+export function NetworkFoundationDetails({ frame, controller, expanded, onExpandedChange, compact, active, displayMode, onDisplayModeChange, showInterfaceLabels, onShowInterfaceLabelsChange }) {
+  const [tab, setTab] = useState('interfaces');
+  const tabs = [['interfaces', 'Interface labels'], ['packet', 'Packet details'], ['tables', 'Tables'], ['steps', 'Steps']];
+  if (!frame) return null;
+  function navigate(e, index) {
+    const next = e.key === 'Home' ? 0 : e.key === 'End' ? 3 : e.key === 'ArrowRight' ? (index + 1) % 4 : e.key === 'ArrowLeft' ? (index + 3) % 4 : null;
+    if (next === null) return;
+    e.preventDefault(); setTab(tabs[next][0]); e.currentTarget.parentElement.children[next].focus();
+  }
+  return <aside className={`network-foundation-details mobile-surface ${active ? 'mobile-active' : ''} ${expanded ? 'is-expanded' : 'is-collapsed'}`} aria-label="Evidence and details">
+    <header><h2>Evidence and details</h2>{!compact ? <button type="button" aria-expanded={expanded} aria-controls="foundation-details-content" aria-label={`${expanded ? 'Collapse' : 'Expand'} networking evidence`} onClick={() => onExpandedChange(!expanded)}>{expanded ? '‹' : '›'}</button> : null}</header>
+    <div id="foundation-details-content" hidden={!expanded}>
+      <div className="foundation-details-tabs" role="tablist" aria-label="Network evidence view">{tabs.map(([id, label], index) => <button type="button" key={id} id={`foundation-tab-${id}`} role="tab" aria-selected={tab === id} aria-controls={`foundation-panel-${id}`} tabIndex={tab === id ? 0 : -1} onClick={() => setTab(id)} onKeyDown={(e) => navigate(e, index)}>{label}</button>)}</div>
+      {tabs.filter(([id]) => id === tab).map(([id]) => <section key={id} id={`foundation-panel-${id}`} role="tabpanel" aria-labelledby={`foundation-tab-${id}`} tabIndex="0">
+        {id === 'interfaces' ? <><label className="foundation-view-mode">Topology view<select aria-label="Topology view" value={displayMode} onChange={(e) => onDisplayModeChange(e.target.value)}><option value="generic">Generic</option><option value="interfaces">Interfaces</option></select></label><label className="foundation-label-toggle"><span>Show interface labels</span><input type="checkbox" checked={displayMode === 'interfaces' && showInterfaceLabels} onChange={(e) => { onShowInterfaceLabelsChange(e.target.checked); if (e.target.checked) onDisplayModeChange('interfaces'); }}/></label><p>{frame.detail.globalIndex === 1 ? 'No packet has moved yet.' : frame.movement.path}</p><NetworkFoundationEvidenceView frame={frame} displayMode={displayMode}/></> : null}
+        {id === 'packet' ? <><h3>Application request</h3><dl><div><dt>Situation</dt><dd>{frame.situation.label}</dd></div><div><dt>Protocol</dt><dd>{frame.situation.protocol}</dd></div><div><dt>Request</dt><dd>{frame.situation.request}</dd></div></dl><p>This foundations scenario explains roles and movement. It does not model packet headers or packet identities.</p><NetworkFoundationConceptsView frame={frame}/></> : null}
+        {id === 'tables' ? <><h3>Tables are not applicable</h3><p>This foundations scenario does not populate ARP or switch MAC tables. Those belong to the ARP activity.</p><NetworkFoundationEvidenceView frame={frame} displayMode={displayMode}/></> : null}
+        {id === 'steps' ? <NetworkStepsView frame={frame} controller={controller}/> : null}
+      </section>)}
+    </div>
+  </aside>;
 }
 
 export const NetworkFoundationGuidePanel = memo(function NetworkFoundationGuidePanel({ frame, expanded, onExpandedChange }) {

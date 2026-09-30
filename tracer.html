@@ -6,7 +6,7 @@
 <title>ITCC47 Pseudocode Tracer</title>
 <link rel="stylesheet" href="styles.css">
 </head>
-<body class="app-fixed" data-course="itcc47">
+<body class="app-fixed tracer-page" data-course="itcc47">
 
 <header class="topbar">
   <div class="topbar-title">
@@ -43,7 +43,10 @@
 
       <p id="status-line" class="muted status-line" role="status" aria-live="polite">Write or load pseudocode, then Run.</p>
 
-      <textarea id="code-box" class="code-box code-editor" spellcheck="false" rows="16" aria-label="Pseudocode editor"></textarea>
+      <div class="numbered-editor">
+        <div class="editor-line-numbers" aria-hidden="true"><pre></pre></div>
+        <textarea id="code-box" class="code-box code-editor" data-line-numbers wrap="off" spellcheck="false" rows="16" aria-label="Pseudocode editor"></textarea>
+      </div>
       <div id="code-view" class="code-view hidden"></div>
 
       <div class="inputs-block">
@@ -102,6 +105,7 @@
           <thead><tr><th>#</th><th>Line</th><th>Statement</th><th>Description</th></tr></thead>
           <tbody id="trace-body"></tbody>
         </table>
+        <div id="trace-empty" class="trace-empty"><span data-icon="tracer" aria-hidden="true"></span><strong>Run to inspect execution</strong><p>The trace table will show each executed line,<br>its statement, and a description.</p></div>
       </div>
     </div>
 

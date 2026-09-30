@@ -1275,18 +1275,37 @@ ok('foundation renderer resolves five fixed layouts from named interfaces rather
   && networkingFoundationsRendererSource.includes('data-to-interface-id={item.toInterfaceId}')
   && networkingFoundationsRendererSource.includes('data-path-definition={geometry.paths[item.id]}')
   && networkingFoundationsRendererSource.includes('activity.input.activityByPreset[presetId]'));
-ok('current movement is rendered once above the full-width network canvas on desktop and phone',
+// Screen 26 places the operation rail between movement and the split workbench.
+// Check uniqueness and ordering rather than requiring the old adjacent JSX tags.
+ok('current movement is rendered exactly once above the operation rail and network workbench',
   networkingRendererSource.includes('export function NetworkCurrentMovement')
   && !networkingRendererSource.includes('<NetworkCurrentMovement frame={frame} compact/>')
-  && visualizerSource.includes('<><NetworkCurrentMovement frame={networkFrame}/><div ref={networkWorkbenchRef}'));
+  && visualizerSource.split('<NetworkCurrentMovement frame={networkFrame}/>').length === 2
+  && visualizerSource.indexOf('<NetworkCurrentMovement frame={networkFrame}/>') < visualizerSource.indexOf('<NetworkFoundationHeader frame={networkFrame}/>')
+  && visualizerSource.indexOf('<NetworkFoundationHeader frame={networkFrame}/>') < visualizerSource.indexOf('ref={networkWorkbenchRef}')
+  && visualizerSource.includes('isNetworkFoundations && !usesCompactWorkspace ? <NetworkFoundationHeader'));
 const networkingDiagramControlsSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'network-diagram-controls.jsx'), 'utf8');
-ok('Module 1 stays generic while the ARP preview preserves Generic, Interfaces, and its label toggle',
+// Screen 26 explicitly requires effective label toggling. Preserve the Generic
+// initial state and ARP controls, and require the new controlled presentation.
+ok('Module 1 starts Generic and exposes real labels while ARP preserves both display modes',
   networkingDiagramControlsSource.includes("onModeChange('generic')")
   && networkingDiagramControlsSource.includes("onModeChange('interfaces')")
   && networkingDiagramControlsSource.includes('onShowLabelsChange(event.target.checked)')
-  && networkingFoundationsRendererSource.includes('data-display-mode="generic"')
-  && networkingFoundationsRendererSource.includes('data-interface-labels="hidden"')
+  && visualizerSource.includes("useState(() => isNetworkFoundations ? 'generic' : 'interfaces')")
+  && networkingFoundationsRendererSource.includes("displayMode = 'generic', showInterfaceLabels = false")
+  && networkingFoundationsRendererSource.includes('data-display-mode={displayMode}')
+  && networkingFoundationsRendererSource.includes("data-interface-labels={displayMode === 'interfaces' && showInterfaceLabels ? 'visible' : 'hidden'}")
+  && networkingFoundationsRendererSource.includes('onShowInterfaceLabelsChange(e.target.checked)')
+  && networkingFoundationsRendererSource.includes("if (e.target.checked) onDisplayModeChange('interfaces')")
+  && networkingFoundationsRendererSource.includes("showInterfaceLabels={displayMode === 'interfaces' && showInterfaceLabels}")
+  && networkingFoundationsRendererSource.includes('>{item.label}</text>')
   && !networkingFoundationsRendererSource.includes('<NetworkDiagramControls'));
+ok('foundation evidence never impersonates ARP packet headers or tables',
+  networkingFoundationsRendererSource.includes('does not model packet headers or packet identities')
+  && networkingFoundationsRendererSource.includes('does not populate ARP or switch MAC tables')
+  && !networkingFoundationsRendererSource.includes('<NetworkPacketInspector')
+  && !networkingFoundationsRendererSource.includes('<NetworkTablesView')
+  && networkingFoundationsRendererSource.includes('<NetworkStepsView frame={frame} controller={controller}/>'));
 ok('device callouts use synchronized third-person teaching narration and preserve overlapping role classifications',
   networkingFoundationsRendererSource.includes('data-callout-device-id={device.id}')
   && networkingFoundationsRendererSource.includes('frame.callouts?.[device.id]')
@@ -1430,6 +1449,39 @@ ok('problems.data.js has problems', PROBLEMS.length > 0);
   ok(`${id}: additional Chapter 1 problem is shipped`, PROBLEMS.some((problem) => problem.id === id));
 });
 ok('round count is set', ROUNDS > 0);
+
+// Public fixtures must survive reference verification and repeated student runs.
+// Exercise the actual boundary functions with public data and legal in-run aliasing.
+const publicProblemFixtures = JSON.parse(fs.readFileSync(path.join(ROOT, 'problems.public.json'), 'utf8'));
+publicProblemFixtures.forEach((problem) => {
+  const shipped = PROBLEMS.find((entry) => entry.id === problem.id);
+  ok(`${problem.id}: generated visible fixtures match public source`,
+    JSON.stringify(shipped?.visibleTests) === JSON.stringify(problem.visibleTests));
+});
+const fixtureSource = 'READ capacity\nREAD items\nREAD front\nREAD value\ncopy <- items\nitems[0] <- value\nWRITE copy[0]';
+const fixtureAst = parse(fixtureSource);
+const referenceBoundary = fs.readFileSync(path.join(ROOT, 'tools/build-problems.js'), 'utf8')
+  .match(/function runReference\([\s\S]*?\n\}/)[0];
+const runtimeBoundary = fs.readFileSync(path.join(ROOT, 'problems-app.js'), 'utf8')
+  .match(/function execCase\([\s\S]*?\n\}/)[0];
+const runFixtureReference = vm.runInNewContext(`${referenceBoundary}; runReference`);
+const runFixtureRuntime = vm.runInNewContext(`${runtimeBoundary}; execCase`, {
+  collectSteps: collectForCounting,
+  STEP_CAP: 20000,
+  TracerError: countingEngine.get('TracerError'),
+  outputsOf: (steps) => steps.filter((step) => step.type === 'write').map((step) => step.frame.outputValue),
+});
+for (const [name, execute] of [
+  ['reference', (inputs) => runFixtureReference({ runProgram }, fixtureAst, inputs)],
+  ['runtime', (inputs) => runFixtureRuntime(fixtureAst, inputs).outputs],
+]) {
+  const fixture = [3, ['A', 'B', 'C'], 1, 'D'];
+  const original = JSON.stringify(fixture);
+  for (let repeat = 1; repeat <= 2; repeat++) {
+    ok(`${name} run ${repeat}: array aliases still observe mutations inside one execution`, eq(execute(fixture), ['D']));
+    ok(`${name} run ${repeat}: nested public fixture is unchanged`, JSON.stringify(fixture) === original);
+  }
+}
 
 PROBLEMS.forEach((p) => {
   ok(`${p.id}: starter parses`, parses(p.starter));

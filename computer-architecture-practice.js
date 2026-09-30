@@ -5,6 +5,18 @@
   let progress = ComputerArchitecturePractice.read(localStorage);
   const count = document.getElementById('ca-practice-progress');
   const resetButton = document.getElementById('ca-reset-practice');
+  const tabs = document.getElementById('ca-section-tabs');
+  const sections = ComputerArchitecturePractice.SECTIONS;
+
+  function selectSection(id, focus = false) {
+    [...tabs.children].forEach((tab) => {
+      const selected = tab.dataset.section === id;
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      if (selected && focus) tab.focus();
+      document.getElementById(tab.getAttribute('aria-controls')).hidden = !selected;
+    });
+  }
 
   function updateProgress() {
     count.textContent = `${progress.solvedIds.length} / ${ComputerArchitecturePractice.QUESTIONS.length} complete`;
@@ -17,7 +29,21 @@
     const sectionElement = document.createElement('section');
     sectionElement.id = section.id;
     sectionElement.className = 'ca-practice-section';
-    sectionElement.innerHTML = `<header><span>${section.title}</span><p>${section.description}</p></header><div class="ca-practice-section-cards"></div>`;
+    sectionElement.setAttribute('role', 'tabpanel');
+    sectionElement.setAttribute('aria-labelledby', `tab-${section.id}`);
+    sectionElement.innerHTML = `<p class="section-description">${section.description}</p><div class="ca-practice-section-cards"></div>`;
+    const tab = document.createElement('button');
+    tab.type = 'button'; tab.id = `tab-${section.id}`; tab.dataset.section = section.id;
+    tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', section.id);
+    tab.textContent = section.title;
+    tab.addEventListener('click', () => selectSection(section.id));
+    tab.addEventListener('keydown', event => {
+      const index = sections.indexOf(section);
+      const next = { ArrowRight: (index + 1) % sections.length, ArrowLeft: (index + sections.length - 1) % sections.length, Home: 0, End: sections.length - 1 }[event.key];
+      if (next === undefined) return;
+      event.preventDefault(); selectSection(sections[next].id, true);
+    });
+    tabs.appendChild(tab);
     const cards = sectionElement.querySelector('.ca-practice-section-cards');
     ComputerArchitecturePractice.QUESTIONS.filter((question) => question.section === section.id).forEach((question) => {
       const questionIndex = ComputerArchitecturePractice.QUESTIONS.indexOf(question);
@@ -42,6 +68,7 @@
     });
     root.appendChild(sectionElement);
   });
+  selectSection(sections[0].id);
 
   resetButton.addEventListener('click', () => {
     progress = ComputerArchitecturePractice.reset(localStorage);

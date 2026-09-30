@@ -36,6 +36,7 @@ const tels = {
   callStackBox: document.getElementById('call-stack-box'),
   outputBox: document.getElementById('output-box'),
   traceBody: document.getElementById('trace-body'),
+  traceEmpty: document.getElementById('trace-empty'),
   tabTrace: document.getElementById('tab-trace'),
   tabOps: document.getElementById('tab-ops'),
   tabRecurrence: document.getElementById('tab-recurrence'),
@@ -121,6 +122,7 @@ function syncCodeEditorHeight() {
   if (!tels.codeBox || tels.codeBox.classList.contains('hidden')) return;
   tels.codeBox.style.height = 'auto';
   tels.codeBox.style.height = `${Math.max(tels.codeBox.scrollHeight + 2, 192)}px`;
+  window.ITCC47EditorTools?.syncLineNumbers(tels.codeBox);
 }
 
 tels.codeBox.addEventListener('input', syncCodeEditorHeight);
@@ -530,6 +532,7 @@ function exitRunMode() {
   tels.btnStep.disabled = true;
   tels.btnPlay.textContent = 'Play';
   tels.traceBody.innerHTML = '';
+  tels.traceEmpty.classList.remove('hidden');
   tels.varsBox.textContent = 'Run the pseudocode to see variable state.';
   tels.callStackBox.textContent = 'No function is active.';
   tels.outputBox.textContent = '(no output yet)';
@@ -558,11 +561,19 @@ function selectMobileWorkspace(which) {
 
 function buildTraceTable() {
   tels.traceBody.innerHTML = '';
+  tels.traceEmpty.classList.toggle('hidden', tstate.steps.length > 0);
   tstate.steps.forEach((step, i) => {
     const tr = document.createElement('tr');
     tr.id = `trace-row-${i}`;
     tr.className = `trace-row-${step.type}`;
     tr.addEventListener('click', () => {
+      tracerPlayback.seek(i);
+    });
+    tr.tabIndex = 0;
+    tr.setAttribute('aria-label', `Event ${i}: ${step.message}`);
+    tr.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
       tracerPlayback.seek(i);
     });
     tr.innerHTML = `<td>${i}</td><td>${step.source.line}</td><td><code>${escapeHtml(step.source.code)}</code></td><td>${escapeHtml(step.message)}</td>`;

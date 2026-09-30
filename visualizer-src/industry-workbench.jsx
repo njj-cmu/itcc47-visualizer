@@ -14,8 +14,10 @@ function PreviewIndicator() {
 const DatasetPreview = memo(function DatasetPreview({ scenario }) {
   const dataset = ITCC47IndustryWorkbench.dataset;
   const records = scenario.previewIndices.slice(0, 4).map((index) => ({ index, record: dataset.recordAt(scenario.datasetView, index) }));
-  return <div className="industry-scenario-preview" aria-label={`${scenario.datasetView} dataset preview`}>
-    {records.map(({ index, record }) => <p key={`${scenario.id}:${index}`}><span>{index.toLocaleString()}</span><strong>{record.ticketId}</strong><em>{record.priority}</em><small>{record.status}</small></p>)}
+  return <div className="industry-dataset-preview">
+    <table aria-label={`${scenario.datasetView} dataset preview`}><thead><tr><th scope="col">Index</th><th scope="col">Ticket</th><th scope="col">Priority</th><th scope="col">Status</th></tr></thead><tbody>
+    {records.map(({ index, record }) => <tr key={index}><td>{index.toLocaleString()}</td><td><strong>{record.ticketId}</strong></td><td><em>{record.priority}</em></td><td>{record.status}</td></tr>)}
+    <tr><td colSpan="4">… More records in the scenarios</td></tr></tbody></table>
   </div>;
 });
 
@@ -24,25 +26,29 @@ function ScenarioHub({ Icon }) {
   const options = ITCC47CurriculumUI.previewOptions();
   const releases = useMemo(() => new Map(scenarios.map((scenario) => [scenario.id, ITCC47Curriculum.stateForResource('activity', scenario.id, options)])), [scenarios, options.preview]);
   const anyOpen = scenarios.some((scenario) => isOpenState(releases.get(scenario.id)?.state));
+  const previewScenario = scenarios.find((scenario) => isOpenState(releases.get(scenario.id)?.state));
   return <main className="industry-hub" aria-labelledby="industry-hub-title">
     <a className="industry-back-link" href={ITCC47CurriculumUI.href('problems.html?view=workbenches')}><Icon name="back" size={16}/>Workbench samples</a>
     <header className="industry-hub-heading"><div><h1 id="industry-hub-title">Industry Data Workbench</h1><p>Use one shared support dataset to see why different questions need different techniques.</p></div><PreviewIndicator/></header>
     <section className="industry-how" aria-label="How it works"><strong>How it works</strong><ol><li><span>1</span>Choose a scenario</li><li><Icon name="arrow" size={18}/></li><li><span>2</span>Inspect compressed records</li><li><Icon name="arrow" size={18}/></li><li><span>3</span>Follow the algorithm</li></ol></section>
-    <section className="industry-dataset-band" aria-labelledby="industry-dataset-title">
-      <Icon name="database" size={27}/><div><h2 id="industry-dataset-title">Shared dataset: Support Operations</h2><p>12,400 support tickets</p></div>
-      <div><strong>ticket ID · priority · opened at · category · status · SLA</strong><p>Stable ticket IDs persist across arrival-order, priority-sorted, and manual-review views.</p></div>
+    <div className="industry-hub-grid">
+    <section className="industry-dataset-card" aria-labelledby="industry-dataset-title">
+      <header><Icon name="database" size={38}/><div><h2 id="industry-dataset-title">Support Operations</h2><p>{ITCC47IndustryWorkbench.dataset.logicalLength.toLocaleString()} deterministic support tickets</p></div></header>
+      <p>Stable ticket IDs persist across arrival-order, priority-sorted, and manual-review views.</p>
+      {anyOpen ? <><DatasetPreview scenario={previewScenario}/><p className="industry-preview-caption">{ITCC47IndustryWorkbench.dataset.views[previewScenario.datasetView].label} · representative records</p></> : <div className="industry-scenario-locked-preview"><Icon name="lock" size={22}/><span>Dataset remains closed until release</span></div>}
     </section>
     <div className="industry-scenario-list" aria-label="Industry dataset scenarios">
-      {scenarios.map((scenario) => {
+      {scenarios.map((scenario, index) => {
         const release = releases.get(scenario.id);
         const open = isOpenState(release.state);
         return <article className={`industry-scenario-row release-item-${release.state}`} key={scenario.id}>
-          {open ? <DatasetPreview scenario={scenario}/> : <div className="industry-scenario-locked-preview" aria-hidden="true"><Icon name="lock" size={22}/><span>Dataset remains closed until release</span></div>}
+          <span className="industry-scenario-number" aria-hidden="true">{index + 1}</span>
           <div className="industry-scenario-copy"><h2>{scenario.title}</h2><span>{ITCC47IndustryWorkbench.dataset.views[scenario.datasetView].label}</span><p>{scenario.question}</p></div>
-          <div className="industry-scenario-algorithm"><strong>{scenario.algorithm}</strong><span><Icon name="clock" size={18}/>{complexityLabel(scenario)}</span></div>
+          <div className="industry-scenario-algorithm"><div><span>Method</span><strong>{scenario.algorithm}</strong></div><div><span>Complexity</span><strong><Icon name="clock" size={18}/>{complexityLabel(scenario)}</strong></div></div>
           <a className={`industry-scenario-action${open ? ' is-primary' : ''}`} href={ITCC47CurriculumUI.href(`industry-workbench.html?scenario=${encodeURIComponent(scenario.id)}`)}>{open ? 'Open scenario' : 'View requirements'}<Icon name="arrow" size={17}/></a>
         </article>;
       })}
+    </div>
     </div>
     {!anyOpen ? <p className="industry-release-note"><Icon name="lock" size={16}/>Scenario metadata is visible now. Records and timelines open together at Industry data integration.</p> : null}
   </main>;
@@ -109,6 +115,47 @@ function RecordRail({ frame, inspectedIndex, pinnedIndex, setPreviewIndex, setPi
   </>;
 }
 
+function RecordTable({ frame, inspectedIndex, pinnedIndex, setPreviewIndex, setPinnedIndex, onCloseInspector }) {
+  const onKeyDown = (event) => {
+    if (event.key === 'Escape') { onCloseInspector(); return; }
+    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+    const buttons = [...event.currentTarget.querySelectorAll('[data-record-button]')];
+    const current = buttons.indexOf(document.activeElement);
+    if (current < 0) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : Math.max(0, Math.min(buttons.length - 1, current + (event.key === 'ArrowDown' ? 1 : -1)));
+    buttons[next]?.focus();
+  };
+  return <div className="industry-record-table" onKeyDown={onKeyDown} tabIndex="0" role="region" aria-label="Compressed ticket records">
+    <table><caption>Ticket records ({frame.view.label.toLowerCase()})</caption><thead><tr><th scope="col">Index</th><th scope="col">Ticket ID</th><th scope="col">Status</th><th scope="col">Opened at</th></tr></thead>
+      <tbody>{frame.tokens.map((token) => {
+        if (token.kind === 'gap') return <tr className={`industry-table-gap ${gapState(token, frame)}`} key={token.id}><td colSpan="4" title={`${token.start.toLocaleString()} through ${token.end.toLocaleString()}: ${token.reason}`}>… <span>{token.count.toLocaleString()} records compressed · indexes {token.start.toLocaleString()}–{token.end.toLocaleString()}</span> …</td></tr>;
+        if (token.kind === 'hole') return <tr className="is-hole" key={token.id}><td>{token.index.toLocaleString()}</td><td colSpan="3">OPEN · {token.label}</td></tr>;
+        const pointers = frame.pointers.filter((pointer) => pointer.index === token.index);
+        const scanned = inRanges(token.index, frame.scannedRange ? [frame.scannedRange] : []);
+        return <tr key={token.id} className={`role-${token.role}${inRanges(token.index, frame.discardedRanges) ? ' is-discarded' : ''}${scanned ? ' is-scanned' : ''}${inspectedIndex === token.index ? ' is-selected' : ''}`}
+          onMouseEnter={() => setPreviewIndex(token.index)} onMouseLeave={() => setPreviewIndex(null)}>
+          <td>{token.index.toLocaleString()}{pointers.map((pointer) => <small className={`industry-table-pointer tone-${pointer.tone}`} key={pointer.id}>{pointer.label}</small>)}</td>
+          <td><button type="button" data-record-button data-record-index={token.index} aria-pressed={pinnedIndex === token.index} aria-label={`Index ${token.index}, ${token.record.ticketId}, ${frame.keyField} ${token.key}`}
+            onFocus={() => setPreviewIndex(token.index)} onBlur={() => setPreviewIndex(null)} onClick={() => setPinnedIndex((current) => current === token.index ? null : token.index)}>{token.record.ticketId}</button></td>
+          <td>{token.record.status}</td><td>{token.record.openedAt.slice(5)}</td>
+        </tr>;
+      })}</tbody>
+    </table>
+  </div>;
+}
+
+function SlaEvidence({ frame, metricEntries, invariantEntries }) {
+  const resultFact = frame.facts.find((fact) => fact.label === 'result');
+  const pending = frame.comparison?.outcome === true ? 'Breach confirmed / Awaiting return' : metricEntries.some((metric) => metric.value > 0) ? 'Not found yet / Scanning' : 'Not found yet / Not scanned';
+  return <><h3 className="industry-evidence-title">Evidence and state</h3><div className="industry-state-evidence industry-sla-evidence">
+    <section aria-label="Operation metrics">{metricEntries.map((metric) => <div key={metric.key}><span>{metric.label}</span><b>{factValue(metric.value)}</b></div>)}</section>
+    <section aria-label="Active range"><span>Active range</span><b>{frame.activeRange ? frame.activeRange.map(factValue).join(' … ') : 'Scan complete'}</b></section>
+    <section aria-label="Current invariants"><span>Invariants</span><div>{invariantEntries.map(([key, value]) => <strong className={value === false ? 'is-open' : 'is-valid'} key={key}>{humanizeKey(key)} <em>{typeof value === 'boolean' ? (value ? 'holds' : 'open') : factValue(value)}</em></strong>)}</div></section>
+    <section aria-label="Result"><span>Result</span><b className={resultFact ? 'is-found' : 'is-pending'}>{resultFact ? factValue(resultFact.value) : pending}</b>{resultFact ? <small>Index {factValue(frame.facts.find((fact) => fact.label === 'index')?.value)}</small> : null}</section>
+  </div></>;
+}
+
 function RecordInspector({ record, onClose, Icon }) {
   if (!record) return null;
   const fields = [
@@ -146,26 +193,29 @@ function IndustryWorkbench({ scenario, Icon, usePlaybackHook, IntegratedPlayback
   const summary = summaryFor(scenario);
   const metricEntries = scenario.metrics.map((metric) => ({ ...metric, value: event?.metrics?.[metric.key] ?? 0 }));
   const invariantEntries = Object.entries(frame?.invariants || {});
+  const isSla = scenario.id === 'industry-sla-breach-scan';
+  const predicate = isSla ? result.events[0].frame.facts.find((fact) => fact.label === 'predicate') : null;
   const closeInspector = useCallback(() => { setPinnedIndex(null); setPreviewIndex(null); }, []);
 
-  return <main className={`industry-workbench industry-motion-${motionPreference.mode}`} style={{ '--industry-transition-duration': `${motionDurationForSpeed(playback.speed)}s` }} aria-labelledby="industry-workbench-title">
+  return <main className={`industry-workbench${isSla ? ' industry-sla' : ''} industry-motion-${motionPreference.mode}`} style={{ '--industry-transition-duration': `${motionDurationForSpeed(playback.speed)}s` }} aria-labelledby="industry-workbench-title">
     <a className="industry-back-link" href={ITCC47CurriculumUI.href('industry-workbench.html')}><Icon name="back" size={16}/>Industry Data Workbench</a>
     <header className="industry-workbench-heading"><div><h1 id="industry-workbench-title">{scenario.title}</h1><p>{scenario.id.includes('priority-range') ? 'Find the complete P2 priority band in 12,400 support tickets.' : scenario.subtitle}</p></div><PreviewIndicator/></header>
     <section className="industry-summary" aria-label="Scenario summary">{summary.map((item) => <div key={item.label}><Icon name={item.icon} size={23}/><span>{item.label}</span><strong>{item.value}</strong></div>)}</section>
     <section className="industry-teaching-panel" aria-labelledby="industry-teaching-title">
       <header className="industry-teaching-heading"><h2 id="industry-teaching-title">{headingFor(scenario, frame)}</h2><p aria-live="polite">{event?.message}</p></header>
       <ol className="industry-phase-rail" aria-label="Scenario phases">{frame.phase.steps.map((step, index) => <li className={`is-${step.state}`} key={step.id}><span>{step.state === 'complete' ? <Icon name="check" size={15}/> : index + 1}</span>{step.label}</li>)}</ol>
+      {predicate ? <div className="industry-predicate"><span>SLA breach predicate</span><code>{predicate.value}</code></div> : null}
       {frame.held.length ? <div className="industry-held-row" aria-label="Held records">{frame.held.map((held) => <article key={held.ticketId}><span>{held.label}</span><strong>{held.ticketId}</strong><em>{held.priority}</em></article>)}</div> : null}
-      <RecordRail frame={frame} inspectedIndex={inspectedIndex} pinnedIndex={pinnedIndex} setPreviewIndex={setPreviewIndex} setPinnedIndex={setPinnedIndex} onCloseInspector={closeInspector}/>
+      {isSla ? <RecordTable frame={frame} inspectedIndex={inspectedIndex} pinnedIndex={pinnedIndex} setPreviewIndex={setPreviewIndex} setPinnedIndex={setPinnedIndex} onCloseInspector={closeInspector}/> : <RecordRail frame={frame} inspectedIndex={inspectedIndex} pinnedIndex={pinnedIndex} setPreviewIndex={setPreviewIndex} setPinnedIndex={setPinnedIndex} onCloseInspector={closeInspector}/>}
       <RecordInspector record={inspectedRecord} onClose={closeInspector} Icon={Icon}/>
       {frame.operationSpan ? <div className="industry-operation-span"><Icon name="compress" size={18}/><strong>{frame.operationSpan.count.toLocaleString()} repeated operations compressed</strong><span>indexes {frame.operationSpan.start.toLocaleString()}…{frame.operationSpan.end.toLocaleString()} · {frame.operationSpan.reason}</span></div> : null}
       {frame.transition ? <div className="industry-transition" onAnimationEnd={() => onEntityComplete(frame.transition.entityId)}><span>shift source <strong>{frame.transition.from.toLocaleString()}</strong></span><Icon name="arrow" size={18}/><span>destination <strong>{frame.transition.to.toLocaleString()}</strong></span></div> : null}
       {frame.comparison ? <div className={`industry-comparison outcome-${frame.comparison.outcome}`}><code>{frame.comparison.text}</code><Icon name="arrow" size={16}/><strong>{String(frame.comparison.outcome).toUpperCase()}</strong></div> : null}
-      <div className="industry-facts">{frame.facts.map((fact) => <div className={`tone-${fact.tone || 'default'}`} key={fact.label}><span>{fact.label}</span><strong>{factValue(fact.value)}</strong></div>)}</div>
-      <div className="industry-state-evidence">
+      {(!isSla || frame.comparison) ? <div className="industry-facts">{frame.facts.map((fact) => <div className={`tone-${fact.tone || 'default'}`} key={fact.label}><span>{fact.label}</span><strong>{factValue(fact.value)}</strong></div>)}</div> : null}
+      {isSla ? <SlaEvidence frame={frame} metricEntries={metricEntries} invariantEntries={invariantEntries}/> : <div className="industry-state-evidence">
         <section aria-label="Operation metrics"><span>Metrics</span>{metricEntries.map((metric) => <strong key={metric.key}>{metric.short} <em>{factValue(metric.value)}</em></strong>)}</section>
         <section aria-label="Current invariants"><span>Invariants</span>{invariantEntries.map(([key, value]) => <strong className={value === false ? 'is-open' : 'is-valid'} key={key}>{humanizeKey(key)} <em>{typeof value === 'boolean' ? (value ? 'holds' : 'open') : factValue(value)}</em></strong>)}</section>
-      </div>
+      </div>}
       <IntegratedPlaybackComponent state={playback} controller={controller} event={event} motionPreference={motionPreference}/>
     </section>
     <footer className="industry-complexity"><span>Time <strong>{scenario.complexity.worst}</strong></span><i aria-hidden="true">·</i><span>Extra space <strong>{scenario.complexity.space}</strong></span><i aria-hidden="true">·</i><span>Stable ticket IDs preserved</span></footer>

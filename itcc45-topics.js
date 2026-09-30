@@ -23,12 +23,23 @@
     const activities = ITCC45Activities.forTopic(topic.id);
     const item = element('li', 'oop-topic-group');
     item.dataset.topic = topic.id;
+    const railLink = element('a', '', '');
+    railLink.href = `#topic-${topic.id}`;
+    railLink.append(element('span', 'topic-number', String(topicIndex + 1).padStart(2, '0')), element('strong', '', topic.title));
+    if (!topicIndex) railLink.setAttribute('aria-current', 'location');
+    document.getElementById('itcc45-topic-nav').append(railLink);
 
     const heading = element('header', 'oop-topic-group-heading');
     heading.append(element('span', 'topic-number', String(topicIndex + 1).padStart(2, '0')));
     const copy = element('div', 'topic-copy');
     const title = element('h2', '', topic.title);
     title.id = `topic-${topic.id}`;
+    title.tabIndex = -1;
+    railLink.addEventListener('click', () => {
+      document.querySelectorAll('.oop-topic-nav a').forEach((link) => link.removeAttribute('aria-current'));
+      railLink.setAttribute('aria-current', 'location');
+      title.focus({ preventScroll: true });
+    });
     copy.append(title, element('p', '', topic.summary));
     const practice = element('a', 'topic-practice-link', 'Practice 3 tasks');
     practice.href = `itcc45-practice.html?topic=${encodeURIComponent(topic.id)}`;

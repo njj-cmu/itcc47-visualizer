@@ -390,7 +390,7 @@ test('Network Lab follows five client-server situations step by step and preserv
     await expect(page.locator('.network-foundation-concepts')).toContainText('selects the link leading to Web server');
     await page.getByRole('tab', { name: 'Evidence', exact: true }).click();
     await expect(page.locator('.network-foundation-evidence')).toContainText('Open a website');
-    await page.getByRole('tab', { name: 'Steps', exact: true }).click();
+    await page.locator('.mobile-surface-tabs').getByRole('tab', { name: 'Steps', exact: true }).click();
     await expect(page.locator('.network-current-movement')).toContainText('Service router → Web server');
   } else {
     const desktopMovement = page.locator('.workspace-main > .network-current-movement');
@@ -2242,6 +2242,85 @@ test('queue enqueue and dequeue animate stable value identities from offline fil
     const after = await ticketA.boundingBox();
     return Math.hypot(after.x - beforeDequeue.x, after.y - beforeDequeue.y);
   }, { timeout: 2500 }).toBeGreaterThan(35);
+});
+
+test('queue mobile views preserve a single source, playback state, settings, and footer across resize', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/visualizer.html?activity=queue-fifo-basics');
+  const workbench = page.locator('.queue-workbench');
+  const tabs = page.getByRole('tablist', { name: 'Workspace view' });
+  await expect(tabs.getByRole('tab', { name: 'Visualize' })).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(workbench).toHaveAttribute('data-phase', '2');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByLabel('Speed', { exact: true }).selectOption('9');
+  await page.getByLabel('Motion preference', { exact: true }).selectOption('off');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await tabs.getByRole('tab', { name: 'Visualize' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(tabs.getByRole('tab', { name: 'Source' })).toBeFocused();
+  await expect(page.locator('.queue-source')).toBeVisible();
+  await expect(page.locator('.queue-source .source-line.is-current')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Step', exact: true }).click();
+  await expect(workbench).toHaveAttribute('data-phase', '3');
+  await page.keyboard.press('Tab');
+  await tabs.getByRole('tab', { name: 'Evidence' }).click();
+  await expect(page.getByRole('region', { name: 'Queue Basics' })).toBeVisible();
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await expect(page.locator('.queue-source')).toBeVisible();
+  await expect(page.locator('.queue-physical')).toBeVisible();
+  await expect(workbench).toHaveAttribute('data-phase', '3');
+  await page.setViewportSize({ width: 360, height: 800 });
+  await expect(tabs.getByRole('tab', { name: 'Evidence' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('.queue-source .source-line.is-current')).toHaveCount(1);
+  await expect(page.locator('#btn-step')).toHaveCount(1);
+  const box = await page.getByRole('button', { name: 'Step', exact: true }).boundingBox();
+  expect(box.y + box.height).toBeLessThanOrEqual(800);
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await expect(page.getByLabel('Speed', { exact: true })).toHaveValue('9');
+  await expect(page.getByLabel('Motion preference', { exact: true })).toHaveValue('off');
+  await page.getByLabel('Playback settings', { exact: true }).click();
+  await page.getByRole('button', { name: 'Menu', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Practice this module' })).toHaveAttribute('href', /problem-list.html\?module=4/);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('foundation evidence controls effective interface labels without changing the scenario or timeline', async ({ page }, testInfo) => {
+  await page.goto('/visualizer.html?course=computer-networking&activity=networking-read-classroom-network');
+  const mobile = testInfo.project.name === 'phone';
+  const workspaceTabs = page.locator('.mobile-surface-tabs');
+  if (mobile) await workspaceTabs.getByRole('tab', { name: 'Evidence', exact: true }).click();
+  const panel = page.getByRole('complementary', { name: 'Evidence and details' });
+  const diagram = page.locator('.network-foundations-renderer');
+  await expect(diagram).toHaveAttribute('data-interface-labels', 'hidden');
+  await panel.getByRole('checkbox', { name: 'Show interface labels' }).check();
+  await expect(diagram).toHaveAttribute('data-display-mode', 'interfaces');
+  await expect(diagram).toHaveAttribute('data-interface-labels', 'visible');
+  expect(await diagram.locator('.network-foundation-interface text').count()).toBeGreaterThan(0);
+  await expect(page.locator('.integrated-step strong')).toHaveText('1 / 24');
+  await panel.getByRole('combobox', { name: 'Topology view' }).selectOption('generic');
+  await expect(panel.getByRole('checkbox', { name: 'Show interface labels' })).not.toBeChecked();
+  await expect(diagram.locator('.network-foundation-interface text')).toHaveCount(0);
+  await panel.getByRole('tab', { name: 'Packet details' }).click();
+  await expect(panel).toContainText('does not model packet headers or packet identities');
+  await panel.getByRole('tab', { name: 'Tables', exact: true }).click();
+  await expect(panel.getByRole('heading', { name: 'Tables are not applicable' })).toBeVisible();
+  await panel.getByRole('tab', { name: 'Steps', exact: true }).click();
+  await panel.locator('.network-steps-view > li').nth(1).getByRole('button').first().click();
+  await expect(diagram).toHaveAttribute('data-operation-id', 'choose-endpoint');
+  const position = await page.locator('.integrated-step strong').innerText();
+  if (!mobile) {
+    await panel.getByRole('button', { name: 'Collapse networking evidence' }).click();
+    await panel.getByRole('button', { name: 'Expand networking evidence' }).click();
+  }
+  await expect(page.locator('.integrated-step strong')).toHaveText(position);
+  const options = await page.getByRole('combobox', { name: 'Situation' }).locator('option').evaluateAll(items => items.map(item => item.value));
+  expect(options).toHaveLength(5);
+  for (const situation of options) {
+    await page.getByRole('combobox', { name: 'Situation' }).selectOption(situation);
+    await expect(diagram).toHaveAttribute('data-situation-id', situation);
+    await expect(page.locator('.integrated-step strong')).toHaveText('1 / 24');
+  }
 });
 
 test('printer queue visualizer presents all seven FIFO states with semantic front and back', async ({ page }, testInfo) => {

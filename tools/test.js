@@ -1275,18 +1275,37 @@ ok('foundation renderer resolves five fixed layouts from named interfaces rather
   && networkingFoundationsRendererSource.includes('data-to-interface-id={item.toInterfaceId}')
   && networkingFoundationsRendererSource.includes('data-path-definition={geometry.paths[item.id]}')
   && networkingFoundationsRendererSource.includes('activity.input.activityByPreset[presetId]'));
-ok('current movement is rendered once above the full-width network canvas on desktop and phone',
+// Screen 26 places the operation rail between movement and the split workbench.
+// Check uniqueness and ordering rather than requiring the old adjacent JSX tags.
+ok('current movement is rendered exactly once above the operation rail and network workbench',
   networkingRendererSource.includes('export function NetworkCurrentMovement')
   && !networkingRendererSource.includes('<NetworkCurrentMovement frame={frame} compact/>')
-  && visualizerSource.includes('<><NetworkCurrentMovement frame={networkFrame}/><div ref={networkWorkbenchRef}'));
+  && visualizerSource.split('<NetworkCurrentMovement frame={networkFrame}/>').length === 2
+  && visualizerSource.indexOf('<NetworkCurrentMovement frame={networkFrame}/>') < visualizerSource.indexOf('<NetworkFoundationHeader frame={networkFrame}/>')
+  && visualizerSource.indexOf('<NetworkFoundationHeader frame={networkFrame}/>') < visualizerSource.indexOf('ref={networkWorkbenchRef}')
+  && visualizerSource.includes('isNetworkFoundations && !usesCompactWorkspace ? <NetworkFoundationHeader'));
 const networkingDiagramControlsSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'network-diagram-controls.jsx'), 'utf8');
-ok('Module 1 stays generic while the ARP preview preserves Generic, Interfaces, and its label toggle',
+// Screen 26 explicitly requires effective label toggling. Preserve the Generic
+// initial state and ARP controls, and require the new controlled presentation.
+ok('Module 1 starts Generic and exposes real labels while ARP preserves both display modes',
   networkingDiagramControlsSource.includes("onModeChange('generic')")
   && networkingDiagramControlsSource.includes("onModeChange('interfaces')")
   && networkingDiagramControlsSource.includes('onShowLabelsChange(event.target.checked)')
-  && networkingFoundationsRendererSource.includes('data-display-mode="generic"')
-  && networkingFoundationsRendererSource.includes('data-interface-labels="hidden"')
+  && visualizerSource.includes("useState(() => isNetworkFoundations ? 'generic' : 'interfaces')")
+  && networkingFoundationsRendererSource.includes("displayMode = 'generic', showInterfaceLabels = false")
+  && networkingFoundationsRendererSource.includes('data-display-mode={displayMode}')
+  && networkingFoundationsRendererSource.includes("data-interface-labels={displayMode === 'interfaces' && showInterfaceLabels ? 'visible' : 'hidden'}")
+  && networkingFoundationsRendererSource.includes('onShowInterfaceLabelsChange(e.target.checked)')
+  && networkingFoundationsRendererSource.includes("if (e.target.checked) onDisplayModeChange('interfaces')")
+  && networkingFoundationsRendererSource.includes("showInterfaceLabels={displayMode === 'interfaces' && showInterfaceLabels}")
+  && networkingFoundationsRendererSource.includes('>{item.label}</text>')
   && !networkingFoundationsRendererSource.includes('<NetworkDiagramControls'));
+ok('foundation evidence never impersonates ARP packet headers or tables',
+  networkingFoundationsRendererSource.includes('does not model packet headers or packet identities')
+  && networkingFoundationsRendererSource.includes('does not populate ARP or switch MAC tables')
+  && !networkingFoundationsRendererSource.includes('<NetworkPacketInspector')
+  && !networkingFoundationsRendererSource.includes('<NetworkTablesView')
+  && networkingFoundationsRendererSource.includes('<NetworkStepsView frame={frame} controller={controller}/>'));
 ok('device callouts use synchronized third-person teaching narration and preserve overlapping role classifications',
   networkingFoundationsRendererSource.includes('data-callout-device-id={device.id}')
   && networkingFoundationsRendererSource.includes('frame.callouts?.[device.id]')

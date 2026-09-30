@@ -88,7 +88,7 @@ function build() {
   const data = validate(JSON.parse(fs.readFileSync(SOURCE, 'utf8')));
   validateRelease(data, readReleaseProfile());
   const banner = '/* GENERATED FILE — edit curriculum.public.json, then run node tools/build-curriculum.js. */';
-  fs.writeFileSync(OUTPUT, `${banner}\nconst ITCC47_CURRICULUM_DATA = ${JSON.stringify(data, null, 2)};\n`, 'utf8');
+  fs.writeFileSync(OUTPUT, `${banner}\nconst ITCC47_CURRICULUM_DATA = ${JSON.stringify(data)};\n`, 'utf8');
   console.log(`Built curriculum.data.js (${data.checkpoints.length} checkpoints, ${data.resources.length} resources)`);
 }
 

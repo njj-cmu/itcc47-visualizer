@@ -230,7 +230,7 @@ function build() {
  * and nothing to decrypt. Hidden inputs are obfuscated, not encrypted.
  */`;
 
-  const body = `${banner}\nconst PROBLEM_SCHEMA_VERSION = 1;\nconst PROBLEM_ROUNDS = ${ROUNDS};\nconst PROBLEMS = ${JSON.stringify(out, null, 2)};\n`;
+  const body = `${banner}\nconst PROBLEM_SCHEMA_VERSION = 1;\nconst PROBLEM_ROUNDS = ${ROUNDS};\nconst PROBLEMS = ${JSON.stringify(out)};\n`;
   fs.writeFileSync(path.join(ROOT, 'problems.data.js'), body, 'utf8');
 
   const totalHidden = out.reduce((a, p) => a + p.hidden.length, 0);

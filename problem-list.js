@@ -18,7 +18,7 @@
   const esc = ITCC47CurriculumUI.esc;
   const cards = document.getElementById('problem-cards');
   document.getElementById('module-crumb').textContent = moduleName;
-  document.getElementById('problem-list-heading').textContent = `${module?.title || moduleName}: select a problem`;
+  document.getElementById('problem-list-heading').textContent = module?.title || moduleName;
 
   if (!problems.length) {
     cards.innerHTML = '<div class="empty-module"><h2>Planned practice</h2><p>This module is on the roadmap; its checked practice set is still being prepared.</p><a class="btn btn-primary" href="problems.html">Return to roadmap</a></div>';
@@ -27,13 +27,15 @@
       const release = ITCC47Curriculum.stateForResource('problem', problem.id, releaseOptions);
       const open = ['available', 'current'].includes(release.state);
       const complete = Boolean(solved[problem.id]);
-      const hasDraft = Object.prototype.hasOwnProperty.call(drafts, problem.id);
+      const hasDraft = typeof drafts[problem.id] === 'string' && drafts[problem.id].length > 0;
       const difficultyClass = `diff-${problem.difficulty.toLowerCase().replace(/[^a-z]/g, '')}`;
       const article = document.createElement('article'); article.className = `problem-choice problem-choice-${release.state}`;
       article.innerHTML = `<div class="problem-choice-number" aria-hidden="true">${String(index + 1).padStart(2, '0')}</div>
-        <div class="problem-choice-body"><div class="problem-choice-heading"><h2>${esc(problem.title)}</h2>${ITCC47CurriculumUI.badge(release.state)}<span class="chip chip-diff ${difficultyClass}">${esc(problem.difficulty)}</span>${complete ? '<span class="chip chip-solved">Solved</span>' : ''}</div>
+        <div class="problem-choice-body"><div class="problem-choice-heading"><h2>${esc(problem.title)}</h2></div>
         <p>${open ? esc(problem.statement) : esc(ITCC47CurriculumUI.requirement(release))}</p>
-        <small>${open ? `${problem.visibleTests.length} visible example${problem.visibleTests.length === 1 ? '' : 's'} · ${hasDraft && !complete ? 'Draft saved' : complete ? 'Completed in this browser' : 'Not started'}` : `Requires ${esc(release.checkpoint?.title || 'curriculum review')}`}</small></div>
+        <small>${open ? `${problem.visibleTests.length} visible example${problem.visibleTests.length === 1 ? '' : 's'}` : `Requires ${esc(release.checkpoint?.title || 'curriculum review')}`}</small></div>
+        <div class="problem-choice-tags">${ITCC47CurriculumUI.badge(release.state)}<span class="chip chip-diff ${difficultyClass}">${esc(problem.difficulty)}</span>${complete ? '<span class="chip chip-solved">Solved</span>' : ''}</div>
+        <span class="problem-choice-state">${hasDraft && !complete ? 'Draft saved' : complete ? 'Completed in this browser' : 'Not started'}</span>
         <a class="btn ${open && !complete ? 'btn-primary' : 'btn-edit'} problem-choice-action" href="${ITCC47CurriculumUI.href(`practice.html?module=${moduleNumber}&problem=${encodeURIComponent(problem.id)}`)}">${open ? complete ? 'Review' : hasDraft ? 'Continue' : 'Start' : 'Requirements'}</a>`;
       cards.appendChild(article);
     });

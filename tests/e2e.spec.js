@@ -21,6 +21,12 @@ const midtermResourcesByModule = new Map([1, 2, 3, 4].map((moduleNumber) => [mod
   curriculumSource.resources.filter((resource) => checkpointById.get(resource.checkpointId)?.moduleId === `m${moduleNumber}`),
 ]));
 
+async function selectReviewModule(page, number) {
+  const selector = page.locator('#midterm-module-select');
+  if (await selector.isVisible()) await selector.selectOption(String(number));
+  else await page.locator(`[data-midterm-nav-module="${number}"]`).click();
+}
+
 const studentStateTests = new Set([
   'curriculum roadmap expands the current module and compacts locked modules',
   'student preview query cannot expose instructor controls or locked content',
@@ -1283,8 +1289,7 @@ test('Midterm Review presents every reviewed checkpoint and resource on laptop a
 
   const module2 = page.locator('[data-midterm-module="2"]');
   const module2Toggle = module2.locator('[data-midterm-module-toggle="2"]');
-  await module2Toggle.focus();
-  await page.keyboard.press('Enter');
+  await selectReviewModule(page, 2);
   await expect(module2Toggle).toHaveAttribute('aria-expanded', 'true');
   await expect(module2.locator('.midterm-module-body')).toBeVisible();
   await expect(page.locator('[data-midterm-module="4"] [data-midterm-module-toggle]')).toHaveAttribute('aria-expanded', 'false');
@@ -1298,9 +1303,11 @@ test('Midterm Review presents every reviewed checkpoint and resource on laptop a
   const reachedResources = [];
   for (const moduleNumber of [1, 2, 3, 4]) {
     const module = page.locator(`[data-midterm-module="${moduleNumber}"]`);
-    await module.locator('[data-midterm-module-toggle]').click();
+    await selectReviewModule(page, moduleNumber);
     await expect(module.locator('.midterm-module-body')).toBeVisible();
-    await module.locator('.midterm-more').evaluateAll((items) => items.forEach((item) => { item.open = true; }));
+    for (const details of await module.locator('.midterm-more').all()) {
+      if (await details.getAttribute('open') === null) await details.locator('summary').click();
+    }
     reachedResources.push(...await module.locator('[data-midterm-resource]').evaluateAll((links) => links.filter((link) => link.getClientRects().length > 0).map((link) => link.dataset.midtermResource)));
   }
   expect(new Set(reachedResources).size).toBe(64);
@@ -1363,18 +1370,18 @@ test('Midterm stage numbers follow only the stages that exist', async ({ page })
   };
   await expectStages('orientation', ['learn']);
   await expect(page.locator('[data-midterm-checkpoint="orientation"] [data-midterm-stage="learn"] [data-midterm-resource="tool:writer"]')).toBeVisible();
-  await expectStages('m1-ipo', ['learn', 'practice']);
+  await expectStages('m1-ipo', ['practice']);
   await expect(page.locator('[data-midterm-checkpoint="m1-ipo"] [data-midterm-stage="visualize"]')).toHaveCount(0);
-  await page.locator('[data-midterm-module="2"] [data-midterm-module-toggle]').click();
-  await expectStages('m2-linear-search', ['learn', 'visualize', 'practice']);
-  await expectStages('m2-industry-workbench', ['learn', 'visualize']);
+  await selectReviewModule(page, 2);
+  await expectStages('m2-linear-search', ['visualize', 'practice']);
+  await expectStages('m2-industry-workbench', ['visualize']);
   await expect(page.locator('[data-midterm-checkpoint="m2-arrays"] [data-midterm-stage="visualize"]')).toHaveCount(0);
 });
 
 test('Midterm Review derives core choices from checkpoint sequence and frames Module 3 around references', async ({ page }) => {
   await page.goto('/problems.html?view=midterm');
   const module3 = page.locator('[data-midterm-module="3"]');
-  await module3.locator('[data-midterm-module-toggle="3"]').click();
+  await selectReviewModule(page, 3);
   const foundation = module3.locator('[data-midterm-checkpoint="m3-linked-foundations"]');
   await expect(foundation).toContainText('Linked storage, identity, and reachability');
   await expect(foundation).toContainText('contiguous storage with explicit links');
@@ -1505,7 +1512,7 @@ test('focused visualizations remember visits and fade only after the final step'
   await expect(bubbleCard).toHaveClass(/visualization-visited/);
   await expect(bubbleCard).not.toHaveClass(/visualization-reviewed/);
   await expect(bubbleCard).toContainText('Visited');
-  await expect(bubbleCard).toContainText(/Last visited at: \d{2}\/\d{2}\/\d{4}/);
+  await expect(bubbleCard.locator('.visualization-progress-meta')).toHaveAttribute('title', /Last visited at: \d{2}\/\d{2}\/\d{4}/);
   await bubbleCard.click();
   await expect(page.getByRole('heading', { name: 'Bubble Sort' })).toBeVisible();
   await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
@@ -1517,7 +1524,7 @@ test('focused visualizations remember visits and fade only after the final step'
   await expect(bubbleCard).toHaveClass(/visualization-reviewed/);
   await expect(bubbleCard).toContainText('Reviewed');
   await expect(page.getByRole('heading', { name: '1 of 25 available visualizations reviewed' })).toBeVisible();
-  await expect(bubbleCard).toHaveCSS('background-color', 'rgb(32, 33, 38)');
+  await expect(bubbleCard).toHaveCSS('background-color', 'rgb(20, 33, 31)');
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('itcc47.visualizer-progress:v1')));
   expect(stored.schemaVersion).toBe(1);
   expect(Object.keys(stored.activities['bubble-sort']).sort()).toEqual(['lastVisitedAt', 'reviewedAt']);
@@ -1526,7 +1533,7 @@ test('focused visualizations remember visits and fade only after the final step'
 test('workbench samples are separate from focused visualizations', async ({ page }) => {
   await page.goto('/problems.html?view=workbenches');
   await expect(page.getByRole('tab', { name: 'Workbench Samples' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('heading', { name: 'See how algorithms support real data decisions' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Algorithms behind real data decisions.' })).toBeVisible();
   await expect(page.locator('.industry-catalog-feature')).toHaveCount(1);
   await expect(page.locator('.industry-catalog-feature')).toContainText('Industry Data Workbench Sample');
   await expect(page.locator('.industry-catalog-feature')).toContainText('Choose a scenario');
@@ -3917,16 +3924,119 @@ test('problem work tabs reach code and results on a phone', async ({ page }, tes
   await expect(page.locator('#results-body')).toBeVisible();
 });
 
+test('problem selector reports local drafts accurately and clears only practice records after confirmation', async ({ browser }) => {
+  const context = await browser.newContext({ serviceWorkers: 'block' });
+  const page = await context.newPage();
+  try {
+    await page.goto('http://127.0.0.1:' + (process.env.ITCC47_TEST_PORT || 4173) + '/problem-list.html?module=4');
+    await page.evaluate(() => {
+      const problems = PROBLEMS.filter(problem => problem.module === 'Module 4');
+      const records = Object.fromEntries(problems.map((problem, index) => [problem.id, {
+        contentVersion: problem.contentVersion, draft: index === 1 ? 'WRITE 1' : '', completed: index === 2,
+      }]));
+      localStorage.setItem('itcc47.practice-records:v2', JSON.stringify({ schemaVersion: 2, records }));
+      localStorage.setItem('itcc47.problems.v1', '{}');
+      localStorage.setItem('itcc47.problems.code.v1', '{}');
+      localStorage.setItem('itcc47.visualizer-progress:v1', '{"sentinel":"keep"}');
+      localStorage.setItem('itcc45.practice:v1', '{"sentinel":"keep"}');
+    });
+    await page.reload();
+    const rows = page.locator('.problem-choice');
+    await expect(rows).toHaveCount(6);
+    await expect(rows.nth(0).locator('.problem-choice-action')).toHaveText('Start');
+    await expect(rows.nth(0).locator('.problem-choice-state')).toHaveText('Not started');
+    await expect(rows.nth(1).locator('.problem-choice-action')).toHaveText('Continue');
+    await expect(rows.nth(1).locator('.problem-choice-state')).toHaveText('Draft saved');
+    await expect(rows.nth(2).locator('.problem-choice-action')).toHaveText('Review');
+    const before = await page.evaluate(() => localStorage.getItem('itcc47.practice-records:v2'));
+    page.once('dialog', dialog => dialog.dismiss());
+    await page.locator('#btn-clear-progress').click();
+    expect(await page.evaluate(() => localStorage.getItem('itcc47.practice-records:v2'))).toBe(before);
+    page.once('dialog', dialog => dialog.accept());
+    await page.locator('#btn-clear-progress').click();
+    await expect(rows.locator('.problem-choice-action')).toHaveText(Array(6).fill('Start'));
+    expect(await page.evaluate(() => ['itcc47.practice-records:v2', 'itcc47.problems.v1', 'itcc47.problems.code.v1'].map(key => localStorage.getItem(key)))).toEqual([null, null, null]);
+    expect(await page.evaluate(() => ['itcc47.visualizer-progress:v1', 'itcc45.practice:v1'].map(key => localStorage.getItem(key)))).toEqual(['{"sentinel":"keep"}', '{"sentinel":"keep"}']);
+  } finally { await context.close(); }
+});
+
+test('practice bank selection preserves release gates, URL history and every available problem', async ({ browser }, testInfo) => {
+  const context = await browser.newContext({ baseURL: testInfo.project.use.baseURL });
+  const page = await context.newPage();
+  try {
+    await page.goto('/problems.html');
+    const originalProfile = await page.evaluate(() => JSON.stringify(ITCC47Curriculum.activeProfile()));
+    const reached = [];
+    for (const number of [1, 2, 3, 4]) {
+      await page.locator(`[data-bank-select="${number}"]`).click();
+      await expect(page.locator(`[data-bank-select="${number}"]`)).toHaveAttribute('aria-current', 'true');
+      const panel = page.locator(`[data-bank-module="${number}"]`);
+      await expect(panel).toBeVisible();
+      expect(new URL(page.url()).searchParams.get('bank')).toBe(String(number));
+      reached.push(...await panel.locator('.module-problem-card').evaluateAll(links => links.map(a => new URL(a.href).searchParams.get('problem'))));
+    }
+    const expected = curriculumSource.resources.filter(r => r.kind === 'problem' && ['m1','m2','m3','m4'].includes(checkpointById.get(r.checkpointId)?.moduleId)).map(r => r.id);
+    expect(reached.sort()).toEqual(expected.sort());
+    await page.locator('[data-bank-select="5"]').click();
+    await expect(page.locator('[data-bank-module="5"] .module-problem-card')).toHaveCount(0);
+    await expect(page.locator('[data-bank-module="5"]')).toContainText('View requirements');
+    await page.goBack();
+    await expect(page.locator('[data-bank-module="4"]')).toBeVisible();
+    await page.getByRole('tab', { name: 'Midterm Review' }).click();
+    await selectReviewModule(page, 2);
+    await page.getByRole('tab', { name: 'Practice banks' }).click();
+    await expect(page.locator('[data-bank-module="4"]')).toBeVisible();
+    await page.goBack();
+    await expect(page.getByRole('tab', { name: 'Midterm Review' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('[data-midterm-module="2"]')).toBeVisible();
+    expect(await page.evaluate(() => JSON.stringify(ITCC47Curriculum.activeProfile()))).toBe(originalProfile);
+  } finally { await context.close(); }
+});
+
+test('topic disclosures survive resize and do not mark activities reviewed', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/problems.html?view=visualizations');
+  const before = await page.evaluate(() => localStorage.getItem('itcc47.visualizer-progress:v1'));
+  const sorting = page.getByRole('button', { name: 'Sorting', exact: true });
+  const searching = page.getByRole('button', { name: 'Searching', exact: true });
+  await expect(sorting).toHaveAttribute('aria-expanded', 'true');
+  await expect(searching).toHaveAttribute('aria-expanded', 'false');
+  await searching.focus(); await page.keyboard.press('Enter');
+  await expect(searching).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('.visualization-card', { hasText: 'Binary Search' }).first()).toBeVisible();
+  await sorting.click();
+  await expect(page.locator('.visualization-card', { hasText: 'Bubble Sort' })).toBeHidden();
+  await page.setViewportSize({ width: 1366, height: 768 });
+  await expect(page.locator('.visualization-card:visible')).toHaveCount(35);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(sorting).toHaveAttribute('aria-expanded', 'false');
+  await expect(searching).toHaveAttribute('aria-expanded', 'true');
+  expect(await page.evaluate(() => localStorage.getItem('itcc47.visualizer-progress:v1'))).toBe(before);
+});
+
+test('workbench catalog links every registered scenario and preserves its individual gate', async ({ page }) => {
+  await page.goto('/problems.html?view=workbenches');
+  const rows = await page.locator('.catalog-scenario').evaluateAll(links => links.map(link => ({ id: link.dataset.scenario, route: new URL(link.href).searchParams.get('scenario') })));
+  const expected = await page.evaluate(() => ITCC47IndustryWorkbench.listScenarios().map(s => s.id));
+  expect(rows.map(row => row.id)).toEqual(expected);
+  expect(rows.every(row => row.id === row.route)).toBe(true);
+  for (const id of expected) {
+    await page.locator(`[data-scenario="${id}"]`).click();
+    await expect(page.locator('.industry-workbench')).toBeVisible();
+    await page.goBack();
+  }
+});
+
 test('module catalog exposes current practice and retains the full problem list', async ({ page }, testInfo) => {
   await page.goto('/problems.html');
-  await expect(page.getByRole('heading', { name: 'Choose how to review' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Practice banks', exact: true })).toBeVisible();
   await expect(page.locator('.module-card')).toHaveCount(8);
   await expect(page.locator('.module-card-current')).toContainText('Stacks, Queues, and Deques');
   await expect(page.locator('.module-card-locked')).not.toHaveCount(0);
   await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(6);
-  await page.getByRole('link', { name: /Browse all Module 4 practice/ }).click();
+  await page.getByRole('link', { name: /Open 6 problems/ }).click();
   await expect(page).toHaveURL(/problem-list\.html\?module=4$/);
-  await expect(page.getByRole('heading', { name: 'Stacks, Queues, and Deques: select a problem' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Stacks, Queues, and Deques', exact: true })).toBeVisible();
   await page.locator('.problem-choice-action').first().click();
   await expect(page).toHaveURL(/practice\.html\?module=4&problem=/);
   await expect(page.locator('#p-module')).toHaveText('Module 4');
@@ -4025,7 +4135,7 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
   await expect(page.locator('.companion-thesis')).toHaveText('DATA + REFERENCES = STRUCTURE');
 
   await page.goto(`file:///${path.resolve(__dirname, '..', 'problems.html').replace(/\\/g, '/')}?view=midterm`);
-  await expect(page.getByRole('heading', { name: /Move from understanding/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Midterm Review', exact: true })).toBeVisible();
   await expect(page.locator('[data-midterm-module]')).toHaveCount(4);
   await page.locator('[data-midterm-module="4"] [data-midterm-module-toggle="4"]').click();
   await page.locator('[data-midterm-resource="activity:stack-lifo-basics"]').click();

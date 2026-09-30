@@ -203,6 +203,62 @@ test('subject chooser remains usable when the catalog grows to ten courses', asy
   expect(Math.min(...layout.widths)).toBeGreaterThanOrEqual(280);
 });
 
+test('public subject chooser preserves three, two and one columns as its catalog grows', async ({ browser }) => {
+  const context = await browser.newContext({ serviceWorkers: 'block' });
+  const page = await context.newPage();
+  try {
+    for (const width of [360, 390, 700, 1099, 1100, 1366, 1920]) {
+      await page.setViewportSize({ width, height: 1080 });
+      await page.goto(`http://127.0.0.1:${process.env.ITCC47_TEST_PORT || 4173}/index.html`);
+      for (const count of [4, 5, 7, 10]) {
+        await page.evaluate((count) => {
+          const catalog = document.querySelector('.subject-choices');
+          const seeds = [...catalog.children].slice(0, 4);
+          while (catalog.children.length < count) catalog.append(seeds[catalog.children.length % 4].cloneNode(true));
+        }, count);
+        const grid = await page.locator('.subject-choice').evaluateAll((cards) => {
+          const boxes = cards.map((card) => card.getBoundingClientRect());
+          return {
+            columns: boxes.filter((box) => Math.abs(box.top - boxes[0].top) < 1).length,
+            widths: boxes.map((box) => box.width),
+            fourthAtLeft: Math.abs(boxes[3].left - boxes[0].left) < 1,
+            overflow: document.documentElement.scrollWidth > innerWidth,
+            previewOverflow: [...document.querySelectorAll('.subject-preview')].some((node) => node.scrollWidth > node.clientWidth + 1),
+          };
+        });
+        expect(grid.columns, `${width}px with ${count} subjects`).toBe(width >= 1100 ? 3 : width >= 700 ? 2 : 1);
+        expect(grid.overflow).toBe(false);
+        expect(grid.previewOverflow).toBe(false);
+        expect(Math.max(...grid.widths) - Math.min(...grid.widths)).toBeLessThan(1);
+        if (width >= 1100) expect(grid.fourthAtLeft).toBe(true);
+      }
+    }
+  } finally { await context.close(); }
+});
+
+test('public practice examples remain canonical after repeated array-mutating answers', async ({ browser }) => {
+  const context = await browser.newContext({ serviceWorkers: 'block' });
+  const page = await context.newPage();
+  try {
+    await page.goto(`http://127.0.0.1:${process.env.ITCC47_TEST_PORT || 4173}/practice.html?module=4&problem=queue-service`);
+    const canonical = [3, ['A', 'B', 'C'], 1, 'D'];
+    const currentInputs = () => page.evaluate(() => PROBLEMS.find((problem) => problem.id === 'queue-service').visibleTests[0].inputs);
+    expect(await currentInputs()).toEqual(canonical);
+    if (await page.getByRole('tab', { name: 'Code', exact: true }).isVisible()) {
+      await page.getByRole('tab', { name: 'Code', exact: true }).click();
+    }
+    await page.locator('#code-box').fill('READ capacity\nREAD items\nREAD front\nREAD value\ncopy <- items\nitems[0] <- value\nWRITE copy[0]');
+    for (let repeat = 0; repeat < 2; repeat++) {
+      if (await page.getByRole('tab', { name: 'Code', exact: true }).isVisible()) {
+        await page.getByRole('tab', { name: 'Code', exact: true }).click();
+      }
+      await page.locator('#btn-check').click();
+      expect(await currentInputs()).toEqual(canonical);
+      expect(await page.locator('#p-examples').textContent()).toContain('A');
+    }
+  } finally { await context.close(); }
+});
+
 test('computer architecture roadmap exposes one current module and two non-clickable planned modules', async ({ page }) => {
   await page.goto('/computer-architecture-modules.html');
   await expect(page.locator('.ca-module-card')).toHaveCount(3);
@@ -2830,7 +2886,7 @@ test('Explore the Tools performs a guided transition and moves focus', async ({ 
   await page.goto('/itcc47.html');
   await page.getByRole('link', { name: 'Explore the Tools' }).click();
   await expect(page).toHaveURL(/#tools$/);
-  await expect(page.getByRole('heading', { name: 'Open a tool' })).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Explore the Tools' })).toBeFocused();
 });
 
 test('subject chooser routes to both course homes', async ({ page }) => {

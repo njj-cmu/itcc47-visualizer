@@ -237,9 +237,25 @@ test('selected Midterm modules, disclosures, navigation, and local progress rema
   await expect(page.locator('[data-progress-state="completed"]')).toHaveCount(1);
   for (const moduleNumber of [1, 2, 3, 4]) {
     const module = page.locator(`[data-midterm-module="${moduleNumber}"]`);
-    await module.locator('[data-midterm-module-toggle]').click();
+    const jump = page.locator('#midterm-module-select');
+    if (await jump.isVisible()) {
+      await jump.selectOption(String(moduleNumber));
+    } else {
+      const navButton = page.locator(`[data-midterm-nav-module="${moduleNumber}"]`);
+      await navButton.focus();
+      await page.keyboard.press('Enter');
+      await expect(navButton).toHaveAttribute('aria-current', 'true');
+    }
+    await expect(module.locator('.midterm-module-body')).toBeVisible();
+    await expect(module.locator('[data-midterm-module-toggle]')).toHaveAttribute('aria-expanded', 'true');
     await expect(page.locator('.midterm-module-body:not([hidden])')).toHaveCount(1);
-    await module.locator('.midterm-more').evaluateAll((items) => items.forEach((item) => { item.open = true; }));
+    for (const disclosure of await module.locator('.midterm-more').all()) {
+      if (await disclosure.getAttribute('open') === null) {
+        await disclosure.locator('summary').focus();
+        await page.keyboard.press('Enter');
+      }
+      await expect(disclosure).toHaveAttribute('open', '');
+    }
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       .analyze();

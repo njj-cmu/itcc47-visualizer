@@ -3,6 +3,8 @@ import './recursion-workspace.css';
 
 const format = (value) => ITCC47Recursion.formatValue(value);
 const callLabel = (frame) => frame ? frame.functionName + '(' + format(frame.locals.n) + ')' : 'driver';
+const shortValue = (tag) => tag?.kind === 'UNBOUND' ? 'unbound' : format(tag);
+const STATUS_TEXT = { RUNNING: 'Executing', RETURNING: 'Returning', WAITING: 'Paused' };
 
 export function RecursionInputs({ inputs, setInputs, controller }) {
   return <div className="data-controls recursion-fixtures">
@@ -13,7 +15,7 @@ export function RecursionInputs({ inputs, setInputs, controller }) {
   </div>;
 }
 
-function PythonSource({ source, event, filename }) {
+function PythonSource({ source, event, filename, frame }) {
   const [copyStatus, setCopyStatus] = useState('');
   async function copy() {
     try { await navigator.clipboard.writeText(source); setCopyStatus('Python copied.'); }
@@ -38,8 +40,12 @@ function PythonSource({ source, event, filename }) {
     <header><h2>Python source</h2><span>{filename}</span></header>
     <div className="recursion-source-actions"><button type="button" onClick={copy}>Copy Python</button><button type="button" onClick={download}>Download Python</button><span role="status">{copyStatus}</span></div>
     <div className="recursion-code" tabIndex="0" aria-label="Scrollable Python source">
-      {lines.map((line, i) => <div className={'source-line' + (event.source?.line === i + 1 ? ' is-current' : '')}
-        aria-current={event.source?.line === i + 1 ? 'step' : undefined} key={i}><span aria-hidden="true">{i + 1}</span><code>{line}</code></div>)}
+      {lines.map((line, i) => {
+        const paused = frame.stack.filter((id) => frame.framesById[id].status === 'WAITING' && frame.framesById[id].suspendedCallSite === i + 1);
+        return <div className={'source-line' + (event.source?.line === i + 1 ? ' is-current' : '')}
+          aria-current={event.source?.line === i + 1 ? 'step' : undefined} key={i}><span aria-hidden="true">{i + 1}</span><code>{line}</code>
+          {paused.length ? <small className="paused-here">paused here: {paused.slice().reverse().join(', ')}</small> : null}</div>;
+      })}
     </div>
     <p className="recursion-source-note">{event.source ? 'Line ' + event.source.line + ' · ' + event.source.phase.replaceAll('_', ' ') : event.terminal ? 'Execution complete; no current source instruction.' : 'No current source instruction.'}</p>
   </section>;
@@ -50,13 +56,14 @@ export function RecursionStack({ frame, inspectedId, onInspect }) {
     <header><h2>Live call stack</h2><span>TOP first · driver separate</span></header>
     {frame.stack.length ? <ol aria-label="Live calls, newest first">{frame.stack.map((id, index) => {
       const call = frame.framesById[id];
-      return <li key={id} data-call-id={id} data-call-status={call.status}>
+      return <li key={id} data-call-id={id} data-call-status={call.status} className={index === 0 ? 'is-top' : ''}>
         <button type="button" className={'recursion-frame status-' + call.status.toLowerCase()} aria-pressed={inspectedId === id}
           onClick={() => onInspect(id)} aria-label={'Inspect ' + id + ', ' + callLabel(call) + ', ' + call.status.toLowerCase()}>
           <span className="recursion-frame-title"><strong>{callLabel(call)}</strong><small>{index === 0 ? 'TOP · ' : ''}{id}</small></span>
-          <span className="recursion-frame-status">{call.status === 'RUNNING' ? 'ACTIVE' : call.status}</span>
-          <span>{call.status === 'WAITING' ? 'Waiting for ' + call.waitingFor + ' at line ' + call.suspendedCallSite : call.status === 'RETURNING' ? 'Return prepared: ' + format(call.returnValue) : 'Own parameter n = ' + format(call.locals.n)}</span>
-          {call.status === 'WAITING' ? <small>{call.continuation}</small> : null}
+          <span className="recursion-frame-status">{STATUS_TEXT[call.status] || call.status}</span>
+          <span>{call.status === 'WAITING' ? 'Stopped at line ' + call.suspendedCallSite + ' · needs ' + call.waitingFor + '’s return value' : call.status === 'RETURNING' ? 'Return prepared: ' + format(call.returnValue) : 'Running its own code'}</span>
+          <span className="recursion-chips" aria-hidden="true">{Object.entries(call.locals).map(([name, tag]) =>
+            <span className={'recursion-chip' + (tag.kind === 'UNBOUND' ? ' is-unbound' : '')} key={name}>{name} = {shortValue(tag)}</span>)}</span>
         </button>
       </li>;
     })}</ol> : <p className="recursion-empty">{frame.metrics.totalInvocations ? 'All calls have returned. The function stack is empty.' : 'No function call yet. The driver will create the first frame.'}</p>}
@@ -64,18 +71,34 @@ export function RecursionStack({ frame, inspectedId, onInspect }) {
   </section>;
 }
 
-function FrameDetails({ frame, inspectedId, follow }) {
+function ExecutingNow({ frame, event, inspectedId, follow, sourceLines }) {
   const call = frame.framesById[inspectedId];
-  return <section className="recursion-panel recursion-inspector" aria-label="Selected frame details">
-    <header><h2>Frame details</h2><button type="button" onClick={follow}>Follow active call</button></header>
-    {call ? <><p className="recursion-inspection-status">Inspecting {call.status.toLowerCase()} call · {inspectedId}{inspectedId !== frame.activeCallId ? ' · execution stays with ' + (frame.activeCallId || 'the handoff / driver') : ''}</p>
-      <h3>{callLabel(call)}</h3><dl className="recursion-locals">{Object.entries(call.locals).map(([name, tag]) => <div key={name}><dt>{name}</dt><dd data-binding={name} data-value-kind={tag.kind}>{format(tag)}</dd></div>)}</dl>
-      <dl className="recursion-detail-facts"><div><dt>Caller</dt><dd>{call.parentCallId || 'driver'} · source line {call.callSite}</dd></div>
+  const topId = frame.stack[0];
+  const isTop = inspectedId === topId;
+  const handoff = isTop && !frame.activeCallId;
+  const line = !call ? null : inspectedId === frame.activeCallId || handoff ? event.source?.line
+    : call.status === 'WAITING' ? call.suspendedCallSite : call.callSite;
+  const heading = isTop ? (handoff ? 'Top of stack · receiving a result' : 'Top of stack · ' + STATUS_TEXT[call?.status].toLowerCase() + ' now') : '';
+  return <section className="recursion-panel recursion-inspector" aria-label="Currently executing call" data-executing-call={isTop ? inspectedId : ''}>
+    <header><h2>Executing now</h2>{!isTop && topId ? <button type="button" onClick={follow}>Back to top of stack</button> : null}</header>
+    {call ? <>
+      <p className="recursion-inspection-status">{isTop ? heading + ' · ' + inspectedId : 'Inspecting ' + call.status.toLowerCase() + ' call · ' + inspectedId + ' · execution stays with ' + (frame.activeCallId || 'the handoff / driver')}</p>
+      <h3 className="recursion-executing-title">{callLabel(call)}</h3>
+      <div className="recursion-now-line" role="group" aria-label="Current instruction">
+        <span>{isTop ? (handoff ? 'Resumes at line ' : call.status === 'RETURNING' ? 'Returning from line ' : 'Running line ') : 'Paused at line '}{line ?? '—'}</span>
+        <code>{line && sourceLines[line - 1] ? sourceLines[line - 1].trim() : '(no source line)'}</code>
+      </div>
+      {isTop ? <p className="recursion-narration" role="status">{event.message}</p> : null}
+      <h4>This call’s own locals</h4>
+      <dl className="recursion-locals">{Object.entries(call.locals).map(([name, tag]) => <div key={name}><dt>{name}</dt><dd data-binding={name} data-value-kind={tag.kind}>{format(tag)}</dd></div>)}</dl>
+      <dl className="recursion-detail-facts">
+        {call.status === 'WAITING' ? <div><dt>Paused for</dt><dd>{call.waitingFor} · {call.continuation}</dd></div> : null}
+        <div><dt>Returns to</dt><dd>{call.parentCallId || 'driver'} · source line {call.callSite}</dd></div>
         <div><dt>Return value</dt><dd>{format(call.returnValue)}</dd></div>
         {call.pendingExpression.kind === 'PENDING' ? <div><dt>Call expression</dt><dd>{format(call.pendingExpression)}</dd></div> : null}
-        {call.continuation ? <div><dt>Continuation</dt><dd>{call.continuation}</dd></div> : null}</dl>
+      </dl>
       {call.locals.child_total?.kind === 'UNBOUND' && call.status === 'WAITING' ? <p>Next calculation after the child returns: <code>n + child_total</code>. This is a teaching annotation, not a bound value.</p> : null}
-    </> : <p>Step into a call, or inspect a completed call in history.</p>}
+    </> : <p>{frame.metrics.totalInvocations ? 'All calls have returned. Only the driver remains.' : 'The stack is empty. The driver will create the first frame.'}</p>}
   </section>;
 }
 
@@ -131,7 +154,8 @@ export function RecursionWorkspace({ activity, inputs, result, event, controller
   const inspectedId = selected && frame.framesById[selected] ? selected : frame.activeCallId || frame.stack[0] || frame.history.at(-1);
   const fixture = activity.fixtureFor(inputs);
   const sumLesson = activity.programId === 'sum_to';
-  const tabs = ['source', 'stack', 'details'];
+  const tabs = ['source', 'stack', 'executing'];
+  const sourceLines = fixture.source.split('\n');
   function tabKeys(e) {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
     e.preventDefault();
@@ -147,9 +171,9 @@ export function RecursionWorkspace({ activity, inputs, result, event, controller
         tabIndex={tab === id ? 0 : -1} onClick={() => setTab(id)} key={id}>{id[0].toUpperCase() + id.slice(1)}</button>)}
     </nav>
     <div className="recursion-grid">
-      <div id="recursion-surface-source" className={'recursion-surface ' + (tab === 'source' ? 'is-visible' : '')}><PythonSource source={fixture.source} event={event} filename={activity.programId + '-n' + inputs.n + '.py'}/></div>
+      <div id="recursion-surface-source" className={'recursion-surface ' + (tab === 'source' ? 'is-visible' : '')}><PythonSource source={fixture.source} event={event} frame={frame} filename={activity.programId + '-n' + inputs.n + '.py'}/></div>
       <div id="recursion-surface-stack" className={'recursion-surface ' + (tab === 'stack' ? 'is-visible' : '')}><StackRenderer frame={frame} inspectedId={inspectedId} onInspect={setSelected}/></div>
-      <div id="recursion-surface-details" className={'recursion-surface ' + (tab === 'details' ? 'is-visible' : '')}><FrameDetails frame={frame} inspectedId={inspectedId} follow={() => setSelected(null)}/></div>
+      <div id="recursion-surface-executing" className={'recursion-surface ' + (tab === 'executing' ? 'is-visible' : '')}><ExecutingNow frame={frame} event={event} inspectedId={inspectedId} sourceLines={sourceLines} follow={() => setSelected(null)}/></div>
     </div>
     {sumLesson ? <section className="recursion-panel recursion-transfer" aria-label="Return transfer"><h2>Return transfer</h2>
       {frame.returnTransfer ? <p data-transfer-stage={frame.returnTransfer.stage}><strong>{frame.returnTransfer.childCallId}</strong> → <strong>{frame.returnTransfer.callerCallId || 'driver'}</strong> · {format(frame.returnTransfer.value)} · {frame.returnTransfer.stage} · line {frame.returnTransfer.callSite} · {frame.returnTransfer.destination}</p>

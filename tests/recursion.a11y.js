@@ -18,10 +18,10 @@ for (const [id, program] of [['recursion-call-stack', 'countdown'], ['recursion-
     await page.getByRole('button', { name: /Inspect call-1,/ }).focus();
     await page.keyboard.press('Enter');
     const current = await page.locator('.recursion-workspace').getAttribute('data-event-id');
-    await surface(page, 'Details');
+    await surface(page, 'Executing');
     await expect(page.locator('.recursion-inspection-status')).toContainText('waiting call');
     await expect(page.locator('.recursion-workspace')).toHaveAttribute('data-event-id', current);
-    for (const view of ['Stack', 'Source', 'Details']) {
+    for (const view of ['Stack', 'Source', 'Executing']) {
       await surface(page, view);
       const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
       expect(results.violations.filter(v => ['serious', 'critical'].includes(v.impact)).map(v => ({ id: v.id, nodes: v.nodes.map(n => n.target) }))).toEqual([]);
@@ -30,7 +30,7 @@ for (const [id, program] of [['recursion-call-stack', 'countdown'], ['recursion-
     await page.locator('.recursion-evidence > summary').click();
     const expanded = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
     expect(expanded.violations.filter(v => ['serious', 'critical'].includes(v.impact)).map(v => v.id)).toEqual([]);
-    const tab = page.getByRole('tab', { name: 'Details', exact: true });
+    const tab = page.getByRole('tab', { name: 'Executing', exact: true });
     if (await tab.isVisible()) {
       await tab.focus(); await page.keyboard.press('Home');
       await expect(page.getByRole('tab', { name: 'Source', exact: true })).toBeFocused();

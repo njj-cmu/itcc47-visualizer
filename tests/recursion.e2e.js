@@ -86,7 +86,7 @@ test.describe('M5-A foundations', () => {
     await seek(page, calls, child);
     await screenshot(page, testInfo, '02-first-child');
     await page.getByRole('button', { name: /Inspect call-1,/ }).click();
-    await surface(page, 'Details');
+    await surface(page, 'Executing');
     await expect(page.locator('.recursion-inspection-status')).toContainText('Inspecting waiting call');
     await expect(page.locator('.recursion-workspace')).toHaveAttribute('data-active-call', 'call-2');
     await expect(page.locator('[data-binding="n"]')).toHaveText('3');
@@ -105,7 +105,7 @@ test.describe('M5-A foundations', () => {
     await expect(page.locator('[data-call-id="call-4"]')).toHaveAttribute('data-call-status', 'RETURNING');
     await screenshot(page, testInfo, '04-return-ready');
     await seek(page, sum, assigned);
-    await surface(page, 'Details');
+    await surface(page, 'Executing');
     await expect(page.locator('[data-binding="child_total"]')).toHaveText('0');
     await expect(page.locator('[data-binding="total"]')).toHaveAttribute('data-value-kind', 'UNBOUND');
     await screenshot(page, testInfo, '05-parent-assigned');

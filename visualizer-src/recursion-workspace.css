@@ -21,16 +21,30 @@
 .recursion-workspace .recursion-panel p { margin: 8px 0; }
 .recursion-warmup, .recursion-readiness, .recursion-evidence { margin: 12px 0; }
 .recursion-workspace summary { cursor: pointer; font-weight: 650; }
-.recursion-grid { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+.recursion-grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.15fr) minmax(0, 1.05fr); gap: 12px; align-items: start; }
 .recursion-surface { min-width: 0; }
 .recursion-source.source-panel { max-width: none; max-height: none; margin: 0; font-family: inherit; }
 .recursion-source-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .recursion-source-actions [role="status"] { width: 100%; font-size: .8rem; color: var(--vw-muted); }
 .recursion-code { overflow: auto; padding-bottom: 8px; }
-.recursion-code .source-line { grid-template-columns: 28px minmax(max-content,1fr); font-size: .78rem; min-width: max-content; min-height: 28px; }
+.recursion-code .source-line { grid-template-columns: 28px minmax(max-content,1fr) auto; font-size: .78rem; min-width: max-content; min-height: 28px; }
 .recursion-code .source-line code { overflow: visible; text-overflow: clip; padding-right: 10px; color: var(--vw-text); }
 .recursion-code .source-line.is-current { background: #203a54; box-shadow: inset 3px 0 var(--recursion-active); }
 .recursion-source-note { font-size: .8rem; }
+.recursion-code .paused-here { grid-column: 2 / -1; padding: 0 0 6px; color: var(--recursion-active); font-size: .72rem; font-weight: 650; white-space: nowrap; }
+.recursion-stack li.is-top .recursion-frame { padding: 16px; box-shadow: 0 0 0 2px var(--recursion-active); }
+.recursion-stack li.is-top .recursion-frame-title strong { font-size: 1.2rem; }
+.recursion-workspace .recursion-frame.status-waiting { opacity: .92; }
+.recursion-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.recursion-chip { padding: 1px 8px; border: 1px solid var(--vw-border); border-radius: 999px; font: .72rem Consolas, monospace; color: var(--vw-text); background: #0003; }
+.recursion-chip.is-unbound { color: var(--vw-muted); border-style: dashed; }
+.recursion-inspector[data-executing-call]:not([data-executing-call=""]) { border-color: var(--recursion-active); }
+.recursion-inspector h4 { margin: 14px 0 0; font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; color: var(--vw-muted); }
+.recursion-executing-title { font-size: 1.5rem !important; margin: 6px 0 12px !important; }
+.recursion-now-line { display: grid; gap: 4px; padding: 10px 12px; border-left: 4px solid var(--recursion-active); border-radius: 6px; background: #203a54; }
+.recursion-now-line > span { font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--vw-muted); }
+.recursion-now-line code { font-size: .95rem; color: var(--vw-text); white-space: pre-wrap; }
+.recursion-workspace .recursion-panel p.recursion-narration { color: var(--vw-text); font-weight: 600; }
 .recursion-stack ol { list-style: none; display: grid; gap: 8px; padding: 0; margin: 0; }
 .recursion-workspace .recursion-frame { display: flex; flex-direction: column; align-items: stretch; gap: 4px; width: 100%; padding: 12px; text-align: left; font-size: .85rem; border-left: 4px solid var(--vw-border); }
 .recursion-frame-title { display: flex; gap: 8px; justify-content: space-between; align-items: center; }

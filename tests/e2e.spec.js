@@ -1488,11 +1488,11 @@ test('locked visualization cards use a compact icon and border state', async ({ 
   await page.goto('/problems.html?view=visualizations');
   await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.industry-catalog-feature')).toBeHidden();
-  await expect(page.locator('.visualization-card')).toHaveCount(35);
+  await expect(page.locator('.visualization-card')).toHaveCount(37);
   await expect(page.locator('.visualization-card.visualization-available')).toHaveCount(19);
   await expect(page.locator('.visualization-card.visualization-current')).toHaveCount(6);
-  await expect(page.locator('.visualization-card.visualization-locked')).toHaveCount(10);
-  await expect(page.locator('.visualization-lock')).toHaveCount(10);
+  await expect(page.locator('.visualization-card.visualization-locked')).toHaveCount(12);
+  await expect(page.locator('.visualization-lock')).toHaveCount(12);
   await expect(page.locator('.visualization-card .release-badge')).toHaveCount(0);
   await expect(page.locator('.visualization-card').first().locator('.visualization-card-meta')).toContainText('Module 2');
   const familyOrder = await page.locator('.visualization-group h2').allTextContents();
@@ -1720,7 +1720,7 @@ test('the legacy visualizer discovery route redirects to the canonical catalog',
   await page.goto('/visualizer.html');
   await expect(page).toHaveURL(/problems\.html\?view=visualizations$/);
   await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.visualization-card')).toHaveCount(35);
+  await expect(page.locator('.visualization-card')).toHaveCount(37);
   await expect(page.locator('.industry-catalog-feature')).toBeHidden();
   await expect(page.locator('#visualizer-root')).toHaveCount(0);
 });
@@ -3344,7 +3344,7 @@ test('Visualize opens the canonical Modules visualization catalog', async ({ pag
   await browse.click();
   await expect(page).toHaveURL(/problems\.html\?view=visualizations$/);
   await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.visualization-card')).toHaveCount(35);
+  await expect(page.locator('.visualization-card')).toHaveCount(37);
   await expect(page.locator('.industry-catalog-feature')).toBeHidden();
   await expect(page.locator('#visualizer-root')).toHaveCount(0);
   await expect(page.locator('.visualizer-workspace')).toHaveCount(0);
@@ -4356,7 +4356,7 @@ test('topic disclosures survive resize and do not mark activities reviewed', asy
   await sorting.click();
   await expect(page.locator('.visualization-card', { hasText: 'Bubble Sort' })).toBeHidden();
   await page.setViewportSize({ width: 1366, height: 768 });
-  await expect(page.locator('.visualization-card:visible')).toHaveCount(35);
+  await expect(page.locator('.visualization-card:visible')).toHaveCount(37);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(sorting).toHaveAttribute('aria-expanded', 'false');
   await expect(searching).toHaveAttribute('aria-expanded', 'true');
@@ -4398,7 +4398,7 @@ test('module catalog exposes current practice and retains the full problem list'
 test('modules catalog opens visualizations in the shared navigation shell', async ({ page }) => {
   await page.goto('/problems.html?view=visualizations&preview=1');
   await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.visualization-card')).toHaveCount(35);
+  await expect(page.locator('.visualization-card')).toHaveCount(37);
   await page.getByRole('link', { name: /Bubble Sort/ }).click();
   await expect(page).toHaveURL(/visualizer\.html\?activity=bubble-sort&preview=1$/);
   await expect(page.locator('.topbar-nav a', { hasText: 'Visualize' })).toHaveAttribute('aria-current', 'page');
@@ -4800,3 +4800,5 @@ test('sliding-window maximum stays within a phone viewport and keeps step contro
   await page.getByRole('button', { name: 'Previous' }).click();
   await expect(page.getByTestId('sliding-window-app')).toHaveAttribute('data-state-index', '1');
 });
+
+require('./recursion.e2e');

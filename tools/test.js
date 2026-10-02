@@ -524,7 +524,7 @@ ok('insertion presentation keeps a single held entity and explicit hole', insert
 const visualizerSource = fs.readFileSync(path.join(ROOT, 'visualizer-src', 'main.jsx'), 'utf8');
 ok('visual input uses one 18-value limit', visualizerSource.includes('const MAX_VISUAL_VALUES = 18') && /parts\.length > MAX_VISUAL_VALUES/.test(visualizerSource));
 
-const workspaceEngine = load(['interpreter.js', 'playback.js', 'complexity.js', 'algorithms.js', 'activity-catalog.js', 'linear-adt-activities.js', 'industry-workbench.js', 'visualizer-registry.js'], { setTimeout, clearTimeout });
+const workspaceEngine = load(['interpreter.js', 'playback.js', 'complexity.js', 'algorithms.js', 'activity-catalog.js', 'sha256.js', 'activity-packs/recursion-traces.js', 'visualizer-src/recursion-contract.js', 'recursion-activities.js', 'linear-adt-activities.js', 'industry-workbench.js', 'visualizer-registry.js'], { setTimeout, clearTimeout });
 const Activities = workspaceEngine.get('ITCC47Activities');
 const Registry = workspaceEngine.get('ITCC47VisualizerRegistry');
 const IndustryWorkbench = workspaceEngine.get('ITCC47IndustryWorkbench');
@@ -2079,6 +2079,8 @@ const evaluationB = Evaluation.createResult(evaluationSpec);
 ok('evaluation results are deterministic', JSON.stringify(evaluationA) === JSON.stringify(evaluationB));
 ok('evaluation results contain versions', evaluationA.schemaVersion === 1 && evaluationA.engineVersion && evaluationA.activityVersion === 2);
 ok('evaluation results contain no identity or timestamps', !('studentId' in evaluationA) && !('timestamp' in evaluationA) && !('grade' in evaluationA));
+
+require('./recursion/test-contract')({ ok, section, load, root: ROOT });
 
 // ---------- report ----------
 

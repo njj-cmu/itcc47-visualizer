@@ -288,3 +288,5 @@ test('sliding-window maximum redesign has no serious or critical Axe violations'
   const summary = important.map((violation) => ({ id: violation.id, targets: violation.nodes.map((node) => node.target.join(' ')) }));
   expect(summary, important.map((violation) => `${violation.id}: ${violation.help}`).join('\n')).toEqual([]);
 });
+
+require('./recursion.a11y');

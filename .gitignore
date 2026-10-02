@@ -27,5 +27,7 @@ setup/report.html
 
 node_modules/
 .visualizer-build/
+.recursion-pack-build/
+.recursion-catalog-build/
 playwright-report/
 test-results/

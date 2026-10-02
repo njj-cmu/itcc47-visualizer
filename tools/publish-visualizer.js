@@ -8,6 +8,12 @@ const packDestination = path.join(root, 'activity-packs');
 const assets = ['visualizer-app.js', 'visualizer-workspace.css'];
 const packs = [
   {
+    buildDirectory: '.recursion-pack-build',
+    assets: ['recursion-traces.js', 'recursion-workspace.js', 'recursion-workspace.css'],
+    manifestFile: 'recursion-foundations-manifest.json',
+    manifest: { schemaVersion: 1, id: 'python-recursion-foundations', title: 'Python recursion foundations' },
+  },
+  {
     buildDirectory: '.sliding-window-pack-build',
     assets: ['sliding-window-maximum.js', 'sliding-window-maximum.css'],
     manifestFile: 'manifest.json',
@@ -34,6 +40,8 @@ for (const asset of assets) {
   if (!fs.existsSync(source)) throw new Error(`Vite did not produce ${asset}.`);
   fs.copyFileSync(source, path.join(root, asset));
 }
+fs.copyFileSync(path.join(root, '.recursion-catalog-build/recursion-activities.js'), path.join(root, 'recursion-activities.js'));
+fs.rmSync(path.join(root, '.recursion-catalog-build'), { recursive: true, force: true });
 
 fs.rmSync(packDestination, { recursive: true, force: true });
 fs.mkdirSync(packDestination, { recursive: true });

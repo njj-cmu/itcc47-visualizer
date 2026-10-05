@@ -214,10 +214,14 @@ test.describe('M5-A foundations', () => {
   });
 });
 
-test('M5 public and forged-preview routes stay locked without loading the optional pack', async ({ browser, baseURL }) => {
-  const publicContext = await browser.newContext({ baseURL });
+test('M5 routes still lock before pack loading under an earlier release profile', async ({ browser, baseURL }) => {
+  const publicContext = await browser.newContext({ baseURL, serviceWorkers: 'block' });
   try {
     const page = await publicContext.newPage();
+    await page.route('**/release-profile.js', async route => {
+      const response = await route.fetch();
+      await route.fulfill({ response, body: (await response.text()).replace("currentCheckpointId: 'm5-recursion'", "currentCheckpointId: 'm4-queue-deque'") });
+    });
     const packs = [];
     page.on('request', request => { if (request.url().includes('/activity-packs/recursion')) packs.push(request.url()); });
     for (const id of ['recursion-call-stack', 'recursion-return-values', 'recursion-list-total', 'recursion-folder-total']) {
@@ -230,4 +234,98 @@ test('M5 public and forged-preview routes stay locked without loading the option
     expect(packs).toEqual([]);
     expect(await page.evaluate(() => ITCC47_RELEASE_PROFILE.currentCheckpointId)).toBe('m4-queue-deque');
   } finally { await publicContext.close(); }
+});
+
+async function captureRelease(page, name, info) {
+  if (!process.env.M5_RELEASE_EVIDENCE_DIR) return;
+  fs.mkdirSync(process.env.M5_RELEASE_EVIDENCE_DIR, { recursive: true });
+  const capture = path.join(process.env.M5_RELEASE_EVIDENCE_DIR, name + '-' + info.project.name);
+  await page.screenshot({ path: capture + '.png', fullPage: true });
+  fs.writeFileSync(capture + '.json', JSON.stringify({
+    url: page.url(), title: await page.title(), browser: page.context().browser().version(),
+    viewport: page.viewportSize(), release: await page.evaluate(() => ITCC47_RELEASE_PROFILE.currentCheckpointId),
+    instructorAccess: await page.evaluate(() => ITCC47Curriculum.hasInstructorAccess()),
+    eventId: await page.locator('.recursion-workspace').count() ? await page.locator('.recursion-workspace').getAttribute('data-event-id') : null,
+  }, null, 2));
+}
+
+test('M5 released Python lessons open without preview and replay offline', async ({ browser, baseURL }, info) => {
+  test.setTimeout(90000);
+  const context = await browser.newContext({ baseURL, viewport: info.project.use.viewport });
+  try {
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    for (const id of ['recursion-call-stack', 'recursion-return-values', 'recursion-list-total', 'recursion-folder-total']) {
+      for (const suffix of ['', '&preview=1']) {
+        await page.goto('/visualizer.html?activity=' + id + suffix);
+        await expect(page).toHaveTitle('ITCC47 Visualizer Workspace');
+        await expect(page.locator('.recursion-workspace')).toHaveAttribute('data-event-kind', 'INITIAL');
+        await expect(page.locator('.curriculum-lock, .draft-preview-indicator')).toHaveCount(0);
+        await page.getByRole('button', { name: 'Step', exact: true }).click();
+        await expect(page.locator('.recursion-workspace')).not.toHaveAttribute('data-event-kind', 'INITIAL');
+      }
+    }
+    expect(await page.evaluate(() => ITCC47Curriculum.hasInstructorAccess())).toBe(false);
+    await captureRelease(page, 'm5-release-folder', info);
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+    await page.locator('.recursion-evidence > summary').click();
+    page.once('dialog', dialog => dialog.accept());
+    await page.getByRole('button', { name: 'Download for offline use', exact: true }).click();
+    await expect(page.locator('.recursion-evidence [role="status"]')).toContainText('Saved for offline use');
+    await context.setOffline(true);
+    for (const [id, program, key, output] of [
+      ['recursion-folder-total', 'folder_total', 'folder-course', '500\n'],
+      ['recursion-list-total', 'list_total', 'list-main', '14\n'],
+    ]) {
+      await page.goto('/visualizer.html?activity=' + id);
+      await expect(page.locator('.recursion-workspace')).toHaveAttribute('data-event-kind', 'INITIAL');
+      const data = fixture(program, { fixture: key });
+      await seek(page, data, data.events.length - 1);
+      await expect(page.locator('[data-recursion-stdout]')).toHaveText(output);
+      await expect(page.locator('.curriculum-lock, .draft-preview-indicator')).toHaveCount(0);
+    }
+    expect(errors).toEqual([]);
+  } finally { await context.close(); }
+});
+
+test('M5 released search and practice open while saved drafts and later locks survive', async ({ browser, baseURL }, info) => {
+  const context = await browser.newContext({ baseURL, viewport: info.project.use.viewport });
+  try {
+    const page = await context.newPage();
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+    await page.goto('/problems.html?bank=5');
+    await expect(page.locator('[data-bank-module="5"] .module-problem-card')).toHaveCount(2);
+    await expect(page.locator('.draft-preview-indicator')).toHaveCount(0);
+    await captureRelease(page, 'm5-release-practice-bank', info);
+    await page.evaluate(() => localStorage.setItem('itcc47.practice-records:v2', JSON.stringify({
+      schemaVersion: 2, records: { 'recursive-sum': { contentVersion: 1, draft: 'READ n\nWRITE n', completed: false } }, recovery: {},
+    })));
+    await page.goto('/practice.html?module=5&problem=recursive-sum');
+    if (info.project.name === 'phone') await page.getByRole('tab', { name: 'Code', exact: true }).click();
+    await expect(page.locator('#code-box')).toHaveValue('READ n\nWRITE n');
+    for (const id of ['recursive-sum', 'recursive-binary-range']) {
+      await page.goto('/practice.html?module=5&problem=' + id);
+      await expect(page.locator('.curriculum-lock, .draft-preview-indicator')).toHaveCount(0);
+      if (info.project.name === 'phone') await page.getByRole('tab', { name: 'Code', exact: true }).click();
+      await page.locator('#code-box').fill(await page.evaluate(key => PROBLEMS.find(problem => problem.id === key).starter, id));
+      await page.locator('#btn-check').click();
+      await expect(page.locator('.results-score')).toContainText('2/2');
+    }
+    await page.goto('/visualizer.html?activity=recursive-range-search');
+    await expect(page.locator('.concept-domain')).toBeVisible();
+    await page.getByRole('button', { name: 'Step', exact: true }).click();
+    await expect(page.locator('.curriculum-lock, .draft-preview-indicator')).toHaveCount(0);
+    for (const route of ['visualizer.html?activity=stable-merge-sort', 'practice.html?module=5&problem=merge-two-sorted', 'practice.html?module=6&problem=bst-insert-order']) {
+      await page.goto('/' + route + '&preview=1');
+      await expect(page.locator('.curriculum-lock')).toBeVisible();
+      await expect(page.locator('#code-box, .source-panel')).toHaveCount(0);
+    }
+    expect(await page.evaluate(() => ITCC47Curriculum.hasInstructorAccess())).toBe(false);
+    expect(errors).toEqual([]);
+  } finally { await context.close(); }
 });

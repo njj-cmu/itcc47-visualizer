@@ -65,7 +65,7 @@ module.exports = function testRecursion({ ok, section, load, root }) {
   }
   for (const id of ['recursion-list-total', 'recursion-folder-total']) {
     const activity = Activities.get(id);
-    ok(id + ': explicit draft Python contract', activity.language === 'python' && activity.reviewStatus === 'draft' && activity.traceHandoff === false);
+    ok(id + ': explicit reviewed Python contract', activity.language === 'python' && activity.reviewStatus === 'reviewed' && activity.traceHandoff === false);
   }
   for (const outcome of ['runtime-error', 'pedagogical-limit', 'unknown']) {
     const event = JSON.parse(JSON.stringify(data.fixtures['sum_to:n3'].events[2]));
@@ -79,8 +79,8 @@ module.exports = function testRecursion({ ok, section, load, root }) {
     Activities.get('recursive-range-search').engine === 'curated-concept' && Activities.get('stable-merge-sort').engine === 'curated-concept');
   for (const id of ids) {
     const activity = Activities.get(id);
-    ok(id + ': explicit Python contract, version and preview-only parent', activity.language === 'python' && activity.traceHandoff === false &&
-      activity.checkpointId === 'm5-recursion' && activity.reviewStatus === 'draft' && activity.contentVersion === '2026.10-m5-b-2');
+    ok(id + ': explicit Python contract, version and reviewed parent', activity.language === 'python' && activity.traceHandoff === false &&
+      activity.checkpointId === 'm5-recursion' && activity.reviewStatus === 'reviewed' && activity.contentVersion === '2026.10-m5-b-2');
     for (const n of Recursion.PRESETS) {
       const fixture = activity.fixtureFor({ n });
       const run = activity.run({ n });
@@ -129,9 +129,9 @@ module.exports = function testRecursion({ ok, section, load, root }) {
     !Recursion.adapt(failed).events.at(-1).terminal);
   const curriculum = JSON.parse(fs.readFileSync(path.join(root, 'curriculum.public.json'), 'utf8'));
   const cp = curriculum.checkpoints.find(c => c.id === 'm5-recursion');
-  ok('M5-LOCK-01 foundations precede the preserved duplicate-range draft', cp.reviewStatus === 'draft' &&
-    cp.sequence.join(',') === 'activity:recursion-call-stack,activity:recursion-return-values,activity:recursion-list-total,activity:recursion-folder-total,activity:recursive-range-search');
-  ok('M5-LOCK-01 public release still ends at Module 4', fs.readFileSync(path.join(root, 'release-profile.js'), 'utf8').includes("currentCheckpointId: 'm4-queue-deque'"));
+  ok('M5 release opens the reviewed lessons, search and matching practice in sequence', cp.reviewStatus === 'reviewed' &&
+    cp.sequence.join(',') === 'activity:recursion-call-stack,activity:recursion-return-values,activity:recursion-list-total,activity:recursion-folder-total,activity:recursive-range-search,problem:recursive-sum,problem:recursive-binary-range');
+  ok('M5 release stops at recursion', fs.readFileSync(path.join(root, 'release-profile.js'), 'utf8').includes("currentCheckpointId: 'm5-recursion'") && curriculum.checkpoints.find(c => c.id === 'm5-divide-conquer').reviewStatus === 'draft');
   ok('M5 saved pseudocode draft contract is not migrated', fs.readFileSync(path.join(root, 'future-problems.js'), 'utf8').includes("'recursive-sum','Recursive range sum'"));
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'activity-packs/recursion-foundations-manifest.json'), 'utf8'));
   const bytes = manifest.files.reduce((sum, file) => sum + fs.statSync(path.join(root, file)).size, 0);

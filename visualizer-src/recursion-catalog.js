@@ -1,4 +1,4 @@
-/* Python recursion remains instructor-preview content under the draft checkpoint. */
+/* Reviewed Python lessons released together at the recursion checkpoint. */
 (() => {
   const specifications = [
     { id: 'recursion-call-stack', programId: 'countdown', title: 'Calls go down; control returns up' },
@@ -8,7 +8,7 @@
   ];
   const activities = specifications.map((spec) => Object.freeze({
     ...spec, subtitle: 'Guided Python execution', module: 5, topic: 'Python recursion', family: 'Recursion',
-    checkpointId: 'm5-recursion', cloIds: Object.freeze([4, 5, 6]), reviewStatus: 'draft',
+    checkpointId: 'm5-recursion', cloIds: Object.freeze([4, 5, 6]), reviewStatus: 'reviewed',
     contentVersion: '2026.10-m5-b-2', engine: 'verified-python-fixture', renderer: 'python-recursion',
     workspaceComposition: 'python-recursion', language: 'python', traceHandoff: false,
     input: Object.freeze({ kind: 'python-recursion-preset', defaults: Object.freeze(spec.defaults || { n: 3 }), editable: false }),

@@ -1657,7 +1657,7 @@ const curriculumEngine = load(['course-catalog.js','curriculum.data.js','release
 const Curriculum = curriculumEngine.get('ITCC47Curriculum');
 const ReleaseProfile = curriculumEngine.get('ITCC47_RELEASE_PROFILE');
 const InstructorAccess = curriculumEngine.get('ITCC47_INSTRUCTOR_ACCESS');
-ok('Midterm profile ends at Module 4 queues and deques', ReleaseProfile.schemaVersion === 2 && ReleaseProfile.profileVersion === 6 && ReleaseProfile.currentCheckpointId === 'm4-queue-deque' && !('finalProjectId' in ReleaseProfile));
+ok('release profile opens Module 5 recursion', ReleaseProfile.schemaVersion === 2 && ReleaseProfile.profileVersion === 6 && ReleaseProfile.currentCheckpointId === 'm5-recursion' && !('finalProjectId' in ReleaseProfile));
 const visualProgressStorage = (() => { const values = new Map(); return { getItem:(key)=>values.has(key)?values.get(key):null,setItem:(key,value)=>values.set(key,String(value)),removeItem:(key)=>values.delete(key) }; })();
 const visualProgressEngine = load(['visualizer-progress.js'], { localStorage: visualProgressStorage });
 const VisualProgress = visualProgressEngine.get('ITCC47VisualizerProgress');
@@ -1674,7 +1674,7 @@ ok('catalog preserves all six authoritative CLO definitions', Curriculum.clos.le
 ok('checkpoint order is unique and increasing', new Set(Curriculum.checkpoints.map((item)=>item.order)).size === Curriculum.checkpoints.length && Curriculum.checkpoints.every((item,index,list)=>!index || item.order > list[index-1].order));
 ok('every checkpoint prerequisite points backward', Curriculum.checkpoints.every((item)=>item.prerequisiteIds.every((id)=>Curriculum.getCheckpoint(id)?.order < item.order)));
 ok('every resource mapping resolves', Curriculum.listResources().every((resource)=>resource.alwaysAvailable || Curriculum.getCheckpoint(resource.checkpointId)));
-ok('Modules 1-4 are reviewed while Modules 5-8 remain drafts', Curriculum.checkpoints.filter((item)=>item.order <= Curriculum.getCheckpoint('m4-queue-deque').order).every((item)=>item.reviewStatus === 'reviewed') && Curriculum.checkpoints.filter((item)=>item.order > Curriculum.getCheckpoint('m4-queue-deque').order).every((item)=>item.reviewStatus === 'draft'));
+ok('checkpoints through recursion are reviewed while later topics remain drafts', Curriculum.checkpoints.filter((item)=>item.order <= Curriculum.getCheckpoint('m5-recursion').order).every((item)=>item.reviewStatus === 'reviewed') && Curriculum.checkpoints.filter((item)=>item.order > Curriculum.getCheckpoint('m5-recursion').order).every((item)=>item.reviewStatus === 'draft'));
 const midtermEndOrder = Curriculum.getCheckpoint('m4-queue-deque').order;
 const midtermCheckpoints = Curriculum.checkpoints.filter((checkpoint)=>checkpoint.order <= midtermEndOrder);
 const midtermCheckpointIds = new Set(midtermCheckpoints.map((checkpoint)=>checkpoint.id));
@@ -1696,21 +1696,21 @@ ok('every Module 1-4 resource resolves to student-facing metadata and a canonica
 }));
 ok('public curriculum exposes tools, activities, and practice problems only', Curriculum.listResources().every((resource)=>['tool','activity','problem'].includes(resource.kind) && !('labRefs' in resource) && ['reviewed','draft'].includes(resource.reviewStatus)));
 ok('checkpoint sequences and resources contain no retired lesson references', Curriculum.listResources().every((resource)=>resource.kind !== 'lesson') && Curriculum.checkpoints.every((checkpoint)=>(checkpoint.sequence || []).every((reference)=>!reference.startsWith('lesson:'))));
-ok('current, available, and locked states share one resolver', Curriculum.stateForResource('problem','sum-two').state === 'available' && Curriculum.stateForResource('activity','industry-priority-range-recall').state === 'available' && Curriculum.stateForResource('activity','linked-list-insert-head').state === 'available' && Curriculum.stateForResource('activity','deque-service-lane').state === 'current' && Curriculum.stateForResource('activity','recursive-range-search').state === 'locked');
+ok('current, available, and locked states share one resolver', Curriculum.stateForResource('problem','sum-two').state === 'available' && Curriculum.stateForResource('activity','industry-priority-range-recall').state === 'available' && Curriculum.stateForResource('activity','linked-list-insert-head').state === 'available' && Curriculum.stateForResource('activity','deque-service-lane').state === 'available' && Curriculum.stateForResource('activity','recursive-range-search').state === 'current' && Curriculum.stateForResource('activity','stable-merge-sort').state === 'locked');
 ok('missing mappings fail closed at runtime', Curriculum.stateForResource('activity','not-mapped').state === 'planned' && !Curriculum.isOpen('activity','not-mapped'));
-ok('student preview requests cannot authorize themselves', Curriculum.writePreview('m8-dp',previewStorage) === null && Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm4-queue-deque');
+ok('student preview requests cannot authorize themselves', Curriculum.writePreview('m8-dp',previewStorage) === null && Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm5-recursion');
 previewStorage.setItem(Curriculum.PREVIEW_STORAGE_KEY, JSON.stringify({ schemaVersion:2,profileId:ReleaseProfile.profileId,profileVersion:ReleaseProfile.profileVersion,currentCheckpointId:'m8-dp' }));
-ok('a stored release checkpoint without instructor access remains locked', Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm4-queue-deque');
+ok('a stored release checkpoint without instructor access remains locked', Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm5-recursion');
 previewStorage.setItem(Curriculum.INSTRUCTOR_ACCESS_STORAGE_KEY, JSON.stringify({ schemaVersion:InstructorAccess.schemaVersion,profileId:InstructorAccess.profileId,profileVersion:InstructorAccess.profileVersion,tokenHash:InstructorAccess.tokenHash }));
 ok('the public verifier hash cannot be copied into storage to forge instructor access', !Curriculum.hasInstructorAccess(previewStorage));
 Curriculum.grantInstructorAccess(unitInstructorToken, previewStorage);
 Curriculum.writePreview('m8-dp',previewStorage);
 ok('authorized preview is explicit and persisted under versioned keys', Curriculum.activeProfile({preview:true,storage:previewStorage}).currentCheckpointId === 'm8-dp' && previewStorage.getItem(Curriculum.PREVIEW_STORAGE_KEY) && previewStorage.getItem(Curriculum.INSTRUCTOR_ACCESS_STORAGE_KEY));
-const finalCheckpointIds = new Set(Curriculum.checkpoints.filter((checkpoint)=>checkpoint.order > midtermEndOrder).map((checkpoint)=>checkpoint.id));
+const finalCheckpointIds = new Set(Curriculum.checkpoints.filter((checkpoint)=>checkpoint.order > Curriculum.getCheckpoint('m5-recursion').order).map((checkpoint)=>checkpoint.id));
 const finalResources = Curriculum.listResources().filter((resource)=>finalCheckpointIds.has(resource.checkpointId));
-ok('ordinary students cannot open any Module 5-8 resource', finalResources.length > 0 && finalResources.every((resource)=>Curriculum.stateForResource(resource.kind,resource.id,{ storage:visualProgressStorage,search:'' }).state === 'locked'));
-ok('instructor preview reaches every Module 5-8 resource', finalResources.length > 0 && finalResources.every((resource)=>['available','current'].includes(Curriculum.stateForResource(resource.kind,resource.id,{ preview:true,storage:previewStorage }).state)));
-ok('normal visits ignore an authorized stored preview without the preview query', Curriculum.activeProfile({preview:false,storage:previewStorage,search:''}).currentCheckpointId === 'm4-queue-deque');
+ok('ordinary students cannot open any later draft resource', finalResources.length > 0 && finalResources.every((resource)=>Curriculum.stateForResource(resource.kind,resource.id,{ storage:visualProgressStorage,search:'' }).state === 'locked'));
+ok('instructor preview reaches every later draft resource', finalResources.length > 0 && finalResources.every((resource)=>['available','current'].includes(Curriculum.stateForResource(resource.kind,resource.id,{ preview:true,storage:previewStorage }).state)));
+ok('normal visits ignore an authorized stored preview without the preview query', Curriculum.activeProfile({preview:false,storage:previewStorage,search:''}).currentCheckpointId === 'm5-recursion');
 Curriculum.revokeInstructorAccess(previewStorage);
 ok('exiting instructor mode removes both access and checkpoint state', !previewStorage.getItem(Curriculum.INSTRUCTOR_ACCESS_STORAGE_KEY) && !previewStorage.getItem(Curriculum.PREVIEW_STORAGE_KEY));
 const activationToken = 'separate-activation-token-with-sufficient-entropy';
@@ -2043,12 +2043,13 @@ const buildCurriculum = require('./build-curriculum.js');
 const rawCurriculum = JSON.parse(fs.readFileSync(path.join(ROOT,'curriculum.public.json'),'utf8'));
 const validatedCurriculum = buildCurriculum.validate(rawCurriculum);
 let draftReleaseRejected = false;
-try { buildCurriculum.validateRelease(validatedCurriculum,{...ReleaseProfile,currentCheckpointId:'m5-recursion'}); } catch (error) { draftReleaseRejected = /draft checkpoint/.test(error.message); }
+try { buildCurriculum.validateRelease(validatedCurriculum,{...ReleaseProfile,currentCheckpointId:'m5-divide-conquer'}); } catch (error) { draftReleaseRejected = /draft checkpoint/.test(error.message); }
 ok('release readiness rejects profiles that advance into draft work', draftReleaseRejected);
 vm.runInContext(fs.readFileSync(path.join(ROOT,'future-problems.js'),'utf8'),curriculumEngine.ctx);
 const FutureProblems = curriculumEngine.get('ITCC47FutureProblems');
 ok('only Modules 5-8 remain in the future problem catalog', [5,6,7,8].every((module)=>FutureProblems.problems.filter((problem)=>problem.module === `Module ${module}`).length === 4) && FutureProblems.problems.every((problem)=>![2,3,4].includes(Number(problem.module.replace('Module ','')))));
-ok('future problem metadata matches the curriculum resolver', FutureProblems.problems.every((problem)=>problem.checkpointId === Curriculum.getResource('problem',problem.id)?.checkpointId && problem.cloIds.length && problem.visibleTests.length >= 2));
+ok('future problem metadata matches the curriculum resolver', FutureProblems.problems.every((problem)=>problem.checkpointId === Curriculum.getResource('problem',problem.id)?.checkpointId && problem.reviewStatus === Curriculum.getResource('problem',problem.id)?.reviewStatus && problem.cloIds.length && problem.visibleTests.length >= 2));
+ok('all seven recursion resources are reviewed, sequenced and publicly open', Curriculum.resourcesForCheckpoint('m5-recursion').length === 7 && Curriculum.resourcesForCheckpoint('m5-recursion').every((resource)=>resource.reviewStatus === 'reviewed' && Curriculum.getCheckpoint('m5-recursion').sequence.includes(`${resource.kind}:${resource.id}`) && Curriculum.stateForResource(resource.kind,resource.id,{ storage:visualProgressStorage,search:'' }).state === 'current'));
 const invalidFutureStarters = FutureProblems.problems.filter((problem)=>!parses(problem.starter)).map((problem)=>problem.id);
 ok('every future problem starter parses', invalidFutureStarters.length === 0, invalidFutureStarters.join(', '));
 

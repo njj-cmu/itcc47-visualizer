@@ -1,9 +1,10 @@
 # M5-B: design, repair and apply Python recursion
 
-Local review continuation of staging `7359dc860f75ae477b1ab15870724d5215d0ba1c`.
-All four Python activities remain draft under `m5-recursion`; the public
-checkpoint remains `m4-queue-deque`. This implementation does not authorize a
-commit, merge, push, deployment or student release.
+Continuation of staging `7359dc860f75ae477b1ab15870724d5215d0ba1c`.
+The approved promotion opens the reviewed `m5-recursion` checkpoint in
+pre-production: four Python lessons, the existing recursive-search activity,
+and the two recursion practice problems. Divide-and-conquer and later
+checkpoints remain draft. Publishing main remains a separate release action.
 
 ## Learning sequence
 
@@ -11,7 +12,9 @@ commit, merge, push, deployment or student release.
 2. `recursion-return-values`: numeric return and caller assignment.
 3. `recursion-list-total`: five design decisions, six input presets, four repair modes.
 4. `recursion-folder-total`: a bounded synthetic hierarchy and sequential child totals.
-5. The existing `recursive-range-search` draft placeholder is preserved.
+5. The existing `recursive-range-search` concept activity is preserved.
+6. `recursive-sum` and `recursive-binary-range` retain their pseudocode,
+   content versions and saved-work contracts.
 
 The list lesson teaches a one-call promise, direct base answer, decreasing
 remaining length, delegation and combination. The index grows while
@@ -114,9 +117,11 @@ report records baseline and final measurements. No minified file is hand-edited.
 
 The optional pack needs an explicit byte-count confirmation for installation.
 Cancel leaves the shared optional cache unchanged. Installed Module 4 packs
-coexist with it. Authorized preview supports both new lessons and every preset
+coexist with it. Ordinary visits support both new lessons and every preset
 offline; local file delivery uses the same bundled sources and fixtures.
-Public and forged-preview visits are locked before optional runtime requests.
+No instructor capability is needed for the released recursion checkpoint.
+Later drafts still reject public and forged-preview visits before rendering.
+An earlier release profile still locks recursion before optional pack requests.
 Saved pseudocode data and other course releases are not migrated.
 
 Tests are wired into existing release gates:

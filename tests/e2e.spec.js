@@ -1249,21 +1249,21 @@ test('start page gives students a clear route into the current practice bank', a
   await expect(page.getByRole('heading', { name: /Learn the idea/ })).toBeVisible();
   const workflow = page.getByRole('list', { name: 'Midterm learning workflow' });
   for (const step of ['Learn the purpose', 'Visualize the state', 'Practice with checks']) await expect(workflow).toContainText(step);
-  await expect(page.locator('#current-checkpoint')).toContainText('Queues and deques');
+  await expect(page.locator('#current-checkpoint')).toContainText('Recursion and recursive search');
   await page.getByRole('link', { name: /Open current practice bank/ }).click();
-  await expect(page).toHaveURL(/problem-list\.html\?module=4$/);
-  await expect(page.getByRole('heading', { name: 'Stacks, Queues, and Deques', exact: true })).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Problem set breadcrumb' })).toContainText('Module 4');
-  await expect(page.locator('.problem-choice')).toHaveCount(6);
+  await expect(page).toHaveURL(/problem-list\.html\?module=5$/);
+  await expect(page.getByRole('heading', { name: 'Recursion and Divide-and-Conquer', exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Problem set breadcrumb' })).toContainText('Module 5');
+  await expect(page.locator('.problem-choice')).toHaveCount(4);
 });
 
 test('curriculum roadmap expands the current module and compacts locked modules', async ({ page }) => {
   await page.goto('/problems.html');
   await expect(page.locator('.module-card')).toHaveCount(8);
-  await expect(page.locator('.module-card-current')).toContainText('Stacks, Queues, and Deques');
-  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(6);
+  await expect(page.locator('.module-card-current')).toContainText('Recursion and Divide-and-Conquer');
+  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(2);
   await expect(page.locator('.checkpoint-list, .module-lessons, .module-outline')).toHaveCount(0);
-  await expect(page.locator('.module-card-locked')).toHaveCount(4);
+  await expect(page.locator('.module-card-locked')).toHaveCount(3);
   await expect(page.locator('.module-card-locked .module-problem-card')).toHaveCount(0);
   await expect(page.getByText('Instructor preview', { exact: true })).toHaveCount(0);
   await expect(page.locator('#release-controls')).toHaveCount(0);
@@ -1285,10 +1285,11 @@ test('Midterm Review presents every reviewed checkpoint and resource on laptop a
     const profile = ITCC47Curriculum.activeProfile({ preview: false, search: '' });
     return ITCC47Curriculum.getModule(ITCC47Curriculum.getCheckpoint(profile.currentCheckpointId).moduleId).number;
   });
-  expect(deployedModuleNumber).toBe(4);
+  expect(deployedModuleNumber).toBe(5);
+  const selectedMidtermModule = Math.min(deployedModuleNumber, 4);
   await expect(page.locator('.midterm-module-body:not([hidden])')).toHaveCount(1);
-  await expect(page.locator(`[data-midterm-module="${deployedModuleNumber}"] [data-midterm-module-toggle]`)).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.locator(`[data-midterm-module="${deployedModuleNumber}"] .midterm-module-body`)).toBeVisible();
+  await expect(page.locator(`[data-midterm-module="${selectedMidtermModule}"] [data-midterm-module-toggle]`)).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator(`[data-midterm-module="${selectedMidtermModule}"] .midterm-module-body`)).toBeVisible();
 
   const module2 = page.locator('[data-midterm-module="2"]');
   const module2Toggle = module2.locator('[data-midterm-module-toggle="2"]');
@@ -1471,16 +1472,16 @@ test('student preview query cannot expose instructor controls or locked content'
   await page.goto('/problems.html?preview=1');
   await expect(page.getByText('Instructor preview', { exact: true })).toHaveCount(0);
   await expect(page.locator('#release-controls, .draft-preview-indicator')).toHaveCount(0);
-  await expect(page.locator('.module-card-current')).toContainText('Stacks, Queues, and Deques');
-  await page.goto('/visualizer.html?activity=recursive-range-search&preview=1');
-  await expect(page.locator('.curriculum-lock')).toContainText('Recursive duplicate-range search is coming later');
+  await expect(page.locator('.module-card-current')).toContainText('Recursion and Divide-and-Conquer');
+  await page.goto('/visualizer.html?activity=stable-merge-sort&preview=1');
+  await expect(page.locator('.curriculum-lock')).toContainText('Stable merge sort is coming later');
   await expect(page.locator('.curriculum-lock')).not.toContainText('Practice release');
   await expect(page.locator('.curriculum-lock .release-badge')).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /Continue with Module 4/ })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Continue with Module 5/ })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Explore available visualizations' })).toBeVisible();
   await expect(page.locator('.visualizer-workspace, .source-panel')).toHaveCount(0);
-  await page.goto('/practice.html?module=5&problem=recursive-sum&preview=1');
-  await expect(page.locator('.curriculum-lock')).toContainText('Recursive range sum is coming later');
+  await page.goto('/practice.html?module=5&problem=merge-two-sorted&preview=1');
+  await expect(page.locator('.curriculum-lock')).toContainText('Stable merge of two ranges is coming later');
   await expect(page.locator('#p-statement, #code-box')).toHaveCount(0);
 });
 
@@ -1489,10 +1490,10 @@ test('locked visualization cards use a compact icon and border state', async ({ 
   await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.industry-catalog-feature')).toBeHidden();
   await expect(page.locator('.visualization-card')).toHaveCount(39);
-  await expect(page.locator('.visualization-card.visualization-available')).toHaveCount(19);
-  await expect(page.locator('.visualization-card.visualization-current')).toHaveCount(6);
-  await expect(page.locator('.visualization-card.visualization-locked')).toHaveCount(14);
-  await expect(page.locator('.visualization-lock')).toHaveCount(14);
+  await expect(page.locator('.visualization-card.visualization-available')).toHaveCount(25);
+  await expect(page.locator('.visualization-card.visualization-current')).toHaveCount(5);
+  await expect(page.locator('.visualization-card.visualization-locked')).toHaveCount(9);
+  await expect(page.locator('.visualization-lock')).toHaveCount(9);
   await expect(page.locator('.visualization-card .release-badge')).toHaveCount(0);
   await expect(page.locator('.visualization-card').first().locator('.visualization-card-meta')).toContainText('Module 2');
   const familyOrder = await page.locator('.visualization-group h2').allTextContents();
@@ -1504,7 +1505,7 @@ test('focused visualizations remember visits and fade only after the final step'
   await page.goto('/problems.html?view=visualizations');
   await page.evaluate(() => localStorage.removeItem('itcc47.visualizer-progress:v1'));
   await page.reload();
-  await expect(page.getByRole('heading', { name: '0 of 25 available visualizations reviewed' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '0 of 30 available visualizations reviewed' })).toBeVisible();
   let bubbleCard = page.locator('.visualization-card', { hasText: 'Bubble Sort' });
   await expect(bubbleCard).not.toHaveClass(/visualization-visited/);
   await bubbleCard.click();
@@ -1526,7 +1527,7 @@ test('focused visualizations remember visits and fade only after the final step'
   bubbleCard = page.locator('.visualization-card', { hasText: 'Bubble Sort' });
   await expect(bubbleCard).toHaveClass(/visualization-reviewed/);
   await expect(bubbleCard).toContainText('Reviewed');
-  await expect(page.getByRole('heading', { name: '1 of 25 available visualizations reviewed' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '1 of 30 available visualizations reviewed' })).toBeVisible();
   await expect(bubbleCard).toHaveCSS('background-color', 'rgb(20, 33, 31)');
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('itcc47.visualizer-progress:v1')));
   expect(stored.schemaVersion).toBe(1);
@@ -1746,13 +1747,13 @@ test('workbench activity aliases redirect before the standard workspace initiali
 });
 
 test('locked visualizer route renders requirements without source or playback', async ({ page }) => {
-  await page.goto('/visualizer.html?activity=recursive-range-search');
-  await expect(page.locator('.curriculum-lock')).toContainText('Recursive duplicate-range search is coming later');
+  await page.goto('/visualizer.html?activity=stable-merge-sort');
+  await expect(page.locator('.curriculum-lock')).toContainText('Stable merge sort is coming later');
   await expect(page.locator('.curriculum-lock')).not.toContainText('Practice release');
   await expect(page.locator('.curriculum-lock .release-badge')).toHaveCount(0);
   const actions = page.locator('.curriculum-lock-actions .btn');
   await expect(actions).toHaveCount(2);
-  await expect(actions.first()).toContainText('Continue with Module 4');
+  await expect(actions.first()).toContainText('Continue with Module 5');
   await expect(actions.nth(1)).toHaveText('Explore available visualizations');
   expect(await actions.evaluateAll((links) => links.every((link) => getComputedStyle(link).textDecorationLine === 'none'))).toBe(true);
   await expect(actions.first()).toHaveCSS('min-height', '46px');
@@ -1762,8 +1763,8 @@ test('locked visualizer route renders requirements without source or playback', 
 });
 
 test('locked planned practice route exposes no problem statement or editor', async ({ page }) => {
-  await page.goto('/practice.html?module=5&problem=recursive-sum');
-  await expect(page.locator('.curriculum-lock')).toContainText('Recursive range sum is coming later');
+  await page.goto('/practice.html?module=5&problem=merge-two-sorted');
+  await expect(page.locator('.curriculum-lock')).toContainText('Stable merge of two ranges is coming later');
   await expect(page.locator('#p-statement')).toHaveCount(0);
   await expect(page.locator('#code-box')).toHaveCount(0);
 });
@@ -1779,17 +1780,17 @@ test('instructor preview is explicit, persistent, and does not change the deploy
   await page.getByLabel('Preview checkpoint').selectOption('m8-dp');
   await page.getByRole('button', { name: 'Apply preview' }).click();
   await expect(page).toHaveURL(/preview=1/);
-  await page.goto('/visualizer.html?activity=recursive-range-search&preview=1');
-  await expect(page.getByRole('heading', { name: 'Recursive duplicate-range search' })).toBeVisible();
+  await page.goto('/visualizer.html?activity=stable-merge-sort&preview=1');
+  await expect(page.getByRole('heading', { name: 'Stable merge sort' })).toBeVisible();
   await expect(page.locator('.draft-preview-indicator')).toContainText('Draft preview');
-  await page.goto('/visualizer.html?activity=recursive-range-search');
+  await page.goto('/visualizer.html?activity=stable-merge-sort');
   await expect(page.locator('.curriculum-lock')).toBeVisible();
   await page.goto('/problems.html?preview=1');
   await page.getByText('Instructor preview', { exact: true }).click();
   await page.getByRole('button', { name: 'Exit instructor mode' }).click();
   await expect(page).not.toHaveURL(/preview=1/);
   await expect(page.getByText('Instructor preview', { exact: true })).toHaveCount(0);
-  await page.goto('/visualizer.html?activity=recursive-range-search&preview=1');
+  await page.goto('/visualizer.html?activity=stable-merge-sort&preview=1');
   await expect(page.locator('.curriculum-lock')).toBeVisible();
 });
 
@@ -1833,17 +1834,17 @@ test('relocking instructor-preview practice preserves browser-local progress', a
   const savedDraft = 'READ n\nWRITE n';
   await page.addInitScript((draft) => localStorage.setItem('itcc47.practice-records:v2', JSON.stringify({
     schemaVersion: 2,
-    records: { 'recursive-sum': { contentVersion: 1, draft, completed: false } },
+    records: { 'merge-two-sorted': { contentVersion: 1, draft, completed: false } },
     recovery: {},
   })), savedDraft);
-  await page.goto('/practice.html?module=5&problem=recursive-sum&preview=1');
-  await expect(page.getByRole('heading', { name: 'Recursive range sum' })).toBeVisible();
+  await page.goto('/practice.html?module=5&problem=merge-two-sorted&preview=1');
+  await expect(page.getByRole('heading', { name: 'Stable merge of two ranges' })).toBeVisible();
   await page.goto('/problems.html?preview=1');
   await page.getByText('Instructor preview', { exact: true }).click();
   await page.getByRole('button', { name: 'Exit instructor mode' }).click();
-  await page.goto('/practice.html?module=5&problem=recursive-sum');
+  await page.goto('/practice.html?module=5&problem=merge-two-sorted');
   await expect(page.locator('.curriculum-lock')).toBeVisible();
-  const record = await page.evaluate(() => JSON.parse(localStorage.getItem('itcc47.practice-records:v2')).records['recursive-sum']);
+  const record = await page.evaluate(() => JSON.parse(localStorage.getItem('itcc47.practice-records:v2')).records['merge-two-sorted']);
   expect(record).toEqual({ contentVersion: 1, draft: savedDraft, completed: false });
 });
 
@@ -4326,9 +4327,9 @@ test('practice bank selection preserves release gates, URL history and every ava
     }
     const expected = curriculumSource.resources.filter(r => r.kind === 'problem' && ['m1','m2','m3','m4'].includes(checkpointById.get(r.checkpointId)?.moduleId)).map(r => r.id);
     expect(reached.sort()).toEqual(expected.sort());
-    await page.locator('[data-bank-select="5"]').click();
-    await expect(page.locator('[data-bank-module="5"] .module-problem-card')).toHaveCount(0);
-    await expect(page.locator('[data-bank-module="5"]')).toContainText('View requirements');
+    await page.locator('[data-bank-select="6"]').click();
+    await expect(page.locator('[data-bank-module="6"] .module-problem-card')).toHaveCount(0);
+    await expect(page.locator('[data-bank-module="6"]')).toContainText('View requirements');
     await page.goBack();
     await expect(page.locator('[data-bank-module="4"]')).toBeVisible();
     await page.getByRole('tab', { name: 'Midterm Review' }).click();
@@ -4380,16 +4381,16 @@ test('module catalog exposes current practice and retains the full problem list'
   await page.goto('/problems.html');
   await expect(page.getByRole('heading', { name: 'Practice banks', exact: true })).toBeVisible();
   await expect(page.locator('.module-card')).toHaveCount(8);
-  await expect(page.locator('.module-card-current')).toContainText('Stacks, Queues, and Deques');
+  await expect(page.locator('.module-card-current')).toContainText('Recursion and Divide-and-Conquer');
   await expect(page.locator('.module-card-locked')).not.toHaveCount(0);
-  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(6);
-  await page.getByRole('link', { name: /Open 6 problems/ }).click();
-  await expect(page).toHaveURL(/problem-list\.html\?module=4$/);
-  await expect(page.getByRole('heading', { name: 'Stacks, Queues, and Deques', exact: true })).toBeVisible();
+  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(2);
+  await page.getByRole('link', { name: /Open 2 problems/ }).click();
+  await expect(page).toHaveURL(/problem-list\.html\?module=5$/);
+  await expect(page.getByRole('heading', { name: 'Recursion and Divide-and-Conquer', exact: true })).toBeVisible();
   await page.locator('.problem-choice-action').first().click();
-  await expect(page).toHaveURL(/practice\.html\?module=4&problem=/);
-  await expect(page.locator('#p-module')).toHaveText('Module 4');
-  await expect(page.locator('#progress-line')).toContainText('of 6 solved');
+  await expect(page).toHaveURL(/practice\.html\?module=5&problem=/);
+  await expect(page.locator('#p-module')).toHaveText('Module 5');
+  await expect(page.locator('#progress-line')).toContainText('of 4 solved');
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
   await expect(page.getByRole('link', { name: 'Back to Problem List' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'All Problems' })).toHaveCount(0);

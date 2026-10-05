@@ -1,4 +1,4 @@
-/* Instructor-preview drafts for Modules 5–8. Modules 1–4 use the canonical checked pipeline. */
+/* Later-module practice follows the reviewed curriculum release checkpoint. */
 const ITCC47FutureProblems = (() => {
   const modules = {
     5: { checkpointId:'m5-divide-conquer',cloIds:[4,5,6] },
@@ -29,7 +29,7 @@ const ITCC47FutureProblems = (() => {
     const meta = modules[module];
     const mapping = typeof ITCC47Curriculum === 'undefined' ? null : ITCC47Curriculum.getResource('problem',id);
     return Object.freeze({ id,title,module:`Module ${module}`,difficulty:module < 5 ? 'Medium' : 'Challenge',contentVersion:1,
-      checkpointId:mapping?.checkpointId || meta.checkpointId,cloIds:Object.freeze([...meta.cloIds]),reviewStatus:'draft',statement,
+      checkpointId:mapping?.checkpointId || meta.checkpointId,cloIds:Object.freeze([...meta.cloIds]),reviewStatus:mapping?.reviewStatus || 'draft',statement,
       rules:Object.freeze([['Invariant','Preserve the structure or algorithm invariant named in the statement.'],['Output','Display only the required values in the stated order.'],['Evidence','Use the trace and visible cases to justify boundary behavior.']]),
       ioNote:'Read values in the order shown by the examples. Display only the required output; no prompts or labels.',starter,
       visibleTests:Object.freeze(cases.map(([inputs,expected],index)=>Object.freeze({inputs:Object.freeze(inputs),expected:Object.freeze(expected),note:index ? undefined : 'core behavior'}))),salt:'',hidden:Object.freeze([]) });

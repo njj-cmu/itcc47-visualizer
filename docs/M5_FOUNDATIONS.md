@@ -1,8 +1,8 @@
 # M5-A: Python recursion foundations
 
-This local review milestone adds `recursion-call-stack` and
-`recursion-return-values` beneath the existing draft `m5-recursion`
-checkpoint. The public release still ends at `m4-queue-deque`.
+This milestone adds `recursion-call-stack` and `recursion-return-values`
+beneath the reviewed `m5-recursion` checkpoint. The release now opens
+that checkpoint, including the four Python lessons and matching practice.
 The duplicate-range search, merge-sort placeholders, and legacy pseudocode
 problems retain their IDs and meaning. M5-B extends these foundations in
 [M5_APPLICATIONS.md](M5_APPLICATIONS.md); M5-C and M5-D remain later scope.
@@ -87,7 +87,7 @@ and the driver's answer binds only after the root return.
   Source/Stack/Executing tabs share one state and the existing playback controls.
   Predictions and list-total/repair transfer checks remain outside execution.
 - Catalog: `visualizer-src/recursion-catalog.js` compiles to
-  `recursion-activities.js`; curriculum resources remain draft.
+  `recursion-activities.js`; curriculum resources are reviewed for release.
 - Integration: `visualizer-src/main.jsx` gates and loads the optional pack;
   its only progress change requires a successful run before marking reviewed.
 - Publishing: existing Vite/publish scripts generate the catalog, renderer,
@@ -101,12 +101,12 @@ M5-A baseline used 2,097,138 of 2,097,152 raw core bytes. M5-B deduplicates the
 three optional workspace loaders at this boundary; current measurements are
 recorded in M5_APPLICATIONS.md. The lessons and fixtures remain optional.
 
-In an
-authorized HTTP preview, open **Details and completed-call history**, select
+In an HTTP lesson, open **Details and completed-call history**, select
 **Download for offline use**, and confirm its displayed byte count. The existing
 optional-pack cache then serves all four lessons and every preset offline.
 Direct `file://` opening uses the bundled local assets without a server.
-Module 5 public and forged-preview routes remain locked before loading the pack.
+Ordinary visits open the recursion lessons without instructor access. Later
+draft checkpoints remain locked; a preview query alone cannot unlock them.
 
 ## Validation commands
 

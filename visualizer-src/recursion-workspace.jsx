@@ -230,6 +230,6 @@ export function RecursionWorkspace({ activity, inputs, result, event, controller
     </details>
     <Readiness activity={activity} inputs={inputs} events={result.events} controller={controller}/>
     <nav className="recursion-next" aria-label="Recursion lesson sequence">{sequence.filter((_, i) => i === position - 1 || i === position + 1).map(([id, label]) =>
-      <a key={id} href={ITCC47CurriculumUI.href('visualizer.html?activity=' + id)}>{label}</a>)}<span>Module 5 remains draft. Later applications are outside this milestone.</span></nav>
+      <a key={id} href={ITCC47CurriculumUI.href('visualizer.html?activity=' + id)}>{label}</a>)}<span>Module 5 · Python recursion</span></nav>
   </div>;
 }

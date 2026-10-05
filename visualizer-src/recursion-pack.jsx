@@ -1,4 +1,6 @@
 import './recursion-contract.js';
+import './recursion-questions.js';
+import './recursion-presentation.js';
 import { RecursionStack, RecursionInputs, RecursionHistory } from './recursion-workspace.jsx';
 BSITVisualizerRegistry.registerRenderer('python-recursion', RecursionStack);
 BSITVisualizerRegistry.registerInputControls('python-recursion-preset', RecursionInputs);

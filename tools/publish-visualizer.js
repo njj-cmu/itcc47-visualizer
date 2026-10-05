@@ -11,7 +11,7 @@ const packs = [
     buildDirectory: '.recursion-pack-build',
     assets: ['recursion-traces.js', 'recursion-workspace.js', 'recursion-workspace.css'],
     manifestFile: 'recursion-foundations-manifest.json',
-    manifest: { schemaVersion: 1, id: 'python-recursion-foundations', title: 'Python recursion foundations' },
+    manifest: { schemaVersion: 1, id: 'python-recursion-foundations', title: 'Python recursion foundations and applications' },
   },
   {
     buildDirectory: '.sliding-window-pack-build',

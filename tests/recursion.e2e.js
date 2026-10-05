@@ -78,7 +78,7 @@ test.describe('M5-A foundations', () => {
   });
 
   test('meaningful states and waiting-frame inspection remain truthful', async ({ page }, testInfo) => {
-    if (testInfo.project.name === 'laptop') await page.setViewportSize({ width: 1920, height: 1080 });
+    if (process.env.M5_REFERENCE_DESKTOP && testInfo.project.name === 'laptop') await page.setViewportSize({ width: 1920, height: 1080 });
     await open(page, 'recursion-call-stack');
     const calls = fixture('countdown');
     await screenshot(page, testInfo, '01-before-call');
@@ -184,7 +184,7 @@ test.describe('M5-A foundations', () => {
     await page.getByLabel('Python fixture', { exact: true }).selectOption('5');
     await seek(page, fixture('sum_to', 5), fixture('sum_to', 5).events.length - 1);
     expect(await page.locator('[data-recursion-stdout]').textContent()).toBe('15\n');
-    await page.locator('.recursion-next a').click();
+    await page.locator('.recursion-next a[href*="recursion-call-stack"]').click();
     await expect(page.locator('.recursion-workspace')).toHaveAttribute('data-event-id', fixture('countdown').events[0].eventId);
     await surface(page, 'Source');
     await expect(page.locator('.recursion-code')).toContainText('countdown(3)');
@@ -220,7 +220,7 @@ test('M5 public and forged-preview routes stay locked without loading the option
     const page = await publicContext.newPage();
     const packs = [];
     page.on('request', request => { if (request.url().includes('/activity-packs/recursion')) packs.push(request.url()); });
-    for (const id of ['recursion-call-stack', 'recursion-return-values']) {
+    for (const id of ['recursion-call-stack', 'recursion-return-values', 'recursion-list-total', 'recursion-folder-total']) {
       for (const suffix of ['', '&preview=1']) {
         await page.goto('/visualizer.html?activity=' + id + suffix);
         await expect(page.locator('.visualizer-locked')).toBeVisible();

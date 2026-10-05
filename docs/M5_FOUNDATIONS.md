@@ -4,7 +4,8 @@ This local review milestone adds `recursion-call-stack` and
 `recursion-return-values` beneath the existing draft `m5-recursion`
 checkpoint. The public release still ends at `m4-queue-deque`.
 The duplicate-range search, merge-sort placeholders, and legacy pseudocode
-problems retain their IDs and meaning. M5-B through M5-D are not implemented.
+problems retain their IDs and meaning. M5-B extends these foundations in
+[M5_APPLICATIONS.md](M5_APPLICATIONS.md); M5-C and M5-D remain later scope.
 
 ## Source and execution
 
@@ -18,13 +19,15 @@ and the normalized native clipboard read.
 
 `tools/recursion/build_traces.py` executes real Python after a deliberately
 narrow AST instrumentation pass. It does not evaluate Python expressions in
-JavaScript. Unsupported syntax and call placements fail closed. Arguments are
-integers; list/object identity and additional recursive forms are outside this
-milestone. No arbitrary-source editor or browser Python runtime is provided.
+JavaScript. Unsupported syntax and call placements fail closed. These two
+foundation programs use integer arguments; the M5-B extension adds bounded
+read-only list/node references. No arbitrary-source editor or browser Python
+runtime is provided.
 
 Each generated fixture records its source hash, trace hash, and fixture ID.
-The pack records Python's generating version, generator version `m5-ast-1`,
-and recursion schema version 1. The runtime adapter uses the existing
+The pack records Python's generating version, generator version `m5-ast-2`,
+and recursion schema version 2, regenerated coherently for all four lessons.
+The runtime adapter uses the existing
 `BSITPlayback.timelineEvent` schema and controller.
 
 ## Where each teaching phase comes from
@@ -81,7 +84,7 @@ and the driver's answer binds only after the root return.
 - Domain: the Python generator and tests; `visualizer-src/recursion-contract.js`
   adapts immutable snapshots and derives prediction targets.
 - Presentation: `visualizer-src/recursion-workspace.jsx` and its scoped CSS.
-  Source/Stack/Details tabs share one state and the existing playback controls.
+  Source/Stack/Executing tabs share one state and the existing playback controls.
   Predictions and list-total/repair transfer checks remain outside execution.
 - Catalog: `visualizer-src/recursion-catalog.js` compiles to
   `recursion-activities.js`; curriculum resources remain draft.
@@ -94,14 +97,14 @@ and the driver's answer binds only after the root return.
   discovery through `tools/python-runtime.js`, including `BSIT_PYTHON`.
 
 The recursion pack stays outside the unchanged 2 MiB core-cache budget. The
-reviewed Windows build uses 2,097,138 of 2,097,152 raw core bytes, leaving only
-14 bytes of headroom. Further core growth needs a separately scoped decision;
-the foundations runtime and fixtures remain in the optional pack.
+M5-A baseline used 2,097,138 of 2,097,152 raw core bytes. M5-B deduplicates the
+three optional workspace loaders at this boundary; current measurements are
+recorded in M5_APPLICATIONS.md. The lessons and fixtures remain optional.
 
 In an
 authorized HTTP preview, open **Details and completed-call history**, select
 **Download for offline use**, and confirm its displayed byte count. The existing
-optional-pack cache then serves both lessons and every preset offline.
+optional-pack cache then serves all four lessons and every preset offline.
 Direct `file://` opening uses the bundled local assets without a server.
 Module 5 public and forged-preview routes remain locked before loading the pack.
 
@@ -117,7 +120,8 @@ Module 5 public and forged-preview routes remain locked before loading the pack.
 - `npm run check`: the complete repository gate, including all existing Module 4 tests.
 
 Use an available `ITCC47_TEST_PORT`. Set `M5_EVIDENCE_DIR` to an external
-directory to capture the seven named meaningful states at both configured
-viewports. Tests reuse the existing private instructor token and do not publish it.
+directory to capture named meaningful states at both configured viewports.
+Set `M5_REFERENCE_DESKTOP=1` with `--project laptop` for 1920x1080 evidence.
+Tests reuse the existing private instructor token and do not publish it.
 Browser coverage uses the repository's Edge/Chromium configuration; Firefox and
 Safari are not claimed.

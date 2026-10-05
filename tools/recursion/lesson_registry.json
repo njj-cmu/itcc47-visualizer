@@ -1,0 +1,70 @@
+{
+  "countdown": {
+    "functionName": "countdown", "parameters": ["n"], "defaults": {},
+    "source": "countdown.py", "domain": "number", "resultAssignment": false,
+    "signature": "countdown(n)", "defaultFixture": "countdown:n3",
+    "inputContract": "One supported nonnegative integer: 0, 1, 3, or 5.",
+    "limits": {"maxDepth": 8, "maxEvents": 500},
+    "presets": [0, 1, 3, 5], "variants": {"correct": {"label": "Correct example"}}
+  },
+  "sum_to": {
+    "functionName": "sum_to", "parameters": ["n"], "defaults": {},
+    "source": "sum_to.py", "domain": "number", "resultAssignment": true,
+    "signature": "sum_to(n)", "defaultFixture": "sum_to:n3",
+    "inputContract": "One supported nonnegative integer: 0, 1, 3, or 5.",
+    "limits": {"maxDepth": 8, "maxEvents": 500},
+    "presets": [0, 1, 3, 5], "variants": {"correct": {"label": "Correct example"}}
+  },
+  "list_total": {
+    "functionName": "list_total", "parameters": ["values", "index"], "defaults": {"index": 0},
+    "source": "list_total.py", "domain": "list", "resultAssignment": true,
+    "signature": "list_total(values, index=0)", "defaultFixture": "list-main",
+    "inputContract": "A shared read-only list of at most six integers from -1000 to 1000; 0 <= index <= len(values).",
+    "limits": {"maxDepth": 8, "maxEvents": 500},
+    "design": [
+      ["One-call promise", "Return the sum of the existing list from index onward."],
+      ["Direct base answer", "At index == len(values), the remaining suffix is empty: return 0 before indexing."],
+      ["Decreasing measure", "len(values) - index decreases. The index increases; the remaining problem gets smaller."],
+      ["Delegated call", "Ask list_total(values, index + 1) to total the remaining suffix of the same list."],
+      ["Caller’s combination", "Add this call’s values[index] to its own received child_total, then return total."]
+    ],
+    "complexity": "For m remaining elements: m + 1 invocations and peak frames, including the base call. O(m) work and O(m) additional call stack under the bounded-integer model. The list is shared; no suffix lists are allocated. Iteration is often simpler for a flat list.",
+    "fixtures": [
+      {"id":"list-main","label":"[4, 2, 7, 1] · start 0","values":[4,2,7,1],"index":0,"expected":{"result":14,"calls":5,"maxDepth":5,"returns":[0,1,8,10,14]}},
+      {"id":"list-empty","label":"Empty list · start 0","values":[],"index":0,"expected":{"result":0,"calls":1,"maxDepth":1,"returns":[0]}},
+      {"id":"list-single","label":"[7] · start 0","values":[7],"index":0,"expected":{"result":7,"calls":2,"maxDepth":2,"returns":[0,7]}},
+      {"id":"list-zero","label":"[0] · start 0","values":[0],"index":0,"expected":{"result":0,"calls":2,"maxDepth":2,"returns":[0,0]}},
+      {"id":"list-mixed","label":"[5, -2, 0, 5] · start 0","values":[5,-2,0,5],"index":0,"expected":{"result":8,"calls":5,"maxDepth":5,"returns":[0,5,5,3,8]}},
+      {"id":"list-suffix","label":"[4, 2, 7, 1] · start 2","values":[4,2,7,1],"index":2,"expected":{"result":8,"calls":3,"maxDepth":3,"returns":[0,1,8]}}
+    ],
+    "variants": {
+      "correct": {"label":"Correct example"},
+      "wrong_base": {"label":"Repair · wrong base result","source":"repairs/wrong_base.py","outcome":"completed","correctness":"incorrect-result","stdout":"15\n","result":15,"rule":"Direct base answer","repair":"Return 0 for the empty suffix.","explanation":"The first divergence is the base call preparing 1. An empty suffix contributes 0; the legal Python execution adds the extra 1 to the final result."},
+      "missing_combine": {"label":"Repair · missing combination","source":"repairs/missing_combine.py","outcome":"completed","correctness":"incorrect-result","stdout":"0\n","result":0,"rule":"Caller’s combination","repair":"Return total, including this caller’s current value.","explanation":"The first non-base call computes total = 1, then returns child_total = 0. Its calculated local and returned expression differ. The program completes normally with the wrong result."},
+      "print_instead_of_return": {"label":"Repair · print instead of return","source":"repairs/print_instead_of_return.py","outcome":"runtime-error","correctness":"runtime-error","stdout":"1\n","rule":"Return the promised value","repair":"Replace print(total) with return total inside the function.","explanation":"The first non-base call prints 1, then implicitly returns None. Its caller binds None to child_total; adding an integer to None raises a real TypeError. Printing does not return an answer."},
+      "no_progress": {"label":"Repair · no progress","source":"repairs/no_progress.py","outcome":"pedagogical-limit","correctness":"pedagogical-limit","stdout":"","rule":"Decreasing measure","repair":"Pass index + 1 so the remaining length decreases.","explanation":"The first child receives the same index 0 and same list. The base case exists but is never reached. The external teaching guard stops at eight live functions; this is not Python’s recursion limit.","exportWarning":"Intentionally nonterminating example. Do not run this exported driver without an external depth/time limit."}
+    }
+  },
+  "folder_total": {
+    "functionName":"total_size","parameters":["node"],"defaults":{},
+    "source":"folder_total.py","domain":"folder","resultAssignment":true,
+    "signature":"total_size(node)","defaultFixture":"folder-course",
+    "inputContract":"A synthetic acyclic tree of at most 16 distinct nodes, depth at most six; files contain 0 to 10000 bytes. No filesystem access or shared subtrees.",
+    "limits":{"maxDepth":8,"maxEvents":500},
+    "design":[
+      ["One-call promise","Return the total file bytes underneath one supplied synthetic node."],
+      ["Direct base answer","A file returns its own bytes. An empty folder initializes total = 0, skips its loop, and returns 0."],
+      ["Decreasing measure","Each child belongs to a smaller subtree of this finite acyclic hierarchy."],
+      ["Delegated call","Ask total_size(child) for one child’s total; siblings run sequentially in source order."],
+      ["Caller’s combination","Assign the returned value to this caller’s child_total, then add it to this caller’s total."]
+    ],
+    "complexity":"For N nodes and hierarchy height H: O(N) work and O(H) additional call stack under the bounded-value model. The full input hierarchy and inspection history are visualization storage, separate from the algorithm’s live call stack.",
+    "fixtures":[
+      {"id":"folder-course","label":"Course · nine nodes","expected":{"result":500,"calls":9,"maxDepth":4,"returns":[120,80,40,60,100,200,200,200,500]}},
+      {"id":"folder-empty","label":"Empty folder","node":{"kind":"folder","name":"Empty","children":[]},"expected":{"result":0,"calls":1,"maxDepth":1,"returns":[0]}},
+      {"id":"folder-zero","label":"Zero-byte file","node":{"kind":"file","name":"empty.txt","bytes":0},"expected":{"result":0,"calls":1,"maxDepth":1,"returns":[0]}},
+      {"id":"folder-duplicates","label":"Two files with the same name","node":{"kind":"folder","name":"Root","children":[{"kind":"file","name":"notes.txt","bytes":3},{"kind":"file","name":"notes.txt","bytes":7}]},"expected":{"result":10,"calls":3,"maxDepth":2,"returns":[3,7,10]}}
+    ],
+    "variants":{"correct":{"label":"Correct example"}}
+  }
+}

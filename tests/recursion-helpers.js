@@ -6,7 +6,8 @@ const root = path.resolve(__dirname, '..');
 const context = vm.createContext({});
 vm.runInContext(fs.readFileSync(path.join(root, 'activity-packs/recursion-traces.js'), 'utf8'), context);
 const fixtures = vm.runInContext('ITCC47RecursionTraces.fixtures', context);
-const fixture = (program, n = 3) => fixtures[program + ':n' + n];
+const fixture = (program, selection = 3) => fixtures[typeof selection === 'number' ? program + ':n' + selection
+  : selection.fixture + (selection.variant && selection.variant !== 'correct' ? ':' + selection.variant : '')];
 async function preview(page) {
   const token = fs.readFileSync(path.join(root, '.instructor-preview-token'), 'utf8').trim();
   await page.addInitScript((capability) => {
@@ -39,6 +40,17 @@ async function screenshot(page, testInfo, label) {
   const mobile = page.locator('.mobile-playback-details');
   if (await mobile.isVisible() && await mobile.getAttribute('open') !== null) await mobile.locator('summary').click();
   await page.evaluate(() => window.scrollTo(0, 0));
-  await page.screenshot({ path: path.join(process.env.M5_EVIDENCE_DIR, label + '-' + testInfo.project.name + '.png'), fullPage: true });
+  const capture = path.join(process.env.M5_EVIDENCE_DIR, label + '-' + testInfo.project.name);
+  await page.screenshot({ path: capture + '.png', fullPage: true });
+  fs.writeFileSync(capture + '.json', JSON.stringify({
+    url: page.url(), title: await page.title(), viewport: page.viewportSize(),
+    browser: page.context().browser().version(), base: '7359dc860f75ae477b1ab15870724d5215d0ba1c',
+    eventId: await page.locator('.recursion-workspace').getAttribute('data-event-id'),
+    eventKind: await page.locator('.recursion-workspace').getAttribute('data-event-kind'),
+    fixtureId: await page.locator('.recursion-workspace').getAttribute('data-fixture-id'),
+    sourceRevision: await page.locator('.recursion-workspace').getAttribute('data-source-revision'),
+    variant: await page.locator('.recursion-workspace').getAttribute('data-variant'),
+    provenance: await page.locator('.recursion-provenance').allTextContents(),
+  }, null, 2));
 }
 module.exports = { root, fixture, preview, open, surface, slider, seek, screenshot };

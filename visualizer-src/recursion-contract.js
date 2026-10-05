@@ -1,24 +1,65 @@
 /* Classic-script optional pack: verified fixtures, never a Python interpreter. */
 const ITCC47Recursion = (() => {
   const PRESETS = Object.freeze([0, 1, 3, 5]);
-  function fixture(programId, n = 3) {
-    if (!['countdown', 'sum_to'].includes(programId) || !Number.isInteger(n) || !PRESETS.includes(n)) {
-      throw new Error('Choose a supported Python fixture: n = 0, 1, 3, or 5.');
+  const SCHEMA = 2;
+  function lesson(programId) {
+    const spec = ITCC47RecursionTraces.lessons?.[programId];
+    if (!spec || ITCC47RecursionTraces.schemaVersion !== SCHEMA) throw new Error('Incompatible Python fixture schema. Rebuild the verified pack.');
+    return spec;
+  }
+  function fixture(programId, selection = {}) {
+    const spec = lesson(programId);
+    const options = typeof selection === 'object' && selection !== null ? selection : { n: selection };
+    let key;
+    if (spec.domain === 'number') {
+      const n = options.n ?? 3;
+      if (!Number.isInteger(n) || !PRESETS.includes(n)) throw new Error('Choose a supported Python fixture: n = 0, 1, 3, or 5.');
+      key = programId + ':n' + n;
+    } else {
+      const scenario = options.fixture ?? spec.defaultFixture;
+      const variant = options.variant ?? 'correct';
+      if (!spec.fixtures.some(row => row.id === scenario) || !spec.variants[variant] || (variant !== 'correct' && scenario !== 'list-main')) {
+        throw new Error('Choose a declared Python fixture and repair mode.');
+      }
+      key = scenario + (variant === 'correct' ? '' : ':' + variant);
     }
-    const item = ITCC47RecursionTraces.fixtures[programId + ':n' + n];
-    if (!item || ITCC47RecursionTraces.schemaVersion !== 1 || Hash.hex(item.source) !== item.sourceRevision) {
+    const item = ITCC47RecursionTraces.fixtures[key];
+    if (!item || item.programId !== programId || item.schemaVersion !== SCHEMA || Hash.hex(item.source) !== item.sourceRevision) {
       throw new Error('Python source and trace do not match. Rebuild the verified fixtures.');
     }
     return BSITPlayback.deepFreeze(item);
   }
   function adapt(item) {
+    if (item.schemaVersion !== SCHEMA) throw new Error('Incompatible Python fixture schema.');
     if (Hash.hex(item.source) !== item.sourceRevision) throw new Error('Python source revision mismatch.');
     if (Hash.hex(JSON.stringify(item.events)) !== item.traceRevision) throw new Error('Python trace revision mismatch.');
+    if (Hash.hex(JSON.stringify(item.objects)) !== item.objectsRevision) throw new Error('Python input object revision mismatch.');
+    function checkValue(tag) {
+      if (!tag || !['UNBOUND', 'PENDING', 'NONE', 'INTEGER', 'BOOLEAN', 'STRING', 'REFERENCE'].includes(tag.kind)
+        || (tag.kind === 'REFERENCE' && !Object.hasOwn(item.objects, tag.objectId))
+        || (tag.kind === 'INTEGER' && !Number.isSafeInteger(tag.value))
+        || (tag.kind === 'STRING' && typeof tag.value !== 'string')
+        || (tag.kind === 'BOOLEAN' && typeof tag.value !== 'boolean')) throw new Error('Unsupported Python value or input reference.');
+    }
+    for (const object of Object.values(item.objects)) {
+      if (!['list', 'node'].includes(object.type)) throw new Error('Unsupported Python input object.');
+      Object.values(object.type === 'list' ? object.items : object.fields).forEach(checkValue);
+    }
+    const spec = lesson(item.programId);
+    for (const event of item.events) {
+      for (const call of Object.values(event.frame.framesById)) {
+        Object.values(call.locals).forEach(checkValue);
+        checkValue(call.returnValue); checkValue(call.pendingExpression);
+      }
+      Object.values(event.frame.driver.locals).forEach(checkValue);
+      if (event.frame.returnTransfer) checkValue(event.frame.returnTransfer.value);
+    }
     const events = item.events.map((event) => BSITPlayback.timelineEvent({
       id: event.eventId, domain: 'python-recursion', type: event.eventKind.toLowerCase(),
       source: event.source, message: event.message, frame: {
         ...event.frame, programId: item.programId, fixtureId: item.fixtureId,
         sourceRevision: item.sourceRevision, eventKind: event.eventKind,
+        objects: item.objects, inputs: item.inputs, domain: spec.domain,
       },
       metrics: event.frame.metrics,
       boundary: ['CALL', 'RETURN_READY', 'ASSIGN_RESULT'].includes(event.eventKind),
@@ -28,19 +69,22 @@ const ITCC47Recursion = (() => {
     return BSITPlayback.runResult({
       events, outcome: success ? 'complete' : 'error',
       diagnostics: success ? [] : [{ message: events.at(-1)?.message || 'The trace did not complete.' }],
-      result: { fixtureId: item.fixtureId, sourceRevision: item.sourceRevision, finalFrame: events.at(-1)?.frame },
+      result: { fixtureId: item.fixtureId, sourceRevision: item.sourceRevision, identity: identity(item),
+        correctness: item.correctness, finalFrame: events.at(-1)?.frame },
       truncated: item.outcome === 'pedagogical-limit',
       capabilities: { visualize: true, trace: true, variables: true, edit: false },
     });
   }
   function run(programId, options = {}) {
-    try { return adapt(fixture(programId, options.n ?? 3)); }
+    try { return adapt(fixture(programId, options)); }
     catch (error) {
       return BSITPlayback.runResult({ outcome: 'error', diagnostics: [{ message: error.message }], error: error.message });
     }
   }
   function predictions(item) {
+    if (lesson(item.programId).domain !== 'number') return ITCC47RecursionQuestions.forFixture(item);
     const base = item.events.find((event) => event.eventKind === 'BASE_CHECK' && event.frame.annotations.baseCase);
+    if (!base) return [];
     const active = base.frame.framesById[base.frame.activeCallId];
     const recipient = active.parentCallId || 'driver';
     const others = recipient === 'driver' ? ['Every waiting caller', 'No context resumes'] : ['driver', 'Every waiting caller'];
@@ -74,13 +118,34 @@ const ITCC47Recursion = (() => {
     }
     return questions;
   }
+  function identity(item) {
+    return item.programId + ':' + item.fixtureId + ':' + (item.variant || 'correct') + ':v' + item.schemaVersion + ':' + item.sourceRevision + ':' + item.traceRevision;
+  }
+  function filename(item) {
+    return item.programId + '-' + (item.programId === 'countdown' || item.programId === 'sum_to'
+      ? item.fixtureId.split(':')[1] : item.fixtureId.replaceAll(':', '-')) + '.py';
+  }
+  function callLabel(call, objects = {}) {
+    if (!call) return 'driver';
+    const spec = Object.values(ITCC47RecursionTraces.lessons).find(row => row.functionName === call.functionName);
+    const parameters = spec?.parameters || Object.keys(call.locals);
+    return call.functionName + '(' + parameters.map(name => {
+      const tag = call.locals[name];
+      const label = objects[tag?.objectId]?.fields?.name?.value;
+      return (label ? label + ' · ' : '') + formatValue(tag);
+    }).join(', ') + ')';
+  }
   function formatValue(tag) {
     if (tag?.kind === 'INTEGER') return String(tag.value);
     if (tag?.kind === 'NONE') return 'None';
     if (tag?.kind === 'PENDING') return 'PENDING · call has not completed';
-    return 'UNBOUND · not yet assigned';
+    if (tag?.kind === 'UNBOUND') return 'UNBOUND · not yet assigned';
+    if (tag?.kind === 'REFERENCE') return tag.objectId;
+    if (tag?.kind === 'STRING') return JSON.stringify(tag.value);
+    if (tag?.kind === 'BOOLEAN') return tag.value ? 'True' : 'False';
+    return 'Unsupported value: ' + (tag?.kind || 'missing');
   }
-  return Object.freeze({ PRESETS, fixture, adapt, run, formatValue, predictions });
+  return Object.freeze({ PRESETS, lesson, fixture, adapt, run, formatValue, predictions, identity, filename, callLabel });
 })();
 
 globalThis.ITCC47Recursion = ITCC47Recursion;

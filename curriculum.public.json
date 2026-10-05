@@ -133,7 +133,7 @@
       "id": "m5-recursion", "moduleId": "m5", "order": 170, "reviewStatus": "draft", "title": "Recursion and recursive search",
       "summary": "Track base cases, shrinking arguments, calls, and returns as explicit frames.",
       "goals": ["Identify a base case", "Trace calls, locals, and return assignments", "Trace recursive bounds", "Compare recursive and iterative space"],
-      "prerequisiteIds": ["m4-queue-deque"], "sequence": ["activity:recursion-call-stack", "activity:recursion-return-values", "activity:recursive-range-search"]
+      "prerequisiteIds": ["m4-queue-deque"], "sequence": ["activity:recursion-call-stack", "activity:recursion-return-values", "activity:recursion-list-total", "activity:recursion-folder-total", "activity:recursive-range-search"]
     },
     {
       "id": "m5-divide-conquer", "moduleId": "m5", "order": 180, "reviewStatus": "draft", "title": "Divide-and-conquer and merge sort",
@@ -213,6 +213,8 @@
     { "kind": "activity", "id": "deque-service-lane", "checkpointId": "m4-queue-deque" },
     { "kind": "activity", "id": "recursion-call-stack", "checkpointId": "m5-recursion", "title": "M5.1 — Call-stack control" },
     { "kind": "activity", "id": "recursion-return-values", "checkpointId": "m5-recursion", "title": "M5.2 — Returned values" },
+    { "kind": "activity", "id": "recursion-list-total", "checkpointId": "m5-recursion", "title": "M5.3 — Design and repair a list total" },
+    { "kind": "activity", "id": "recursion-folder-total", "checkpointId": "m5-recursion", "title": "M5.4 — Synthetic folder total" },
     { "kind": "activity", "id": "recursive-range-search", "checkpointId": "m5-recursion" },
     { "kind": "activity", "id": "stable-merge-sort", "checkpointId": "m5-divide-conquer" },
     { "kind": "activity", "id": "tree-traversals", "checkpointId": "m6-trees" },

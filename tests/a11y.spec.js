@@ -290,3 +290,4 @@ test('sliding-window maximum redesign has no serious or critical Axe violations'
 });
 
 require('./recursion.a11y');
+require('./recursion-applications.a11y');

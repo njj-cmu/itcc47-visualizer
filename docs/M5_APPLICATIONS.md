@@ -3,8 +3,9 @@
 Continuation of staging `7359dc860f75ae477b1ab15870724d5215d0ba1c`.
 The approved promotion opens the reviewed `m5-recursion` checkpoint in
 pre-production: four Python lessons, the existing recursive-search activity,
-and the two recursion practice problems. Divide-and-conquer and later
-checkpoints remain draft. Publishing main remains a separate release action.
+and the two recursion practice problems. The subsequent version 7 promotion also
+opens both sorting activities and both divide-and-conquer practice problems.
+Modules 6-8 remain draft. Publishing main remains a separate release action.
 
 ## Learning sequence
 

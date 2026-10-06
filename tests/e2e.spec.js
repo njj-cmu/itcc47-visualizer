@@ -3,8 +3,8 @@ const fs = require('fs');
 const path = require('path');
 
 const instructorAccessToken = fs.readFileSync(path.resolve(__dirname, '..', '.instructor-preview-token'), 'utf8').trim();
-const instructorAccessRecord = { schemaVersion: 1, profileId: 'itcc47-2026-2027-s1', profileVersion: 6, token: instructorAccessToken };
-const instructorPreviewRecord = { schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 6, currentCheckpointId: 'm8-dp' };
+const instructorAccessRecord = { schemaVersion: 1, profileId: 'itcc47-2026-2027-s1', profileVersion: 7, token: instructorAccessToken };
+const instructorPreviewRecord = { schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 7, currentCheckpointId: 'm8-dp' };
 
 const entries = ['index.html', 'itcc47.html', 'itcc45.html', 'itcc45-topics.html', 'itcc45-practice.html?topic=classes', 'computer-architecture.html', 'computer-architecture-modules.html', 'computer-architecture-practice.html', 'computer-networking.html', 'computer-networking-modules.html', 'computer-networking-practice.html', 'visualizer.html', 'visualizer.html?activity=insertion-sort', 'visualizer.html?activity=deque-sliding-window', 'visualizer.html?course=itcc45&activity=itcc45-classes-blueprint', 'visualizer.html?course=computer-architecture&activity=architecture-fetch-cycle', 'visualizer.html?course=computer-architecture&activity=architecture-decode-instruction', 'visualizer.html?course=computer-architecture&activity=architecture-add-immediate', 'visualizer.html?course=computer-networking&activity=networking-read-classroom-network', 'visualizer.html?course=computer-networking&activity=networking-local-peer-sharing', 'visualizer.html?course=computer-networking&activity=networking-classify-components', 'visualizer.html?course=computer-networking&activity=networking-compare-media', 'visualizer.html?course=computer-networking&activity=networking-read-network-topologies', 'visualizer.html?course=computer-networking&activity=networking-arp-neighbor-discovery', 'industry-workbench.html', 'industry-workbench.html?scenario=industry-priority-range-recall', 'writer.html', 'tracer.html', 'problems.html', 'problems.html?view=midterm', 'problems.html?view=visualizations', 'problems.html?view=workbenches', 'lesson.html?checkpoint=m2-selection-sort', 'lesson.html?checkpoint=m3-linked-foundations&preview=1', 'student-materials.html', 'problem-list.html?module=1', 'practice.html?module=1', 'practice.html?module=3&problem=linked-node-count', 'practice.html?module=4&problem=stack-reverse'];
 
@@ -32,6 +32,7 @@ const studentStateTests = new Set([
   'curriculum roadmap expands the current module and compacts locked modules',
   'student preview query cannot expose instructor controls or locked content',
   'instructor preview is explicit, persistent, and does not change the deployed profile',
+  'M5C file delivery uses the same verified classic-script pack',
 ]);
 
 test.beforeEach(async ({ page }, testInfo) => {
@@ -1249,7 +1250,7 @@ test('start page gives students a clear route into the current practice bank', a
   await expect(page.getByRole('heading', { name: /Learn the idea/ })).toBeVisible();
   const workflow = page.getByRole('list', { name: 'Midterm learning workflow' });
   for (const step of ['Learn the purpose', 'Visualize the state', 'Practice with checks']) await expect(workflow).toContainText(step);
-  await expect(page.locator('#current-checkpoint')).toContainText('Recursion and recursive search');
+  await expect(page.locator('#current-checkpoint')).toContainText('Merge Sort and Lomuto Quicksort');
   await page.getByRole('link', { name: /Open current practice bank/ }).click();
   await expect(page).toHaveURL(/problem-list\.html\?module=5$/);
   await expect(page.getByRole('heading', { name: 'Recursion and Divide-and-Conquer', exact: true })).toBeVisible();
@@ -1261,7 +1262,7 @@ test('curriculum roadmap expands the current module and compacts locked modules'
   await page.goto('/problems.html');
   await expect(page.locator('.module-card')).toHaveCount(8);
   await expect(page.locator('.module-card-current')).toContainText('Recursion and Divide-and-Conquer');
-  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(2);
+  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(4);
   await expect(page.locator('.checkpoint-list, .module-lessons, .module-outline')).toHaveCount(0);
   await expect(page.locator('.module-card-locked')).toHaveCount(3);
   await expect(page.locator('.module-card-locked .module-problem-card')).toHaveCount(0);
@@ -1473,15 +1474,15 @@ test('student preview query cannot expose instructor controls or locked content'
   await expect(page.getByText('Instructor preview', { exact: true })).toHaveCount(0);
   await expect(page.locator('#release-controls, .draft-preview-indicator')).toHaveCount(0);
   await expect(page.locator('.module-card-current')).toContainText('Recursion and Divide-and-Conquer');
-  await page.goto('/visualizer.html?activity=stable-merge-sort&preview=1');
-  await expect(page.locator('.curriculum-lock')).toContainText('Stable merge sort is coming later');
+  await page.goto('/visualizer.html?activity=tree-traversals&preview=1');
+  await expect(page.locator('.curriculum-lock')).toContainText('Tree traversal orders is coming later');
   await expect(page.locator('.curriculum-lock')).not.toContainText('Practice release');
   await expect(page.locator('.curriculum-lock .release-badge')).toHaveCount(0);
   await expect(page.getByRole('link', { name: /Continue with Module 5/ })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Explore available visualizations' })).toBeVisible();
   await expect(page.locator('.visualizer-workspace, .source-panel')).toHaveCount(0);
-  await page.goto('/practice.html?module=5&problem=merge-two-sorted&preview=1');
-  await expect(page.locator('.curriculum-lock')).toContainText('Stable merge of two ranges is coming later');
+  await page.goto('/practice.html?module=6&problem=bst-insert-order&preview=1');
+  await expect(page.locator('.curriculum-lock')).toContainText('Build a BST in order is coming later');
   await expect(page.locator('#p-statement, #code-box')).toHaveCount(0);
 });
 
@@ -1489,11 +1490,11 @@ test('locked visualization cards use a compact icon and border state', async ({ 
   await page.goto('/problems.html?view=visualizations');
   await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.industry-catalog-feature')).toBeHidden();
-  await expect(page.locator('.visualization-card')).toHaveCount(39);
-  await expect(page.locator('.visualization-card.visualization-available')).toHaveCount(25);
-  await expect(page.locator('.visualization-card.visualization-current')).toHaveCount(5);
-  await expect(page.locator('.visualization-card.visualization-locked')).toHaveCount(9);
-  await expect(page.locator('.visualization-lock')).toHaveCount(9);
+  await expect(page.locator('.visualization-card')).toHaveCount(40);
+  await expect(page.locator('.visualization-card.visualization-available')).toHaveCount(30);
+  await expect(page.locator('.visualization-card.visualization-current')).toHaveCount(2);
+  await expect(page.locator('.visualization-card.visualization-locked')).toHaveCount(8);
+  await expect(page.locator('.visualization-lock')).toHaveCount(8);
   await expect(page.locator('.visualization-card .release-badge')).toHaveCount(0);
   await expect(page.locator('.visualization-card').first().locator('.visualization-card-meta')).toContainText('Module 2');
   const familyOrder = await page.locator('.visualization-group h2').allTextContents();
@@ -1505,7 +1506,7 @@ test('focused visualizations remember visits and fade only after the final step'
   await page.goto('/problems.html?view=visualizations');
   await page.evaluate(() => localStorage.removeItem('itcc47.visualizer-progress:v1'));
   await page.reload();
-  await expect(page.getByRole('heading', { name: '0 of 30 available visualizations reviewed' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '0 of 32 available visualizations reviewed' })).toBeVisible();
   let bubbleCard = page.locator('.visualization-card', { hasText: 'Bubble Sort' });
   await expect(bubbleCard).not.toHaveClass(/visualization-visited/);
   await bubbleCard.click();
@@ -1527,7 +1528,7 @@ test('focused visualizations remember visits and fade only after the final step'
   bubbleCard = page.locator('.visualization-card', { hasText: 'Bubble Sort' });
   await expect(bubbleCard).toHaveClass(/visualization-reviewed/);
   await expect(bubbleCard).toContainText('Reviewed');
-  await expect(page.getByRole('heading', { name: '1 of 30 available visualizations reviewed' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '1 of 32 available visualizations reviewed' })).toBeVisible();
   await expect(bubbleCard).toHaveCSS('background-color', 'rgb(20, 33, 31)');
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('itcc47.visualizer-progress:v1')));
   expect(stored.schemaVersion).toBe(1);
@@ -1721,7 +1722,7 @@ test('the legacy visualizer discovery route redirects to the canonical catalog',
   await page.goto('/visualizer.html');
   await expect(page).toHaveURL(/problems\.html\?view=visualizations$/);
   await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.visualization-card')).toHaveCount(39);
+  await expect(page.locator('.visualization-card')).toHaveCount(40);
   await expect(page.locator('.industry-catalog-feature')).toBeHidden();
   await expect(page.locator('#visualizer-root')).toHaveCount(0);
 });
@@ -1747,8 +1748,8 @@ test('workbench activity aliases redirect before the standard workspace initiali
 });
 
 test('locked visualizer route renders requirements without source or playback', async ({ page }) => {
-  await page.goto('/visualizer.html?activity=stable-merge-sort');
-  await expect(page.locator('.curriculum-lock')).toContainText('Stable merge sort is coming later');
+  await page.goto('/visualizer.html?activity=tree-traversals');
+  await expect(page.locator('.curriculum-lock')).toContainText('Tree traversal orders is coming later');
   await expect(page.locator('.curriculum-lock')).not.toContainText('Practice release');
   await expect(page.locator('.curriculum-lock .release-badge')).toHaveCount(0);
   const actions = page.locator('.curriculum-lock-actions .btn');
@@ -1763,8 +1764,8 @@ test('locked visualizer route renders requirements without source or playback', 
 });
 
 test('locked planned practice route exposes no problem statement or editor', async ({ page }) => {
-  await page.goto('/practice.html?module=5&problem=merge-two-sorted');
-  await expect(page.locator('.curriculum-lock')).toContainText('Stable merge of two ranges is coming later');
+  await page.goto('/practice.html?module=6&problem=bst-insert-order');
+  await expect(page.locator('.curriculum-lock')).toContainText('Build a BST in order is coming later');
   await expect(page.locator('#p-statement')).toHaveCount(0);
   await expect(page.locator('#code-box')).toHaveCount(0);
 });
@@ -1780,17 +1781,17 @@ test('instructor preview is explicit, persistent, and does not change the deploy
   await page.getByLabel('Preview checkpoint').selectOption('m8-dp');
   await page.getByRole('button', { name: 'Apply preview' }).click();
   await expect(page).toHaveURL(/preview=1/);
-  await page.goto('/visualizer.html?activity=stable-merge-sort&preview=1');
-  await expect(page.getByRole('heading', { name: 'Stable merge sort' })).toBeVisible();
+  await page.goto('/visualizer.html?activity=tree-traversals&preview=1');
+  await expect(page.getByRole('heading', { name: 'Tree traversal orders' })).toBeVisible();
   await expect(page.locator('.draft-preview-indicator')).toContainText('Draft preview');
-  await page.goto('/visualizer.html?activity=stable-merge-sort');
+  await page.goto('/visualizer.html?activity=tree-traversals');
   await expect(page.locator('.curriculum-lock')).toBeVisible();
   await page.goto('/problems.html?preview=1');
   await page.getByText('Instructor preview', { exact: true }).click();
   await page.getByRole('button', { name: 'Exit instructor mode' }).click();
   await expect(page).not.toHaveURL(/preview=1/);
   await expect(page.getByText('Instructor preview', { exact: true })).toHaveCount(0);
-  await page.goto('/visualizer.html?activity=stable-merge-sort&preview=1');
+  await page.goto('/visualizer.html?activity=tree-traversals&preview=1');
   await expect(page.locator('.curriculum-lock')).toBeVisible();
 });
 
@@ -1803,13 +1804,13 @@ test('former materials route redirects without exposing downloads or metadata', 
 });
 
 test('instructor preview renders every Module 5-8 teaching activity', async ({ page }) => {
-  const activities = ['recursive-range-search','stable-merge-sort','tree-traversals','bst-insert-search','bst-height-shape','graph-representation','bfs-shortest-path','dfs-reachability','greedy-dp-coin-change','knapsack-dp'];
+  const activities = ['recursive-range-search','stable-merge-sort','quick-sort','tree-traversals','bst-insert-search','bst-height-shape','graph-representation','bfs-shortest-path','dfs-reachability','greedy-dp-coin-change','knapsack-dp'];
   for (const activity of activities) {
     await page.goto(`/visualizer.html?activity=${activity}&preview=1`);
     await expect(page.locator('.visualizer-workspace')).toBeVisible();
     await expect(page.locator('.source-line')).not.toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Playback controls' })).toBeVisible();
-    await expect(page.locator('.concept-domain')).toBeVisible();
+    await expect(page.locator(['stable-merge-sort', 'quick-sort'].includes(activity) ? '.sorting-workspace' : '.concept-domain')).toBeVisible();
     await expect(page.locator('.draft-preview-indicator')).toContainText('Draft preview');
   }
 });
@@ -1834,17 +1835,17 @@ test('relocking instructor-preview practice preserves browser-local progress', a
   const savedDraft = 'READ n\nWRITE n';
   await page.addInitScript((draft) => localStorage.setItem('itcc47.practice-records:v2', JSON.stringify({
     schemaVersion: 2,
-    records: { 'merge-two-sorted': { contentVersion: 1, draft, completed: false } },
+    records: { 'bst-insert-order': { contentVersion: 1, draft, completed: false } },
     recovery: {},
   })), savedDraft);
-  await page.goto('/practice.html?module=5&problem=merge-two-sorted&preview=1');
-  await expect(page.getByRole('heading', { name: 'Stable merge of two ranges' })).toBeVisible();
+  await page.goto('/practice.html?module=6&problem=bst-insert-order&preview=1');
+  await expect(page.getByRole('heading', { name: 'Build a BST in order' })).toBeVisible();
   await page.goto('/problems.html?preview=1');
   await page.getByText('Instructor preview', { exact: true }).click();
   await page.getByRole('button', { name: 'Exit instructor mode' }).click();
-  await page.goto('/practice.html?module=5&problem=merge-two-sorted');
+  await page.goto('/practice.html?module=6&problem=bst-insert-order');
   await expect(page.locator('.curriculum-lock')).toBeVisible();
-  const record = await page.evaluate(() => JSON.parse(localStorage.getItem('itcc47.practice-records:v2')).records['merge-two-sorted']);
+  const record = await page.evaluate(() => JSON.parse(localStorage.getItem('itcc47.practice-records:v2')).records['bst-insert-order']);
   expect(record).toEqual({ contentVersion: 1, draft: savedDraft, completed: false });
 });
 
@@ -3345,7 +3346,7 @@ test('Visualize opens the canonical Modules visualization catalog', async ({ pag
   await browse.click();
   await expect(page).toHaveURL(/problems\.html\?view=visualizations$/);
   await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.visualization-card')).toHaveCount(39);
+  await expect(page.locator('.visualization-card')).toHaveCount(40);
   await expect(page.locator('.industry-catalog-feature')).toBeHidden();
   await expect(page.locator('#visualizer-root')).toHaveCount(0);
   await expect(page.locator('.visualizer-workspace')).toHaveCount(0);
@@ -4357,7 +4358,7 @@ test('topic disclosures survive resize and do not mark activities reviewed', asy
   await sorting.click();
   await expect(page.locator('.visualization-card', { hasText: 'Bubble Sort' })).toBeHidden();
   await page.setViewportSize({ width: 1366, height: 768 });
-  await expect(page.locator('.visualization-card:visible')).toHaveCount(39);
+  await expect(page.locator('.visualization-card:visible')).toHaveCount(40);
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(sorting).toHaveAttribute('aria-expanded', 'false');
   await expect(searching).toHaveAttribute('aria-expanded', 'true');
@@ -4383,8 +4384,8 @@ test('module catalog exposes current practice and retains the full problem list'
   await expect(page.locator('.module-card')).toHaveCount(8);
   await expect(page.locator('.module-card-current')).toContainText('Recursion and Divide-and-Conquer');
   await expect(page.locator('.module-card-locked')).not.toHaveCount(0);
-  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(2);
-  await page.getByRole('link', { name: /Open 2 problems/ }).click();
+  await expect(page.locator('.module-card-current .module-problem-card')).toHaveCount(4);
+  await page.getByRole('link', { name: /Open 4 problems/ }).click();
   await expect(page).toHaveURL(/problem-list\.html\?module=5$/);
   await expect(page.getByRole('heading', { name: 'Recursion and Divide-and-Conquer', exact: true })).toBeVisible();
   await page.locator('.problem-choice-action').first().click();
@@ -4399,7 +4400,10 @@ test('module catalog exposes current practice and retains the full problem list'
 test('modules catalog opens visualizations in the shared navigation shell', async ({ page }) => {
   await page.goto('/problems.html?view=visualizations&preview=1');
   await expect(page.getByRole('tab', { name: 'Visualizations' })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('.visualization-card')).toHaveCount(39);
+  await expect(page.locator('.visualization-card')).toHaveCount(40);
+  const actualIds = await page.locator('.visualization-card').evaluateAll(cards => cards.map(card => new URL(card.href).searchParams.get('activity')).sort());
+  const featuredWorkbenchIds = await page.evaluate(() => ITCC47IndustryWorkbench.listScenarios().map(scenario => scenario.id));
+  expect(actualIds).toEqual(curriculumSource.resources.filter(resource => resource.kind === 'activity' && !featuredWorkbenchIds.includes(resource.id)).map(resource => resource.id).sort());
   await page.getByRole('link', { name: /Bubble Sort/ }).click();
   await expect(page).toHaveURL(/visualizer\.html\?activity=bubble-sort&preview=1$/);
   await expect(page.locator('.topbar-nav a', { hasText: 'Visualize' })).toHaveAttribute('aria-current', 'page');
@@ -4520,7 +4524,61 @@ test('all entry pages open from file URLs and permit an interaction', async ({ p
   await expect(page.locator('.network-packet')).toHaveAttribute('data-motion-link-id', 'link-switch-host-b');
 });
 
+// Identity is fixed by the curriculum; which checkpoint is current is a separate policy.
+const module4PracticeIds = ['balanced-delimiters', 'stack-reverse', 'postfix-operand-order',
+  'queue-service', 'deque-priority', 'round-robin-reenqueue'].sort();
+async function module4PracticeSnapshot(page) {
+  await expect(page.locator('.problem-choice')).toHaveCount(6);
+  const rows = await page.locator('.problem-choice').evaluateAll(cards => cards.map(card => {
+    const link = card.querySelector('.problem-choice-action');
+    const url = new URL(link.href);
+    return { id: url.searchParams.get('problem'), href: url.pathname + url.search,
+      title: card.querySelector('h2').textContent, action: link.textContent,
+      state: [...card.classList].find(name => name.startsWith('problem-choice-')).slice('problem-choice-'.length) };
+  }).sort((a, b) => a.id.localeCompare(b.id)));
+  expect(rows.map(row => row.id)).toEqual(module4PracticeIds);
+  const metadata = await page.evaluate(() => PROBLEMS.filter(problem => problem.module === 'Module 4')
+    .map(({ id, title }) => ({ id, title })).sort((a, b) => a.id.localeCompare(b.id)));
+  expect(rows.map(({ id, title }) => ({ id, title }))).toEqual(metadata);
+  for (const row of rows) {
+    expect(row.href).toBe(`/practice.html?module=4&problem=${row.id}`);
+    expect(['available', 'current']).toContain(row.state);
+    expect(row.action).toBe('Start');
+  }
+  return rows;
+}
+
+for (const checkpoint of ['m4-queue-deque', 'm5-recursion', 'm5-divide-conquer']) {
+  test(`release policy classifies Module 4 under ${checkpoint}`, async ({ page }) => {
+    await page.route('**/release-profile.js*', async route => {
+      const response = await route.fetch();
+      const body = (await response.text()).replace(/currentCheckpointId:\s*'[^']+'/, `currentCheckpointId: '${checkpoint}'`);
+      await route.fulfill({ response, body });
+    });
+    await page.goto('/problem-list.html?module=4');
+    expect(await page.evaluate(() => ITCC47Curriculum.activeProfile().currentCheckpointId)).toBe(checkpoint);
+    const rows = await module4PracticeSnapshot(page);
+    const currentIds = checkpoint === 'm4-queue-deque' ? ['deque-priority', 'queue-service', 'round-robin-reenqueue'] : [];
+    expect(rows.filter(row => row.state === 'current').map(row => row.id)).toEqual(currentIds);
+    expect(rows.filter(row => row.state === 'available').map(row => row.id))
+      .toEqual(module4PracticeIds.filter(id => !currentIds.includes(id)));
+    expect(await page.evaluate(() => ITCC47Curriculum.stateForResource('activity', 'recursive-range-search').state))
+      .toBe(checkpoint === 'm4-queue-deque' ? 'locked' : checkpoint === 'm5-recursion' ? 'current' : 'available');
+    expect(await page.evaluate(() => ITCC47Curriculum.stateForResource('activity', 'stable-merge-sort').state)).toBe(checkpoint === 'm5-divide-conquer' ? 'current' : 'locked');
+  });
+}
+
 test('cached navigation remains available offline', async ({ page, context }, testInfo) => {
+  expect(curriculumSource.resources.filter(resource => resource.kind === 'problem'
+    && checkpointById.get(resource.checkpointId)?.moduleId === 'm4').map(resource => resource.id).sort())
+    .toEqual(module4PracticeIds);
+  await page.goto('/problem-list.html?module=4');
+  const onlineModule4 = await module4PracticeSnapshot(page);
+  await page.goto('/practice.html?module=1&problem=sum-two');
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
+  const savedDraft = 'READ a\nREAD b\nWRITE a + b';
+  await page.locator('#code-box').fill(savedDraft);
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('itcc47.practice-records:v2'))?.records?.['sum-two']?.draft)).toBe(savedDraft);
   await page.goto('/visualizer.html?activity=deque-service-lane');
   await expect(page.getByRole('heading', { name: 'Priority service lane' })).toBeVisible();
   await page.locator('.psl-settings summary').click();
@@ -4558,11 +4616,22 @@ test('cached navigation remains available offline', async ({ page, context }, te
   await page.goto('/visualizer.html?activity=deque-service-lane');
   await expect(page.getByRole('heading', { name: 'Priority service lane' })).toBeVisible();
   await page.goto('/problem-list.html?module=4');
-  await expect(page.locator('.problem-choice-current')).toHaveCount(3);
-  await expect(page.locator('.problem-choice-available')).toHaveCount(3);
-  await page.goto('/practice.html?module=1');
+  const offlineModule4 = await module4PracticeSnapshot(page);
+  expect(offlineModule4).toEqual(onlineModule4);
+  await testInfo.attach('module-4-online-offline', { body: JSON.stringify({ online: onlineModule4, offline: offlineModule4 }, null, 2), contentType: 'application/json' });
+  for (const row of offlineModule4) {
+    await page.locator(`.problem-choice-action[href="practice.html?module=4&problem=${row.id}"]`).click();
+    await expect(page.locator('#p-title')).toHaveText(row.title);
+    await expect(page.locator('#p-statement')).not.toBeEmpty();
+    await expect(page.locator('.curriculum-lock')).toHaveCount(0);
+    await page.goto('/problem-list.html?module=4');
+  }
+  await page.goto('/practice.html?module=1&problem=sum-two');
   if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
-  await expect(page.locator('#code-box')).toBeVisible();
+  await expect(page.locator('#code-box')).toHaveValue(savedDraft);
+  await page.reload();
+  if (testInfo.project.name === 'phone') await page.getByRole('tab', { name: 'Code' }).click();
+  await expect(page.locator('#code-box')).toHaveValue(savedDraft);
 });
 
 test('service-worker updates remove only obsolete practice caches', async ({ page }) => {
@@ -4803,5 +4872,8 @@ test('sliding-window maximum stays within a phone viewport and keeps step contro
 });
 
 require('./recursion.e2e');
+require('./sorting.e2e');
+require('./sorting-visual.e2e');
+require('./sorting-offline.e2e');
 require('./recursion-presentation.e2e');
 require('./recursion-applications.e2e');

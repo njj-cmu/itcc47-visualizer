@@ -266,8 +266,8 @@ test('selected Midterm modules, disclosures, navigation, and local progress rema
 
 test('instructor-preview problem and later-domain activity have no serious or critical Axe violations', async ({ page }) => {
   await page.addInitScript((token) => {
-    localStorage.setItem('itcc47.instructor-access:v1', JSON.stringify({ schemaVersion: 1, profileId: 'itcc47-2026-2027-s1', profileVersion: 6, token }));
-    localStorage.setItem('itcc47.release-preview:v1', JSON.stringify({ schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 6, currentCheckpointId: 'm8-dp' }));
+    localStorage.setItem('itcc47.instructor-access:v1', JSON.stringify({ schemaVersion: 1, profileId: 'itcc47-2026-2027-s1', profileVersion: 7, token }));
+    localStorage.setItem('itcc47.release-preview:v1', JSON.stringify({ schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 7, currentCheckpointId: 'm8-dp' }));
   }, instructorAccessToken);
   for (const entry of ['practice.html?module=5&problem=recursive-sum&preview=1', 'practice.html?module=6&problem=bst-insert-order&preview=1', 'practice.html?module=7&problem=graph-degree&preview=1', 'practice.html?module=8&problem=greedy-coin-count&preview=1', 'visualizer.html?activity=recursive-range-search&preview=1', 'visualizer.html?activity=tree-traversals&preview=1', 'visualizer.html?activity=bfs-shortest-path&preview=1', 'visualizer.html?activity=greedy-dp-coin-change&preview=1']) {
     await page.goto(`/${entry}`);
@@ -290,4 +290,5 @@ test('sliding-window maximum redesign has no serious or critical Axe violations'
 });
 
 require('./recursion.a11y');
+require('./sorting.a11y');
 require('./recursion-applications.a11y');

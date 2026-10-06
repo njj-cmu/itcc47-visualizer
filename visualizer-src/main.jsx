@@ -818,7 +818,7 @@ function IntegratedPlayback({ activity, state, controller, event, motionPreferen
     <GranularityControl value={granularity} onChange={onGranularityChange} labels={granularityLabels}/>
     <div className="transport">
       <button type="button" aria-label="Previous" onClick={() => controller.step(-1)} disabled={state.index === 0 || state.transitioning}><Icon name="previous"/></button>
-      {activity?.id === 'deque-end-operations' || activity?.renderer === 'python-recursion' ? <button type="button" aria-label="Restart" onClick={() => controller.seek(0)} disabled={state.index === 0}><Icon name="restart"/></button> : null}
+      {activity?.id === 'deque-end-operations' || activity?.renderer?.startsWith('python-') ? <button type="button" aria-label="Restart" onClick={() => controller.seek(0)} disabled={state.index === 0}><Icon name="restart"/></button> : null}
       <button type="button" className="primary" aria-label={state.status === 'playing' ? 'Pause' : 'Play'} onClick={controller.toggle} disabled={state.atEnd}><Icon name={state.status === 'playing' ? 'pause' : 'play'}/><span>{state.status === 'playing' ? 'Pause' : 'Play'}</span></button>
       <button id="btn-step" type="button" aria-label="Step" onClick={() => controller.step(1)} disabled={state.atEnd || state.transitioning}><Icon name="next"/><span>Step</span></button>
     </div>
@@ -840,6 +840,7 @@ function useWorkspaceLayout(enabled, engine, adaptive = false) {
 }
 
 const workspacePacks = {
+  sorting: ['sorting-workspace', 'BSITSortingPack', 'SortingWorkspace', 'verified Python sorting fixtures', 'sorting-traces'],
   recursion: ['recursion-workspace', 'BSITRecursionPack', 'RecursionWorkspace', 'verified Python recursion fixtures', 'recursion-traces'],
   sliding: ['sliding-window-maximum', 'BSITSlidingWindowMaximumPack', 'SlidingWindowMaximumWorkspace', 'sliding-window maximum'],
   priority: ['priority-service-lane', 'BSITPriorityServiceLanePack', 'PriorityServiceLaneWorkspace', 'Priority service lane'],
@@ -850,7 +851,7 @@ function loadWorkspacePack(pack) {
     const [file, , , , prerequisite] = workspacePacks[pack];
     const asset = (name, css = false) => new Promise((resolve, reject) => {
       const node = document.createElement(css ? 'link' : 'script');
-      node[css ? 'href' : 'src'] = new URL('activity-packs/' + name, location.href).href;
+      node[css ? 'href' : 'src'] = new URL('activity-packs/' + (pack === 'sorting' ? BSIT_SORTING_PACK_PATH + '/' : '') + name, location.href).href;
       if (css) node.rel = 'stylesheet';
       node.dataset.activityPack = file;
       node.onload = () => { node.onload = node.onerror = null; resolve(); };
@@ -879,7 +880,6 @@ function OptionalWorkspacePack({ pack, children, ...props }) {
   return <main className="sw-pack-loader" role={status === 'failed' ? 'alert' : 'status'}>{status === 'failed'
     ? 'This activity pack could not load. Reconnect and reload the activity.' : 'Loading ' + label + '…'}</main>;
 }
-function RecursionPackLoader(props) { return <OptionalWorkspacePack pack="recursion" {...props}/>; }
 function SlidingWindowMaximumPackLoader(props) { return <OptionalWorkspacePack pack="sliding" {...props}/>; }
 function PriorityServiceLanePackLoader(props) { return <OptionalWorkspacePack pack="priority" {...props}/>; }
 
@@ -984,6 +984,7 @@ function LockedVisualizer({ release, requestedId }) {
 
 function VisualizerWorkspace({ params, courseId, requestedId }) {
   const RecursionWorkspace = window.BSITRecursionPack?.RecursionWorkspace;
+  const SortingWorkspace = window.BSITSortingPack?.SortingWorkspace;
   const isITCC45 = courseId === 'itcc45';
   const isComputerArchitecture = courseId === 'computer-architecture';
   const isComputerNetworking = courseId === 'computer-networking';
@@ -1027,7 +1028,7 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const motionPreference = useMotionPreference();
   const activeGranularity = isComputerNetworking ? networkGranularity : cpuGranularity;
   const result = useMemo(() => activity.run(inputs, { granularity: isComputerArchitecture || isComputerNetworking ? activeGranularity : 'operation' }), [activity, activeGranularity, inputs, isComputerArchitecture, isComputerNetworking]);
-  const source = useMemo(() => result.outcome === 'error' && activity.renderer === 'python-recursion' ? []
+  const source = useMemo(() => result.outcome === 'error' && activity.renderer?.startsWith('python-') ? []
     : activity.sourceFor ? activity.sourceFor(inputs) : activity.source, [activity, inputs, result.outcome]);
   const event = result.events[playback.index] || result.events[0] || null;
   const previousEvent = playback.index > 0 ? result.events[playback.index - 1] || null : null;
@@ -1048,7 +1049,8 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const isPrinterQueueExecution = workspaceComposition === 'printer-queue-execution';
   const isRoundRobinExecution = workspaceComposition === 'round-robin-execution';
   const isRecursion = workspaceComposition === 'python-recursion';
-  const isPhaseExecution = isRecursion || isStackExecution || isPostfixExecution || isDelimiterExecution || isUndoRedoExecution || isQueueExecution || isPrinterQueueExecution || isRoundRobinExecution;
+  const isSorting = workspaceComposition === 'python-sorting';
+  const isPhaseExecution = isRecursion || isSorting || isStackExecution || isPostfixExecution || isDelimiterExecution || isUndoRedoExecution || isQueueExecution || isPrinterQueueExecution || isRoundRobinExecution;
   const usesContextualControls = activity.input.presentation === 'contextual-toolbar';
   const isCpuDecode = workspaceComposition === 'cpu-decode';
   const [Renderer, setRenderer] = useState(() => activity.renderer === 'object-model' ? ObjectModelRenderer : activity.renderer === 'cpu-datapath' ? CpuDatapathRenderer : activity.renderer === 'cpu-instruction-decode' ? CpuInstructionDecodeRenderer : activity.renderer === 'network-topology' ? NetworkTopologyRenderer : activity.renderer === 'network-foundations' ? NetworkFoundationsRenderer : activity.renderer === 'sequence-comparison' ? SequenceComparisonRenderer : ArrayRenderer);
@@ -1063,8 +1065,14 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
       if (startIndex < 0) startIndex = 0;
       pendingGranularityMap.current = null;
     }
+    if (isSorting) {
+      const current = controller.getSnapshot().currentEvent;
+      if (current?.frame.identity === result.result?.identity) {
+        startIndex = Math.max(0, result.events.findLastIndex(item => item.frame.rawIndex <= current.frame.rawIndex));
+      }
+    }
     controller.load(result.events, startIndex);
-  }, [controller, isComputerArchitecture, isComputerNetworking, result]);
+  }, [controller, isComputerArchitecture, isComputerNetworking, isSorting, result]);
   useEffect(() => { setEvidenceTab(activity.evidenceViews?.[0] || 'trace'); setMobileTab(activity.mobileViews?.[0]?.id || 'visualize'); }, [activity.id, activity.evidenceViews, activity.mobileViews]);
   useEffect(() => () => controller.dispose(), [controller]);
   useEffect(() => {
@@ -1120,12 +1128,13 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
   const previousExample = exampleIndex > 0 ? topicActivities[exampleIndex - 1] : null;
   const nextExample = exampleIndex < topicActivities.length - 1 ? topicActivities[exampleIndex + 1] : null;
   const exampleHref = (item) => item ? `visualizer.html?course=itcc45&activity=${encodeURIComponent(item.id)}` : null;
-  const itcc47ActionHref = isRecursion ? '#recursion-readiness' : activity.traceHandoff === false
+  const itcc47ActionHref = isSorting ? '#sorting-predictions' : isRecursion ? '#recursion-readiness' : activity.traceHandoff === false
     ? ITCC47CurriculumUI.href(`lesson.html?checkpoint=${encodeURIComponent(activity.checkpointId)}`)
     : activity.renderer === 'linear-adt'
       ? ITCC47CurriculumUI.href(`problem-list.html?module=${encodeURIComponent(activity.module)}`)
       : ITCC47CurriculumUI.href(`tracer.html?activity=${encodeURIComponent(activity.id)}`);
-  const itcc47ActionLabel = isRecursion ? 'Trace predictions' : activity.traceHandoff === false ? 'Review mental model' : activity.renderer === 'linear-adt' ? 'Practice this module' : 'Edit pseudocode';
+  const itcc47ActionLabel = isSorting ? 'Predict the next action' : isRecursion ? 'Trace predictions' : activity.traceHandoff === false ? 'Review mental model' : activity.renderer === 'linear-adt' ? 'Practice this module' : 'Edit pseudocode';
+  const pythonPlayback = isRecursion || isSorting ? <IntegratedPlayback activity={activity} state={playback} controller={controller} event={event} motionPreference={motionPreference}/> : null;
   const mobileEvidenceActive = mobileTab === 'trace' || mobileTab === 'steps' || mobileTab === 'more';
   if (activity.id === 'deque-sliding-window') {
     return <LazyMotion features={domMax} strict><MotionConfig reducedMotion={motionPreference.mode === 'on' ? 'never' : 'always'} transition={{ duration }}><SlidingWindowMaximumPackLoader activity={activity} event={event} state={playback} controller={controller} motionPreference={motionPreference} Icon={Icon}/></MotionConfig></LazyMotion>;
@@ -1139,7 +1148,7 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
       <div className={`activity-heading ${usesContextualControls ? 'has-contextual-controls' : ''}`}><div>{!isComputerArchitecture ? <p><a href={isITCC45 || isComputerNetworking ? backHref : ITCC47CurriculumUI.href(backHref)}><Icon name="back" size={14}/>{backLabel}</a><span>{isITCC45 ? `Topic ${activity.module} / ${activity.topic} / Example ${exampleIndex + 1} of ${topicActivities.length}` : `Module ${activity.module} / ${activity.topic}${activity.breadcrumbLabel ? ` / ${activity.breadcrumbLabel}` : activity.exampleKind ? ` / ${activity.exampleKind}` : ''}`}</span></p> : null}<h1>{activity.title}</h1>{isITCC45 ? <span className="activity-learning-goal"><em>{activity.context}</em>{activity.learningGoal}</span> : <span>{activity.subtitle}</span>}{usesContextualControls ? <ContextualScenarioControls activity={activity} inputs={inputs} setInputs={setInputs} controller={controller}/> : null}</div><div className="activity-action-stack">{isITCC45 ? <nav className="activity-example-nav" aria-label="Examples in this topic">{previousExample ? <a href={exampleHref(previousExample)} aria-label={`Previous example: ${previousExample.title}`}><Icon name="back" size={14}/>Previous</a> : <span aria-disabled="true"><Icon name="back" size={14}/>Previous</span>}{nextExample ? <a href={exampleHref(nextExample)} aria-label={`Next example: ${nextExample.title}`}>Next<Icon name="next" size={14}/></a> : <span aria-disabled="true">Next<Icon name="next" size={14}/></span>}</nav> : null}<div className="activity-actions">{isITCC45 ? <OOPDataControls activity={activity} inputs={inputs} setInputs={setInputs}/> : isComputerArchitecture || isComputerNetworking ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : <a className={`edit-code ${usesContextualControls ? 'is-tertiary' : ''}`} href={itcc47ActionHref}><Icon name={activity.traceHandoff === false || activity.renderer === 'linear-adt' ? 'grid' : 'code'} size={17}/>{itcc47ActionLabel}</a>}</div></div></div>
       {!isITCC45 && !isComputerArchitecture && !isComputerNetworking && !usesContextualControls && !isPostfixExecution && !isDelimiterExecution && !isUndoRedoExecution && !isQueueExecution && !isPrinterQueueExecution && !isRoundRobinExecution ? <DataControls activity={activity} inputs={inputs} setInputs={setInputs} onShuffle={shuffle} controller={controller} viewOptions={viewOptions} setViewOptions={setViewOptions}/> : null}
       {!isPhaseExecution ? <div className="mobile-surface-tabs" role="tablist" aria-label="Workspace view">{mobileTabs.map(([id, icon, label]) => <button type="button" role="tab" aria-selected={mobileTab === id} className={mobileTab === id ? 'active' : ''} onClick={() => setMobileTab(id)} key={id}><Icon name={icon}/>{label}</button>)}</div> : null}
-      {isRecursion ? <RecursionWorkspace key={result.result?.identity || activity.id} activity={activity} inputs={inputs} result={result} event={event} controller={controller} playback={<IntegratedPlayback activity={activity} state={playback} controller={controller} event={event} motionPreference={motionPreference}/>}/> : isRoundRobinExecution ? <RoundRobinExecutionWorkspace source={source} event={event} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference}/> : isPrinterQueueExecution ? <PrinterQueueExecutionWorkspace source={source} event={event} previousEvent={previousEvent} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference}/> : isQueueExecution ? <QueueExecutionWorkspace source={source} event={event} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference} compact={usesCompactWorkspace} evidence={<EvidenceDrawer tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/>}/> : isUndoRedoExecution ? <UndoRedoExecutionWorkspace source={source} event={event} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference}/> : isDelimiterExecution ? <DelimiterExecutionWorkspace activity={activity} inputs={inputs} setInputs={setInputs} source={source} event={event} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference}/> : isPostfixExecution ? <PostfixExecutionWorkspace source={source} scenario={activity.scenario} event={event} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference}/> : isStackExecution ? <StackExecutionWorkspace source={source} event={event} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference}/> : isITCC45 ? <ITCC45LabStage activity={activity} event={event} previousEvent={previousEvent} index={playback.index} mobileTab={mobileTab} source={source} layout={workspaceLayout} onRatioChange={(sourceRatio) => updateWorkspaceLayout({ sourceRatio })} duration={objectVisualDuration} motionMode={motionPreference.mode}/> : isComputerArchitecture ? <div className="cpu-workbench">
+      {isSorting ? <SortingWorkspace key={result.result?.identity || activity.id} activity={activity} inputs={inputs} setInputs={setInputs} result={result} event={event} controller={controller} state={playback} playback={pythonPlayback} motionPreference={motionPreference} duration={visualDuration} onEntityComplete={onEntityComplete}/> : isRecursion ? <RecursionWorkspace key={result.result?.identity || activity.id} activity={activity} inputs={inputs} result={result} event={event} controller={controller} playback={pythonPlayback}/> : isRoundRobinExecution ? <RoundRobinExecutionWorkspace source={source} event={event} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference}/> : isPrinterQueueExecution ? <PrinterQueueExecutionWorkspace source={source} event={event} previousEvent={previousEvent} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference}/> : isQueueExecution ? <QueueExecutionWorkspace source={source} event={event} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference} compact={usesCompactWorkspace} evidence={<EvidenceDrawer tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/>}/> : isUndoRedoExecution ? <UndoRedoExecutionWorkspace source={source} event={event} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference}/> : isDelimiterExecution ? <DelimiterExecutionWorkspace activity={activity} inputs={inputs} setInputs={setInputs} source={source} event={event} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference}/> : isPostfixExecution ? <PostfixExecutionWorkspace source={source} scenario={activity.scenario} event={event} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference}/> : isStackExecution ? <StackExecutionWorkspace source={source} event={event} state={playback} controller={controller} duration={visualDuration} Icon={Icon} motionPreference={motionPreference}/> : isITCC45 ? <ITCC45LabStage activity={activity} event={event} previousEvent={previousEvent} index={playback.index} mobileTab={mobileTab} source={source} layout={workspaceLayout} onRatioChange={(sourceRatio) => updateWorkspaceLayout({ sourceRatio })} duration={objectVisualDuration} motionMode={motionPreference.mode}/> : isComputerArchitecture ? <div className="cpu-workbench">
         {isCpuDecode ? <div className={`cpu-auxiliary-surface mobile-surface ${mobileTab === 'fields' ? 'mobile-active' : ''}`}><DecodeFieldsPane frame={cpuFrame} numberFormat={viewOptions.numberFormat}/></div> : <div className={`cpu-memory-surface mobile-surface ${mobileTab === 'memory' ? 'mobile-active' : ''}`}><MainMemoryPane frame={cpuFrame} numberFormat={viewOptions.numberFormat}/></div>}
         <div className="cpu-visual-shell">
           <header className="cpu-canvas-heading"><strong>{isCpuDecode ? 'Instruction decoder' : 'CPU datapath'}</strong><span><b>Operation {cpuFrame?.operation?.index || 1} / {cpuFrame?.operation?.total || 1}</b><em>{cpuFrame?.microStep?.index || 1} / {cpuFrame?.microStep?.total || 1} · {cpuFrame?.microStep?.label || 'Find the source'}</em></span></header>
@@ -1170,7 +1179,7 @@ function VisualizerWorkspace({ params, courseId, requestedId }) {
           <IntegratedPlayback activity={activity} state={playback} controller={controller} event={event} motionPreference={motionPreference}/>
         </div>
       </div>}
-      {isPhaseExecution && !isRecursion && !isPrinterQueueExecution && !isQueueExecution ? <details className="stack-evidence-details"><summary>Learning Evidence · trace, variables, and operation counts</summary><EvidenceDrawer tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/></details> : null}
+      {isPhaseExecution && !isRecursion && !isSorting && !isPrinterQueueExecution && !isQueueExecution ? <details className="stack-evidence-details"><summary>Learning Evidence · trace, variables, and operation counts</summary><EvidenceDrawer tab={evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/></details> : null}
       {usesCompactWorkspace && !isComputerNetworking && !isPhaseExecution && mobileEvidenceActive ? <div className="mobile-evidence mobile-surface mobile-active">
         <EvidenceDrawer tab={mobileTab === 'trace' || mobileTab === 'steps' ? primaryEvidence : evidenceTab} setTab={setEvidenceTab} activity={activity} result={result} event={event} index={playback.index} controller={controller} inputs={inputs} viewOptions={viewOptions} setViewOptions={setViewOptions}/>
       </div> : null}
@@ -1198,8 +1207,9 @@ function App() {
   const defaultActivity = courseId === 'computer-architecture' ? 'architecture-fetch-cycle'
     : courseId === 'computer-networking' ? 'networking-read-classroom-network' : 'itcc45-classes-blueprint';
   const workspace = <VisualizerWorkspace params={params} courseId={courseId} requestedId={requestedActivity || defaultActivity}/>;
-  return courseId === 'itcc47' && BSITLearningLab.getActivity(courseId, requestedActivity)?.renderer === 'python-recursion'
-    ? <RecursionPackLoader>{workspace}</RecursionPackLoader> : workspace;
+  const family = BSITLearningLab.getActivity(courseId, requestedActivity)?.renderer;
+  return courseId === 'itcc47' && ['python-recursion', 'python-sorting'].includes(family)
+    ? <OptionalWorkspacePack pack={family === 'python-recursion' ? 'recursion' : 'sorting'}>{workspace}</OptionalWorkspacePack> : workspace;
 }
 
 const root = document.getElementById('visualizer-root');

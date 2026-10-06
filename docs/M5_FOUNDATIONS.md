@@ -1,11 +1,12 @@
 # M5-A: Python recursion foundations
 
 This milestone adds `recursion-call-stack` and `recursion-return-values`
-beneath the reviewed `m5-recursion` checkpoint. The release now opens
-that checkpoint, including the four Python lessons and matching practice.
-The duplicate-range search, merge-sort placeholders, and legacy pseudocode
-problems retain their IDs and meaning. M5-B extends these foundations in
-[M5_APPLICATIONS.md](M5_APPLICATIONS.md); M5-C and M5-D remain later scope.
+beneath the reviewed `m5-recursion` checkpoint. The version 7 release now opens
+all of Module 5 through `m5-divide-conquer`, including four Python recursion lessons,
+the existing duplicate-range search, two Python sorting lessons and four practice
+problems. Existing search and pseudocode problems retain their IDs and meaning.
+M5-B extends these foundations in [M5_APPLICATIONS.md](M5_APPLICATIONS.md);
+M5-C sorting is described in [M5_SORTING.md](M5_SORTING.md).
 
 ## Source and execution
 

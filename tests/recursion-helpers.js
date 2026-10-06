@@ -11,8 +11,8 @@ const fixture = (program, selection = 3) => fixtures[typeof selection === 'numbe
 async function preview(page) {
   const token = fs.readFileSync(path.join(root, '.instructor-preview-token'), 'utf8').trim();
   await page.addInitScript((capability) => {
-    localStorage.setItem('itcc47.instructor-access:v1', JSON.stringify({ schemaVersion: 1, profileId: 'itcc47-2026-2027-s1', profileVersion: 6, token: capability }));
-    localStorage.setItem('itcc47.release-preview:v1', JSON.stringify({ schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 6, currentCheckpointId: 'm5-recursion' }));
+    localStorage.setItem('itcc47.instructor-access:v1', JSON.stringify({ schemaVersion: 1, profileId: 'itcc47-2026-2027-s1', profileVersion: 7, token: capability }));
+    localStorage.setItem('itcc47.release-preview:v1', JSON.stringify({ schemaVersion: 2, profileId: 'itcc47-2026-2027-s1', profileVersion: 7, currentCheckpointId: 'm5-recursion' }));
   }, token);
 }
 async function open(page, id) {

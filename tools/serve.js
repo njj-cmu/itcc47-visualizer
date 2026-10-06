@@ -13,6 +13,12 @@ const TYPES = {
 
 http.createServer((request, response) => {
   const pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname);
+  // Browsers request this optional icon even when no page declares one. Keep
+  // that automatic request from adding noise to application console checks.
+  if (pathname === '/favicon.ico') {
+    response.writeHead(204).end();
+    return;
+  }
   const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
   const target = path.resolve(ROOT, relative);
   if (target !== ROOT && !target.startsWith(ROOT + path.sep)) {

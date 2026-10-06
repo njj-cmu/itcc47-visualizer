@@ -136,10 +136,10 @@
       "prerequisiteIds": ["m4-queue-deque"], "sequence": ["activity:recursion-call-stack", "activity:recursion-return-values", "activity:recursion-list-total", "activity:recursion-folder-total", "activity:recursive-range-search", "problem:recursive-sum", "problem:recursive-binary-range"]
     },
     {
-      "id": "m5-divide-conquer", "moduleId": "m5", "order": 180, "reviewStatus": "draft", "title": "Divide-and-conquer and merge sort",
-      "summary": "Split a range, solve smaller ranges, and merge stable results.",
-      "goals": ["Trace a recursion tree", "Maintain stable merge order", "Connect work to O(n log n)"],
-      "prerequisiteIds": ["m5-recursion"], "sequence": ["activity:stable-merge-sort"]
+      "id": "m5-divide-conquer", "moduleId": "m5", "order": 180, "reviewStatus": "reviewed", "title": "Merge Sort and Lomuto Quicksort",
+      "summary": "Merge returned runs or partition one shared list, then follow each algorithm's recursive order.",
+      "goals": ["Trace stable merges and Lomuto partitions", "Distinguish returned runs from in-place changes", "Explain balanced and worst-case work"],
+      "prerequisiteIds": ["m5-recursion"], "sequence": ["activity:stable-merge-sort", "activity:quick-sort", "problem:merge-two-sorted", "problem:merge-sort-count"]
     },
     {
       "id": "m6-trees", "moduleId": "m6", "order": 190, "reviewStatus": "draft", "title": "Trees and traversals",
@@ -217,6 +217,7 @@
     { "kind": "activity", "id": "recursion-folder-total", "checkpointId": "m5-recursion", "title": "M5.4 — Synthetic folder total" },
     { "kind": "activity", "id": "recursive-range-search", "checkpointId": "m5-recursion" },
     { "kind": "activity", "id": "stable-merge-sort", "checkpointId": "m5-divide-conquer" },
+    { "kind": "activity", "id": "quick-sort", "checkpointId": "m5-divide-conquer" },
     { "kind": "activity", "id": "tree-traversals", "checkpointId": "m6-trees" },
     { "kind": "activity", "id": "bst-insert-search", "checkpointId": "m6-bst" },
     { "kind": "activity", "id": "bst-height-shape", "checkpointId": "m6-bst" },

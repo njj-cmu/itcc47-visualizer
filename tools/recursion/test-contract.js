@@ -75,8 +75,9 @@ module.exports = function testRecursion({ ok, section, load, root }) {
     ok('Stopped and unknown states never imply receiving a result: ' + outcome, view.mode === 'stopped' && view.returnOrigin === null);
   }
   const ids = ['recursion-call-stack', 'recursion-return-values'];
-  ok('M5 catalog IDs are unique and preserve both legacy placeholders', new Set(Activities.list().map(a => a.id)).size === Activities.list().length &&
-    Activities.get('recursive-range-search').engine === 'curated-concept' && Activities.get('stable-merge-sort').engine === 'curated-concept');
+  ok('M5 catalog IDs remain unique; recursive search is preserved and both sorting routes use the verified engine', new Set(Activities.list().map(a => a.id)).size === Activities.list().length &&
+    Activities.get('recursive-range-search').engine === 'curated-concept' && ['stable-merge-sort', 'quick-sort'].every(id =>
+      Activities.get(id).engine === 'verified-python-fixture' && Activities.get(id).renderer === 'python-sorting' && Activities.get(id).reviewStatus === 'reviewed'));
   for (const id of ids) {
     const activity = Activities.get(id);
     ok(id + ': explicit Python contract, version and reviewed parent', activity.language === 'python' && activity.traceHandoff === false &&
@@ -131,7 +132,7 @@ module.exports = function testRecursion({ ok, section, load, root }) {
   const cp = curriculum.checkpoints.find(c => c.id === 'm5-recursion');
   ok('M5 release opens the reviewed lessons, search and matching practice in sequence', cp.reviewStatus === 'reviewed' &&
     cp.sequence.join(',') === 'activity:recursion-call-stack,activity:recursion-return-values,activity:recursion-list-total,activity:recursion-folder-total,activity:recursive-range-search,problem:recursive-sum,problem:recursive-binary-range');
-  ok('M5 release stops at recursion', fs.readFileSync(path.join(root, 'release-profile.js'), 'utf8').includes("currentCheckpointId: 'm5-recursion'") && curriculum.checkpoints.find(c => c.id === 'm5-divide-conquer').reviewStatus === 'draft');
+  ok('M5 release includes sorting while Modules 6-8 remain draft', fs.readFileSync(path.join(root, 'release-profile.js'), 'utf8').includes("currentCheckpointId: 'm5-divide-conquer'") && curriculum.checkpoints.find(c => c.id === 'm5-divide-conquer').reviewStatus === 'reviewed' && curriculum.checkpoints.filter(c => ['m6','m7','m8'].includes(c.moduleId)).every(c => c.reviewStatus === 'draft'));
   ok('M5 saved pseudocode draft contract is not migrated', fs.readFileSync(path.join(root, 'future-problems.js'), 'utf8').includes("'recursive-sum','Recursive range sum'"));
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'activity-packs/recursion-foundations-manifest.json'), 'utf8'));
   const bytes = manifest.files.reduce((sum, file) => sum + fs.statSync(path.join(root, file)).size, 0);

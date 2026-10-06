@@ -1,0 +1,746 @@
+{
+  "kind": "proposed-bounded-teaching-fixtures",
+  "schemaVersion": 1,
+  "fullModeDefault": "default",
+  "uiLimit": 8,
+  "referenceTestLimit": 12,
+  "integerRange": [
+    -1000,
+    1000
+  ],
+  "algorithms": {
+    "stable-merge-sort": "merge_sort.py",
+    "quick-sort": "quicksort.py"
+  },
+  "notes": [
+    "Only the small declared inputs need bundled production traces; exhaustive QA cases need not all ship.",
+    "Expected metrics are specific to the exact canonical code. Swaps=distinct-position exchanges.",
+    "Full Quicksort returns None and mutates its argument. Merge Sort returns a list and leaves its argument unchanged.",
+    "This registry is input/output evidence, not an existing repository schema."
+  ],
+  "fullSortFixtures": [
+    {
+      "id": "default",
+      "label": "Eight values",
+      "values": [
+        8,
+        3,
+        1,
+        7,
+        0,
+        10,
+        2,
+        5
+      ],
+      "expectedSorted": [
+        0,
+        1,
+        2,
+        3,
+        5,
+        7,
+        8,
+        10
+      ],
+      "default": true,
+      "modes": [
+        "merge-full",
+        "quick-full"
+      ],
+      "metrics": {
+        "merge_sort": {
+          "keyComparisons": 17,
+          "resultAppends": 24,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 15,
+          "helperCalls": 7,
+          "peakFunctionDepth": 4,
+          "peakSortDepth": 4
+        },
+        "quicksort": {
+          "keyComparisons": 13,
+          "resultAppends": 0,
+          "swapStatements": 11,
+          "selfSwaps": 0,
+          "exchanges": 11,
+          "sortCalls": 9,
+          "helperCalls": 4,
+          "peakFunctionDepth": 4,
+          "peakSortDepth": 4
+        }
+      }
+    },
+    {
+      "id": "small",
+      "label": "Four values",
+      "values": [
+        4,
+        1,
+        3,
+        2
+      ],
+      "expectedSorted": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "default": false,
+      "modes": [
+        "merge-full",
+        "quick-full"
+      ],
+      "metrics": {
+        "merge_sort": {
+          "keyComparisons": 5,
+          "resultAppends": 8,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 7,
+          "helperCalls": 3,
+          "peakFunctionDepth": 3,
+          "peakSortDepth": 3
+        },
+        "quicksort": {
+          "keyComparisons": 4,
+          "resultAppends": 0,
+          "swapStatements": 4,
+          "selfSwaps": 2,
+          "exchanges": 2,
+          "sortCalls": 5,
+          "helperCalls": 2,
+          "peakFunctionDepth": 3,
+          "peakSortDepth": 3
+        }
+      }
+    },
+    {
+      "id": "empty",
+      "label": "Empty list",
+      "values": [],
+      "expectedSorted": [],
+      "default": false,
+      "modes": [
+        "merge-full",
+        "quick-full"
+      ],
+      "metrics": {
+        "merge_sort": {
+          "keyComparisons": 0,
+          "resultAppends": 0,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 1,
+          "helperCalls": 0,
+          "peakFunctionDepth": 1,
+          "peakSortDepth": 1
+        },
+        "quicksort": {
+          "keyComparisons": 0,
+          "resultAppends": 0,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 1,
+          "helperCalls": 0,
+          "peakFunctionDepth": 1,
+          "peakSortDepth": 1
+        }
+      }
+    },
+    {
+      "id": "single",
+      "label": "One value",
+      "values": [
+        7
+      ],
+      "expectedSorted": [
+        7
+      ],
+      "default": false,
+      "modes": [
+        "merge-full",
+        "quick-full"
+      ],
+      "metrics": {
+        "merge_sort": {
+          "keyComparisons": 0,
+          "resultAppends": 0,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 1,
+          "helperCalls": 0,
+          "peakFunctionDepth": 1,
+          "peakSortDepth": 1
+        },
+        "quicksort": {
+          "keyComparisons": 0,
+          "resultAppends": 0,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 1,
+          "helperCalls": 0,
+          "peakFunctionDepth": 1,
+          "peakSortDepth": 1
+        }
+      }
+    },
+    {
+      "id": "pair",
+      "label": "Two values",
+      "values": [
+        2,
+        1
+      ],
+      "expectedSorted": [
+        1,
+        2
+      ],
+      "default": false,
+      "modes": [
+        "merge-full",
+        "quick-full"
+      ],
+      "metrics": {
+        "merge_sort": {
+          "keyComparisons": 1,
+          "resultAppends": 2,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 3,
+          "helperCalls": 1,
+          "peakFunctionDepth": 2,
+          "peakSortDepth": 2
+        },
+        "quicksort": {
+          "keyComparisons": 1,
+          "resultAppends": 0,
+          "swapStatements": 1,
+          "selfSwaps": 0,
+          "exchanges": 1,
+          "sortCalls": 3,
+          "helperCalls": 1,
+          "peakFunctionDepth": 2,
+          "peakSortDepth": 2
+        }
+      }
+    },
+    {
+      "id": "odd",
+      "label": "Odd length",
+      "values": [
+        7,
+        2,
+        9,
+        1,
+        5
+      ],
+      "expectedSorted": [
+        1,
+        2,
+        5,
+        7,
+        9
+      ],
+      "default": false,
+      "modes": [
+        "merge-full",
+        "quick-full"
+      ],
+      "metrics": {
+        "merge_sort": {
+          "keyComparisons": 8,
+          "resultAppends": 12,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 9,
+          "helperCalls": 4,
+          "peakFunctionDepth": 4,
+          "peakSortDepth": 4
+        },
+        "quicksort": {
+          "keyComparisons": 6,
+          "resultAppends": 0,
+          "swapStatements": 6,
+          "selfSwaps": 2,
+          "exchanges": 4,
+          "sortCalls": 7,
+          "helperCalls": 3,
+          "peakFunctionDepth": 3,
+          "peakSortDepth": 3
+        }
+      }
+    },
+    {
+      "id": "negative",
+      "label": "Negative and duplicate values",
+      "values": [
+        3,
+        -2,
+        0,
+        -2,
+        1
+      ],
+      "expectedSorted": [
+        -2,
+        -2,
+        0,
+        1,
+        3
+      ],
+      "default": false,
+      "modes": [
+        "merge-full",
+        "quick-full"
+      ],
+      "metrics": {
+        "merge_sort": {
+          "keyComparisons": 8,
+          "resultAppends": 12,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 9,
+          "helperCalls": 4,
+          "peakFunctionDepth": 4,
+          "peakSortDepth": 4
+        },
+        "quicksort": {
+          "keyComparisons": 6,
+          "resultAppends": 0,
+          "swapStatements": 6,
+          "selfSwaps": 1,
+          "exchanges": 5,
+          "sortCalls": 5,
+          "helperCalls": 2,
+          "peakFunctionDepth": 3,
+          "peakSortDepth": 3
+        }
+      }
+    },
+    {
+      "id": "ties",
+      "label": "Equal-key identity",
+      "values": [
+        2,
+        2,
+        1
+      ],
+      "expectedSorted": [
+        1,
+        2,
+        2
+      ],
+      "default": false,
+      "modes": [
+        "merge-full",
+        "quick-full"
+      ],
+      "metrics": {
+        "merge_sort": {
+          "keyComparisons": 3,
+          "resultAppends": 5,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 5,
+          "helperCalls": 2,
+          "peakFunctionDepth": 3,
+          "peakSortDepth": 3
+        },
+        "quicksort": {
+          "keyComparisons": 3,
+          "resultAppends": 0,
+          "swapStatements": 3,
+          "selfSwaps": 2,
+          "exchanges": 1,
+          "sortCalls": 5,
+          "helperCalls": 2,
+          "peakFunctionDepth": 3,
+          "peakSortDepth": 3
+        }
+      },
+      "occurrenceLabels": [
+        "A",
+        "B",
+        "C"
+      ],
+      "expectedMergeLabels": [
+        "C",
+        "A",
+        "B"
+      ],
+      "expectedQuickLabels": [
+        "C",
+        "B",
+        "A"
+      ],
+      "comparisonKey": "numeric value only; labels are provenance"
+    },
+    {
+      "id": "all-equal",
+      "label": "Four equal values",
+      "values": [
+        4,
+        4,
+        4,
+        4
+      ],
+      "expectedSorted": [
+        4,
+        4,
+        4,
+        4
+      ],
+      "default": false,
+      "modes": [
+        "merge-full",
+        "quick-full"
+      ],
+      "metrics": {
+        "merge_sort": {
+          "keyComparisons": 4,
+          "resultAppends": 8,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 7,
+          "helperCalls": 3,
+          "peakFunctionDepth": 3,
+          "peakSortDepth": 3
+        },
+        "quicksort": {
+          "keyComparisons": 6,
+          "resultAppends": 0,
+          "swapStatements": 9,
+          "selfSwaps": 9,
+          "exchanges": 0,
+          "sortCalls": 7,
+          "helperCalls": 3,
+          "peakFunctionDepth": 4,
+          "peakSortDepth": 4
+        }
+      }
+    },
+    {
+      "id": "all-equal-eight",
+      "label": "Eight equal values",
+      "values": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "expectedSorted": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "default": false,
+      "modes": [
+        "merge-full",
+        "quick-full"
+      ],
+      "metrics": {
+        "merge_sort": {
+          "keyComparisons": 12,
+          "resultAppends": 24,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 15,
+          "helperCalls": 7,
+          "peakFunctionDepth": 4,
+          "peakSortDepth": 4
+        },
+        "quicksort": {
+          "keyComparisons": 28,
+          "resultAppends": 0,
+          "swapStatements": 35,
+          "selfSwaps": 35,
+          "exchanges": 0,
+          "sortCalls": 15,
+          "helperCalls": 7,
+          "peakFunctionDepth": 8,
+          "peakSortDepth": 8
+        }
+      }
+    },
+    {
+      "id": "sorted",
+      "label": "Already sorted",
+      "values": [
+        0,
+        1,
+        2,
+        3,
+        5,
+        7,
+        8,
+        10
+      ],
+      "expectedSorted": [
+        0,
+        1,
+        2,
+        3,
+        5,
+        7,
+        8,
+        10
+      ],
+      "default": false,
+      "modes": [
+        "merge-full",
+        "quick-full"
+      ],
+      "metrics": {
+        "merge_sort": {
+          "keyComparisons": 12,
+          "resultAppends": 24,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 15,
+          "helperCalls": 7,
+          "peakFunctionDepth": 4,
+          "peakSortDepth": 4
+        },
+        "quicksort": {
+          "keyComparisons": 28,
+          "resultAppends": 0,
+          "swapStatements": 35,
+          "selfSwaps": 35,
+          "exchanges": 0,
+          "sortCalls": 15,
+          "helperCalls": 7,
+          "peakFunctionDepth": 8,
+          "peakSortDepth": 8
+        }
+      }
+    },
+    {
+      "id": "reverse",
+      "label": "Reverse sorted",
+      "values": [
+        10,
+        8,
+        7,
+        5,
+        3,
+        2,
+        1,
+        0
+      ],
+      "expectedSorted": [
+        0,
+        1,
+        2,
+        3,
+        5,
+        7,
+        8,
+        10
+      ],
+      "default": false,
+      "modes": [
+        "merge-full",
+        "quick-full"
+      ],
+      "metrics": {
+        "merge_sort": {
+          "keyComparisons": 12,
+          "resultAppends": 24,
+          "swapStatements": 0,
+          "selfSwaps": 0,
+          "exchanges": 0,
+          "sortCalls": 15,
+          "helperCalls": 7,
+          "peakFunctionDepth": 4,
+          "peakSortDepth": 4
+        },
+        "quicksort": {
+          "keyComparisons": 28,
+          "resultAppends": 0,
+          "swapStatements": 19,
+          "selfSwaps": 15,
+          "exchanges": 4,
+          "sortCalls": 15,
+          "helperCalls": 7,
+          "peakFunctionDepth": 8,
+          "peakSortDepth": 8
+        }
+      }
+    }
+  ],
+  "mergeHelperFixtures": [
+    {
+      "id": "root-pair",
+      "left": [
+        1,
+        3,
+        7,
+        8
+      ],
+      "right": [
+        0,
+        2,
+        5,
+        10
+      ],
+      "expected": [
+        0,
+        1,
+        2,
+        3,
+        5,
+        7,
+        8,
+        10
+      ],
+      "default": true
+    },
+    {
+      "id": "left-empty",
+      "left": [],
+      "right": [
+        1,
+        3
+      ],
+      "expected": [
+        1,
+        3
+      ]
+    },
+    {
+      "id": "right-empty",
+      "left": [
+        2,
+        4
+      ],
+      "right": [],
+      "expected": [
+        2,
+        4
+      ]
+    },
+    {
+      "id": "both-empty",
+      "left": [],
+      "right": [],
+      "expected": []
+    },
+    {
+      "id": "equal-heads",
+      "left": [
+        2
+      ],
+      "right": [
+        2
+      ],
+      "expected": [
+        2,
+        2
+      ],
+      "expectedProvenance": [
+        "left-0",
+        "right-0"
+      ]
+    }
+  ],
+  "partitionHelperFixtures": [
+    {
+      "id": "root-partition",
+      "values": [
+        8,
+        3,
+        1,
+        7,
+        0,
+        10,
+        2,
+        5
+      ],
+      "low": 0,
+      "high": 7,
+      "expectedArray": [
+        3,
+        1,
+        0,
+        2,
+        5,
+        10,
+        7,
+        8
+      ],
+      "expectedPivotIndex": 4,
+      "default": true
+    },
+    {
+      "id": "self-swaps",
+      "values": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "low": 0,
+      "high": 3,
+      "expectedArray": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "expectedPivotIndex": 3
+    },
+    {
+      "id": "partial",
+      "values": [
+        99,
+        4,
+        1,
+        3,
+        2,
+        -99
+      ],
+      "low": 1,
+      "high": 4,
+      "expectedArray": [
+        99,
+        1,
+        2,
+        3,
+        4,
+        -99
+      ],
+      "expectedPivotIndex": 2
+    }
+  ],
+  "rejectBeforeExecution": [
+    "booleans",
+    "floats",
+    "out-of-bounds fixture size/value",
+    "unsorted merge-helper inputs",
+    "empty partition-helper range",
+    "unknown fixture/mode",
+    "unsupported Python source"
+  ]
+}

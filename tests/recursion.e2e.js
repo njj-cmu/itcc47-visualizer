@@ -220,7 +220,7 @@ test('M5 routes still lock before pack loading under an earlier release profile'
     const page = await publicContext.newPage();
     await page.route('**/release-profile.js', async route => {
       const response = await route.fetch();
-      await route.fulfill({ response, body: (await response.text()).replace("currentCheckpointId: 'm5-recursion'", "currentCheckpointId: 'm4-queue-deque'") });
+      await route.fulfill({ response, body: (await response.text()).replace(/currentCheckpointId:\s*'[^']+'/, "currentCheckpointId: 'm4-queue-deque'") });
     });
     const packs = [];
     page.on('request', request => { if (request.url().includes('/activity-packs/recursion')) packs.push(request.url()); });
@@ -299,7 +299,7 @@ test('M5 released search and practice open while saved drafts and later locks su
     page.on('pageerror', error => errors.push(error.message));
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
     await page.goto('/problems.html?bank=5');
-    await expect(page.locator('[data-bank-module="5"] .module-problem-card')).toHaveCount(2);
+    await expect(page.locator('[data-bank-module="5"] .module-problem-card')).toHaveCount(4);
     await expect(page.locator('.draft-preview-indicator')).toHaveCount(0);
     await captureRelease(page, 'm5-release-practice-bank', info);
     await page.evaluate(() => localStorage.setItem('itcc47.practice-records:v2', JSON.stringify({
@@ -308,7 +308,7 @@ test('M5 released search and practice open while saved drafts and later locks su
     await page.goto('/practice.html?module=5&problem=recursive-sum');
     if (info.project.name === 'phone') await page.getByRole('tab', { name: 'Code', exact: true }).click();
     await expect(page.locator('#code-box')).toHaveValue('READ n\nWRITE n');
-    for (const id of ['recursive-sum', 'recursive-binary-range']) {
+    for (const id of ['recursive-sum', 'recursive-binary-range', 'merge-two-sorted', 'merge-sort-count']) {
       await page.goto('/practice.html?module=5&problem=' + id);
       await expect(page.locator('.curriculum-lock, .draft-preview-indicator')).toHaveCount(0);
       if (info.project.name === 'phone') await page.getByRole('tab', { name: 'Code', exact: true }).click();
@@ -320,7 +320,7 @@ test('M5 released search and practice open while saved drafts and later locks su
     await expect(page.locator('.concept-domain')).toBeVisible();
     await page.getByRole('button', { name: 'Step', exact: true }).click();
     await expect(page.locator('.curriculum-lock, .draft-preview-indicator')).toHaveCount(0);
-    for (const route of ['visualizer.html?activity=stable-merge-sort', 'practice.html?module=5&problem=merge-two-sorted', 'practice.html?module=6&problem=bst-insert-order']) {
+    for (const route of ['visualizer.html?activity=tree-traversals', 'practice.html?module=6&problem=bst-insert-order', 'practice.html?module=7&problem=graph-degree', 'practice.html?module=8&problem=greedy-coin-count']) {
       await page.goto('/' + route + '&preview=1');
       await expect(page.locator('.curriculum-lock')).toBeVisible();
       await expect(page.locator('#code-box, .source-panel')).toHaveCount(0);

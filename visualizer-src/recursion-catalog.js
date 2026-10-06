@@ -1,3 +1,4 @@
+import './sorting-catalog.js';
 /* Reviewed Python lessons released together at the recursion checkpoint. */
 (() => {
   const specifications = [

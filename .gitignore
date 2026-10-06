@@ -29,5 +29,6 @@ node_modules/
 .visualizer-build/
 .recursion-pack-build/
 .recursion-catalog-build/
+.sorting-pack-build/
 playwright-report/
 test-results/

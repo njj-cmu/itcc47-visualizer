@@ -66,7 +66,7 @@ function validate(data) {
 
 function validateRelease(data, profile) {
   const failures = [];
-  if (!profile || profile.schemaVersion !== 2 || profile.profileVersion !== 6) failures.push('release profile schemaVersion 2 and profileVersion 6 are required');
+  if (!profile || profile.schemaVersion !== 2 || profile.profileVersion !== 7) failures.push('release profile schemaVersion 2 and profileVersion 7 are required');
   if ('finalProjectId' in (profile || {})) failures.push('finalProjectId is not supported by the practice-only release profile');
   const checkpoints = new Map(data.checkpoints.map((item) => [item.id, item]));
   const current = checkpoints.get(profile?.currentCheckpointId);
@@ -84,13 +84,22 @@ function validateRelease(data, profile) {
   return profile;
 }
 
+// Keep generated metadata compact without dropping fields or changing values.
+// This emits JavaScript (the delivery format), not a second JSON format.
+function javascriptLiteral(value) {
+  if (Array.isArray(value)) return '[' + value.map(javascriptLiteral).join(',') + ']';
+  if (value && typeof value === 'object') return '{' + Object.entries(value).map(([key, entry]) =>
+    (key === '__proto__' ? '["__proto__"]' : /^[A-Za-z_$][\w$]*$/.test(key) ? key : JSON.stringify(key)) + ':' + javascriptLiteral(entry)).join(',') + '}';
+  return JSON.stringify(value);
+}
+
 function build() {
   const data = validate(JSON.parse(fs.readFileSync(SOURCE, 'utf8')));
   validateRelease(data, readReleaseProfile());
   const banner = '/* GENERATED FILE — edit curriculum.public.json, then run node tools/build-curriculum.js. */';
-  fs.writeFileSync(OUTPUT, `${banner}\nconst ITCC47_CURRICULUM_DATA = ${JSON.stringify(data)};\n`, 'utf8');
+  fs.writeFileSync(OUTPUT, `${banner}\nconst ITCC47_CURRICULUM_DATA = ${javascriptLiteral(data)};\n`, 'utf8');
   console.log(`Built curriculum.data.js (${data.checkpoints.length} checkpoints, ${data.resources.length} resources)`);
 }
 
 if (require.main === module) build();
-module.exports = { validate, validateRelease, readReleaseProfile, build };
+module.exports = { validate, validateRelease, readReleaseProfile, build, javascriptLiteral };
